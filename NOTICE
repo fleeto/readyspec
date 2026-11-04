@@ -1,0 +1,33 @@
+ReadySpec
+Copyright 2026 ReadySpec Contributors
+
+===============================================================================
+Third-Party Open Source Notices & License Summary
+===============================================================================
+
+ReadySpec is built exclusively on permissive open-source licenses
+(MIT / BSD / Apache-2.0) and intentionally excludes GPL/AGPL runtime libraries
+(such as ansible-core). Ansible INI/YAML inventory formats are parsed via
+ReadySpec's clean-room native Python parser.
+
+1. Goss (v0.4.9 — Locked Unmodified Target Inspection Binary Specification)
+   - Project URL: https://github.com/goss-org/goss
+   - Copyright: Copyright (c) 2015 Goss Contributors / Ahmed Elsabbahy
+   - License: Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+   - Usage: ReadySpec compiles check instances into Goss YAML manifests and
+     invokes the unmodified official Goss v0.4.9 binary as an isolated child
+     process when running in real OpenSSH target mode.
+
+2. OpenSSH Client (System Binary)
+   - Project URL: https://www.openssh.com/
+   - License: BSD-style Permissive License
+   - Usage: Invoked as an external OS process for SSH transport.
+
+3. Python Runtime Libraries (Permissive MIT / BSD)
+   - Textual (https://github.com/Textualize/textual) — MIT License
+   - Rich (https://github.com/Textualize/rich) — MIT License
+   - Typer (https://github.com/fastapi/typer) — MIT License
+   - Pydantic v2 (https://github.com/pydantic/pydantic) — MIT License
+   - jsonschema (https://github.com/python-jsonschema/jsonschema) — MIT License
+   - rfc8785 (https://github.com/trailofbits/rfc8785.py) — Apache-2.0 / MIT
+   - PyYAML (https://github.com/yaml/pyyaml) — MIT License

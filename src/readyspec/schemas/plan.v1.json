@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readyspec.dev/schemas/plan.v1.json",
+  "title": "ReadySpec Plan Document v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "name", "version", "state", "roles"],
+  "properties": {
+    "schema_version": { "const": "readyspec.plan/v1" },
+    "plan_id": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "minLength": 1, "maxLength": 128 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "software_name": { "type": "string", "maxLength": 200 },
+    "software_version": { "type": "string", "maxLength": 100 },
+    "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "state": { "enum": ["DRAFT", "VALIDATED", "TRIAL_SNAPSHOT", "RELEASED", "RETIRED"] },
+    "description": { "type": "string", "maxLength": 2000 },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_os": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "allowed_arch": {
+          "type": "array",
+          "items": { "enum": ["x86_64", "aarch64"] }
+        }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role_id", "name", "instances"],
+        "properties": {
+          "role_id": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "minLength": 1, "maxLength": 64 },
+          "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "min_nodes": { "type": "integer", "minimum": 0 },
+          "max_nodes": { "type": ["integer", "null"], "minimum": 1 },
+          "allow_colocation": { "type": "boolean" },
+          "instances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["instance_id", "template_id", "template_version", "importance", "enabled"],
+              "properties": {
+                "instance_id": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "minLength": 1, "maxLength": 80 },
+                "title": { "type": "string", "maxLength": 200 },
+                "template_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+                "template_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+                "template_digest": { "type": ["string", "null"] },
+                "importance": { "enum": ["REQUIRED", "WARNING", "INFO"] },
+                "enabled": { "type": "boolean" },
+                "params": { "type": "object" },
+                "explicit_null_params": { "type": "array", "items": { "type": "string" } },
+                "overridable_params": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "embedded_templates": { "type": "array", "items": { "type": "object" } },
+    "template_lock": { "type": "object", "additionalProperties": { "type": "string" } },
+    "release_manifest": { "type": ["object", "null"] },
+    "digest": { "type": ["string", "null"] },
+    "updated_at": { "type": ["string", "null"] }
+  }
+}

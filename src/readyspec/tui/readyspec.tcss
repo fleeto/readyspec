@@ -1,0 +1,371 @@
+/* ReadySpec V1 4-Act TUI Stylesheet */
+
+Screen {
+    background: $surface;
+    color: $text;
+}
+
+#top-bar {
+    dock: top;
+    height: 3;
+    background: $panel;
+    border-bottom: solid $primary;
+    padding: 0 1;
+    layout: horizontal;
+    align: left middle;
+}
+
+#brand-label {
+    width: auto;
+    text-style: bold;
+    color: $accent;
+    margin-right: 2;
+}
+
+.nav-btn {
+    min-width: 14;
+    margin-right: 1;
+}
+
+.nav-active {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+#top-spacer {
+    width: 1fr;
+}
+
+#sim-badge {
+    width: auto;
+    color: $warning;
+    margin-right: 2;
+}
+
+#cleanup-badge {
+    min-width: 14;
+}
+
+.cleanup-alert {
+    background: $error;
+    color: $text;
+    text-style: bold;
+}
+
+#main-switcher {
+    height: 1fr;
+    width: 1fr;
+}
+
+/* Act 1: Home View */
+#view-home {
+    padding: 1 2;
+    height: 1fr;
+    overflow-y: auto;
+}
+
+#home-cards-row {
+    layout: horizontal;
+    height: auto;
+    margin-bottom: 1;
+}
+
+.role-entry-card {
+    width: 1fr;
+    height: auto;
+    border: round $primary;
+    padding: 1 2;
+    margin-right: 1;
+    background: $panel;
+}
+
+.card-title {
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 1;
+}
+
+.card-btn-row {
+    layout: horizontal;
+    height: auto;
+    margin-top: 1;
+}
+
+.card-btn-row Button {
+    margin-right: 1;
+}
+
+#home-recent-box {
+    height: 1fr;
+    min-height: 10;
+    border: round $secondary;
+    padding: 0 1;
+}
+
+/* Act 2: Responsive Workbench */
+#view-workbench {
+    height: 1fr;
+    padding: 0 1;
+    layout: vertical;
+}
+
+#wb-header {
+    height: 3;
+    layout: horizontal;
+    align: left middle;
+    background: $boost;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+#wb-plan-summary {
+    width: 1fr;
+    text-style: bold;
+}
+
+#wb-header Button {
+    margin-left: 1;
+}
+
+#wb-diag-bar {
+    height: auto;
+    max-height: 3;
+    padding: 0 1;
+    background: $panel;
+    color: $warning;
+}
+
+#wb-columns {
+    height: 1fr;
+    layout: horizontal;
+}
+
+.wb-col {
+    height: 1fr;
+    border: round $primary-muted;
+    padding: 0 1;
+    margin-right: 1;
+    overflow-y: auto;
+}
+
+#wb-col-roles {
+    width: 26%;
+    min-width: 24;
+}
+
+#wb-col-instances {
+    width: 42%;
+    min-width: 32;
+}
+
+#wb-col-params {
+    width: 32%;
+    min-width: 28;
+    margin-right: 0;
+}
+
+.hidden-pane {
+    display: none;
+}
+
+.full-pane {
+    width: 1fr !important;
+    margin-right: 0 !important;
+}
+
+.half-pane {
+    width: 1fr !important;
+}
+
+.col-header {
+    text-style: bold;
+    color: $accent;
+    margin: 1 0;
+}
+
+.toolbar-row {
+    layout: horizontal;
+    height: auto;
+    margin: 1 0;
+}
+
+.toolbar-row Button {
+    margin-right: 1;
+    min-width: 8;
+}
+
+.param-field-box {
+    height: auto;
+    border-bottom: dashed $panel-lighten-2;
+    padding-bottom: 1;
+    margin-bottom: 1;
+}
+
+/* Act 3 & Act 4: Run Wizard + Live Board + Report */
+#view-run-report {
+    height: 1fr;
+    padding: 0 1;
+    layout: vertical;
+}
+
+#rr-subbar {
+    height: 3;
+    layout: horizontal;
+    align: left middle;
+    background: $boost;
+    padding: 0 1;
+}
+
+#rr-subbar Button {
+    margin-right: 1;
+}
+
+#wizard-container {
+    height: 1fr;
+    padding: 1;
+    overflow-y: auto;
+}
+
+.step-box {
+    border: round $primary;
+    padding: 1 2;
+    height: auto;
+    margin-bottom: 1;
+    background: $panel;
+}
+
+#inv-textarea {
+    height: 8;
+    margin: 1 0;
+}
+
+#live-board-box {
+    border: round $accent;
+    padding: 1;
+    height: 1fr;
+}
+
+#report-container {
+    height: 1fr;
+    layout: vertical;
+    padding-top: 1;
+}
+
+#report-banner {
+    height: auto;
+    padding: 1;
+    border: heavy $primary;
+    background: $panel;
+    margin-bottom: 1;
+}
+
+.banner-ready {
+    border: heavy $success !important;
+}
+
+.banner-not-ready {
+    border: heavy $error !important;
+}
+
+.banner-unknown {
+    border: heavy $warning !important;
+}
+
+#report-main-split {
+    height: 1fr;
+    layout: horizontal;
+}
+
+#report-table-pane {
+    width: 60%;
+    height: 1fr;
+    border: round $primary-muted;
+    margin-right: 1;
+}
+
+#report-evidence-pane {
+    width: 40%;
+    height: 1fr;
+    border: round $secondary;
+    padding: 1;
+    overflow-y: auto;
+}
+
+/* Act 4 System: Catalog + Recovery */
+#view-system {
+    height: 1fr;
+    padding: 0 1;
+    layout: vertical;
+}
+
+#sys-split {
+    height: 1fr;
+    layout: horizontal;
+}
+
+#sys-catalog-pane {
+    width: 58%;
+    height: 1fr;
+    border: round $primary;
+    padding: 0 1;
+    margin-right: 1;
+}
+
+#sys-cleanup-pane {
+    width: 42%;
+    height: 1fr;
+    border: round $warning;
+    padding: 0 1;
+}
+
+/* Modals */
+.modal-dialog {
+    width: 88%;
+    max-width: 120;
+    height: 86%;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+.modal-compact {
+    width: 72;
+    height: auto;
+    max-height: 85%;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#picker-split {
+    height: 1fr;
+    layout: horizontal;
+    margin: 1 0;
+}
+
+#picker-left {
+    width: 52%;
+    height: 1fr;
+    margin-right: 1;
+}
+
+#picker-right {
+    width: 48%;
+    height: 1fr;
+    border: round $secondary;
+    padding: 1;
+    overflow-y: auto;
+}
+
+#shell-script-area {
+    height: 6;
+}
+
+#paste-yaml-area {
+    height: 12;
+}
+
+#yaml-viewer-area {
+    height: 1fr;
+}

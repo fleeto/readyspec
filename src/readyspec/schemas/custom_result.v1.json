@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readyspec.dev/schemas/custom_result.v1.json",
+  "title": "ReadySpec Custom Result Protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "status", "summary"],
+  "properties": {
+    "protocol": { "const": "readyspec.custom_result/v1" },
+    "status": { "enum": ["PASS", "FAIL", "ERROR"] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "reason_code": { "type": "string", "maxLength": 128 },
+    "expected": { "type": ["string", "number", "boolean", "null"] },
+    "observed": { "type": ["string", "number", "boolean", "null"] },
+    "details": { "type": "object" }
+  }
+}
