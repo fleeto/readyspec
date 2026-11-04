@@ -10,10 +10,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
-
-[project.urls]
-Homepage = "https://github.com/fleeto/readyspec"
-Repository = "https://github.com/fleeto/readyspec"
 dependencies = [
     "textual>=0.85.0",
     "typer>=0.12.0",
@@ -22,6 +18,10 @@ dependencies = [
     "rfc8785>=0.1.4",
     "PyYAML>=6.0.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/fleeto/readyspec"
+Repository = "https://github.com/fleeto/readyspec"
 
 [project.optional-dependencies]
 dev = [

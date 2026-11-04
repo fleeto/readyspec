@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from textual import events, work
@@ -15,7 +16,6 @@ from textual.widgets import (
     Checkbox,
     ContentSwitcher,
     DataTable,
-    Footer,
     Input,
     Label,
     Select,
@@ -37,6 +37,7 @@ from readyspec.domain.models import (
     CheckInstanceResult,
     InventorySnapshot,
     ParameterOverrideRule,
+    ParameterSpec,
     ParamType,
     PlanDocument,
     RoleSpec,
@@ -58,6 +59,7 @@ from readyspec.tui.modals import (
     CleanupActionModal,
     CloneToRoleModal,
     CustomShellModal,
+    HostTypeModal,
     NewPlanModal,
     PasteImportModal,
     TemplatePickerModal,
@@ -85,17 +87,19 @@ class ReadySpecApp(App[None]):
 
     CSS_PATH = "readyspec.tcss"
     TITLE = "ReadySpec V1"
+    # Textual toasts have no parent; mouse text-selection on them crashes.
+    ALLOW_SELECT = False
 
     BINDINGS = [
-        Binding("f1", "nav('view-home')", "1 首页", show=True),
-        Binding("f2", "nav('view-workbench')", "2 方案工作台", show=True),
-        Binding("f3", "nav('view-run-report')", "3 运行与报告", show=True),
-        Binding("f4", "nav('view-system')", "4 模板库与系统", show=True),
-        Binding("f5", "launch_wizard_run", "开始执行", show=True),
-        Binding("f6", "cycle_narrow_pane", "切栏(窄屏)", show=True),
+        Binding("f1", "nav('view-home')", "1 首页", show=False),
+        Binding("f2", "nav('view-workbench')", "2 方案工作台", show=False),
+        Binding("f3", "nav('view-run-report')", "3 运行与报告", show=False),
+        Binding("f4", "nav('view-system')", "4 模板库与系统", show=False),
+        Binding("f5", "launch_wizard_run", "开始执行", show=False),
+        Binding("f6", "cycle_narrow_pane", "切栏(窄屏)", show=False),
         Binding("f9", "jump_cleanup", "待清理", show=False),
-        Binding("ctrl+s", "save_draft", "保存草稿", show=True),
-        Binding("q", "quit_if_nav", "退出", show=True),
+        Binding("ctrl+s", "save_draft", "保存草稿", show=False),
+        Binding("q", "quit_if_nav", "退出", show=False),
     ]
 
     def __init__(
@@ -136,9 +140,14 @@ class ReadySpecApp(App[None]):
         self._live_host_phases: dict[str, tuple[HostPhase, str]] = {}
         self._wb_title_input: Input | None = None
         self._wb_importance_select: Select[Any] | None = None
-        self._wb_param_widgets: dict[str, tuple[Input, Checkbox]] = {}
+        self._wb_param_widgets: dict[
+            str, tuple[Input | Select[Any] | list[tuple[str, Checkbox]], Checkbox]
+        ] = {}
         self._wiz_role_inputs: dict[str, Input] = {}
         self._wiz_ov_inputs: dict[tuple[str, str, str], Input] = {}
+        self._wb_dirty = False
+        self._wb_loading = False
+        self._wb_pending: Callable[[], None] | None = None
 
     def _is_text_editing(self) -> bool:
         focused = self.focused
@@ -168,17 +177,17 @@ class ReadySpecApp(App[None]):
                             "无需理解底层 Goss 语法：加载或粘贴已发布方案 → 填入主机 IP 或兼容 Ansible 清单 → 静态预览确认 → 一键执行检查并定位问题。"
                         )
                         with Horizontal(classes="card-btn-row"):
-                            yield Button("立即开始检查", variant="primary", id="home-start-run")
+                            yield Button("立即开始检查", id="home-start-run")
                             yield Button("粘贴/导入方案", id="home-import-plan")
                             yield Button("重跑上次检查", id="home-rerun-last")
 
                     with Vertical(classes="role-entry-card"):
                         yield Label("🛠 业务开发人员入口", classes="card-title")
                         yield Static(
-                            "按业务角色声明部署前置条件：40 项 P0 模板即搜即加、编写安全参数化自定义 Shell、草稿试跑、一键导出自包含单文件 YAML。"
+                            "按主机类型声明部署前置条件：40 项 P0 模板即搜即加、编写安全参数化自定义 Shell、草稿试跑、一键导出自包含单文件 YAML。"
                         )
                         with Horizontal(classes="card-btn-row"):
-                            yield Button("新建检查方案", variant="success", id="home-new-plan")
+                            yield Button("新建检查方案", id="home-new-plan")
                             yield Button("进入方案工作台", id="home-open-wb")
                             yield Button("浏览 54 组模板库", id="home-browse-tpl")
 
@@ -193,50 +202,30 @@ class ReadySpecApp(App[None]):
                 with Horizontal(id="wb-header"):
                     yield Select([], id="wb-plan-select")
                     yield Static("", id="wb-plan-summary")
-                    yield Button("[s]保存草稿", id="wb-btn-save")
-                    yield Button("[v]静态校验", id="wb-btn-validate")
-                    yield Button("[t]草稿试跑", variant="warning", id="wb-btn-trial")
-                    yield Button("[r]发布&导出", variant="primary", id="wb-btn-release")
-                    yield Button("切栏[F6]", id="wb-btn-pane")
 
-                yield Static("提示: 按 [a] 搜索添加内置模板，[c] 新建自定义Shell，[d] 复制实例到角色，[Space] 启停，[x] 删除，[u] 撤销删除", id="wb-diag-bar")
+                yield Static("", id="wb-diag-bar")
 
                 with Horizontal(id="wb-columns"):
-                    # Left Column: Roles + P01/P02
                     with Vertical(id="wb-col-roles", classes="wb-col"):
-                        yield Label("① 业务角色与节点要求", classes="col-header")
+                        yield Label("主机类型", classes="col-header")
                         yield DataTable(id="wb-roles-table", cursor_type="row")
-                        with Horizontal(classes="toolbar-row"):
-                            yield Input(placeholder="新角色ID(如cache)", id="wb-new-role-input")
-                            yield Button("+角色", id="wb-add-role-btn")
                         yield Static("", id="wb-compat-info")
 
-                    # Middle Column: Role's Independent CheckInstances
                     with Vertical(id="wb-col-instances", classes="wb-col"):
-                        yield Label("② 角色专属检查实例（独立 ID）", classes="col-header")
-                        with Horizontal(classes="toolbar-row"):
-                            yield Button("[a]添加模板", variant="primary", id="wb-add-tpl")
-                            yield Button("[c]自定义Shell", id="wb-add-shell")
-                            yield Button("[d]复制到角色", id="wb-clone-inst")
-                            yield Button("[Space]启停", id="wb-toggle-inst")
-                            yield Button("[x]删除", variant="error", id="wb-del-inst")
-                            yield Button("[u]撤销", id="wb-undo-inst")
+                        yield Label("检查实例", classes="col-header")
                         yield DataTable(id="wb-inst-table", cursor_type="row")
 
-                    # Right Column: Typed Parameter Editor + Overridable Switch
                     with VerticalScroll(id="wb-col-params", classes="wb-col"):
-                        yield Label("③ 实例属性与现场可覆盖开关", classes="col-header")
-                        yield Static("请选择中间栏的一条检查实例", id="wb-param-meta")
+                        yield Label("参数", classes="col-header")
+                        yield Static("请选择一条检查实例", id="wb-param-meta")
                         yield Vertical(id="wb-param-fields")
-                        with Horizontal(classes="toolbar-row"):
-                            yield Button("应用实例修改", variant="success", id="wb-apply-params")
 
             # ==========================================================
             # ACT 3 & ACT 4A: 4-Step Run Wizard + Live 9-Phase Board + Dual Report
             # ==========================================================
             with Vertical(id="view-run-report"):
                 with Horizontal(id="rr-subbar"):
-                    yield Button("①~④ 四步执行向导", variant="primary", id="rr-tab-wizard")
+                    yield Button("①~④ 四步执行向导", id="rr-tab-wizard", classes="is-selected")
                     yield Button("实时看板", id="rr-tab-live")
                     yield Button("检查结果报告", id="rr-tab-report")
                     yield Select([], id="rr-history-select", prompt="切换历史报告...")
@@ -254,7 +243,7 @@ class ReadySpecApp(App[None]):
                         with Vertical(classes="step-box"):
                             yield Label("步骤 ②：目标主机清单与短期内存凭据（终态即焚，绝不落盘）", classes="card-title")
                             with Horizontal(classes="toolbar-row"):
-                                yield Button("兼容 Ansible Inventory (INI/YAML)", variant="primary", id="wiz-mode-ini")
+                                yield Button("兼容 Ansible Inventory (INI/YAML)", id="wiz-mode-ini", classes="is-selected")
                                 yield Button("快速填 IP 列表", id="wiz-mode-ip")
                                 yield Input(value="ops", placeholder="默认 SSH 用户", id="wiz-ssh-user")
                                 yield Input(placeholder="SSH/Sudo 密码（无回显纯内存托管）", password=True, id="wiz-secret")
@@ -271,7 +260,7 @@ class ReadySpecApp(App[None]):
                         with Vertical(classes="step-box"):
                             yield Label("步骤 ③：角色映射与允许现场调整的参数覆盖", classes="card-title")
                             with Horizontal(classes="toolbar-row"):
-                                yield Button("解析主机清单并自动匹配角色", variant="warning", id="wiz-parse-btn")
+                                yield Button("解析主机清单并自动匹配角色", id="wiz-parse-btn")
                             yield Vertical(id="wiz-role-map-box")
                             yield Vertical(id="wiz-overrides-box")
 
@@ -282,7 +271,7 @@ class ReadySpecApp(App[None]):
                             yield Checkbox("显式批准使用 root SSH 连接身份运行（高风险强审计，CHG-001）", value=False, id="wiz-approve-root")
                             with Horizontal(classes="toolbar-row"):
                                 yield Button("刷新静态预览", id="wiz-preview-btn")
-                                yield Button("▶ 确认无误，立即开始执行检查", variant="success", id="wiz-launch-btn")
+                                yield Button("▶ 确认无误，立即开始执行检查", id="wiz-launch-btn")
 
                     # Live 9-Phase Progress Board
                     with Vertical(id="rr-pane-live"):
@@ -291,21 +280,21 @@ class ReadySpecApp(App[None]):
                             yield Static("当前无活动运行", id="live-run-banner")
                             yield DataTable(id="live-phase-table", cursor_type="row")
                             with Horizontal(classes="toolbar-row"):
-                                yield Button("协作式取消当前运行", variant="error", id="live-cancel-btn")
-                                yield Button("查看已完成报告", variant="primary", id="live-goto-report")
+                                yield Button("协作式取消当前运行", id="live-cancel-btn")
+                                yield Button("查看已完成报告", id="live-goto-report")
 
                     # Dual-Perspective Report View
                     with Vertical(id="rr-pane-report"):
                         with Vertical(id="report-container"):
                             yield Static("暂无报告", id="report-banner")
                             with Horizontal(classes="toolbar-row"):
-                                yield Button("按主机视角", variant="primary", id="rep-view-host")
+                                yield Button("按主机视角", id="rep-view-host", classes="is-selected")
                                 yield Button("按检查项视角", id="rep-view-check")
                                 yield Button("[f]仅看异常: 关", id="rep-toggle-anomaly")
                                 yield Button("[g]查看编译Goss工件", id="rep-view-goss")
                                 yield Button("导出JSON报告", id="rep-export-json")
-                                yield Button("[r]全量正式复测", variant="success", id="rep-rerun-full")
-                                yield Button("[t]仅快测异常主机(PARTIAL)", variant="warning", id="rep-rerun-partial")
+                                yield Button("[r]全量正式复测", id="rep-rerun-full")
+                                yield Button("[t]仅快测异常主机(PARTIAL)", id="rep-rerun-partial")
 
                             with Horizontal(id="report-main-split"):
                                 with Vertical(id="report-table-pane"):
@@ -326,12 +315,11 @@ class ReadySpecApp(App[None]):
                     with Vertical(id="sys-cleanup-pane"):
                         yield Label("受控临时目录与崩溃恢复待办（三重归属指纹验证，TODO-007）", classes="col-header")
                         with Horizontal(classes="toolbar-row"):
-                            yield Button("处置选中待清理项 [Enter]", variant="warning", id="sys-resolve-btn")
+                            yield Button("处置选中待清理项 [Enter]", id="sys-resolve-btn")
                             yield Button("刷新列表", id="sys-refresh-cleanups")
                         yield DataTable(id="sys-cleanup-table", cursor_type="row")
                         yield Static("", id="sys-cleanup-detail")
 
-        yield Footer()
 
     # ------------------------------------------------------------------
     # Lifecycle & Responsive Layout (140 / 100 / 80 columns, REQ-TUI-03)
@@ -349,7 +337,6 @@ class ReadySpecApp(App[None]):
             col_roles = self.query_one("#wb-col-roles")
             col_inst = self.query_one("#wb-col-instances")
             col_params = self.query_one("#wb-col-params")
-            pane_btn = self.query_one("#wb-btn-pane", Button)
         except Exception:
             return
 
@@ -357,10 +344,8 @@ class ReadySpecApp(App[None]):
             col.remove_class("hidden-pane", "full-pane", "half-pane")
 
         if width >= 140:
-            pane_btn.display = False
-        elif width >= 100:
-            pane_btn.display = True
-            # 2-column mode: show Roles+Instances OR Instances+Params drawer
+            return
+        if width >= 100:
             if self._narrow_pane_idx == 2:
                 col_roles.add_class("hidden-pane")
                 col_inst.add_class("half-pane")
@@ -370,8 +355,6 @@ class ReadySpecApp(App[None]):
                 col_inst.add_class("half-pane")
                 col_params.add_class("hidden-pane")
         else:
-            pane_btn.display = True
-            # <100 col single-pane switcher
             panes = [col_roles, col_inst, col_params]
             for idx, p in enumerate(panes):
                 if idx == self._narrow_pane_idx % 3:
@@ -401,6 +384,9 @@ class ReadySpecApp(App[None]):
         self.query_one("#sys-cleanup-table", DataTable).focus()
 
     def action_launch_wizard_run(self) -> None:
+        view = self.query_one("#main-switcher", ContentSwitcher).current
+        if view != "view-run-report":
+            return
         try:
             binding = self._collect_wizard_binding()
         except Exception as exc:
@@ -433,6 +419,14 @@ class ReadySpecApp(App[None]):
 
         active_view = self.query_one("#main-switcher", ContentSwitcher).current
         if active_view == "view-workbench":
+            if self._wb_pending is not None and key in ("y", "n"):
+                self._resolve_pending_edit(keep=key == "y")
+                event.stop()
+                return
+            if key == "n" and self._wb_pending is None:
+                self._open_new_host_type()
+                event.stop()
+                return
             if key == "a":
                 self._open_template_picker()
                 event.stop()
@@ -487,10 +481,10 @@ class ReadySpecApp(App[None]):
         home_tbl.add_columns("Run ID", "方案与版本", "范围", "就绪结论", "门禁资格", "完成时间")
 
         roles_tbl = self.query_one("#wb-roles-table", DataTable)
-        roles_tbl.add_columns("角色ID", "名称", "最少节点", "实例数")
+        roles_tbl.add_columns("ID", "名称", "最少节点")
 
         inst_tbl = self.query_one("#wb-inst-table", DataTable)
-        inst_tbl.add_columns("启停", "实例ID", "模板", "重要性", "现场可改参数", "标题")
+        inst_tbl.add_columns("启停", "模板", "重要性", "标题")
 
         live_tbl = self.query_one("#live-phase-table", DataTable)
         live_tbl.add_columns("主机名", "当前阶段 (1~9)", "实时说明")
@@ -576,17 +570,22 @@ class ReadySpecApp(App[None]):
 
     def _refresh_workbench(self) -> None:
         p = self.current_plan
-        self.query_one("#wb-plan-summary", Static).update(
-            f"方案: {p.name}  |  v{p.version}  |  状态: [{p.state.value}]"
-        )
+        state_label = {
+            PlanState.DRAFT: "草稿",
+            PlanState.RELEASED: "已发布",
+            PlanState.VALIDATED: "已校验",
+            PlanState.RETIRED: "已退役",
+            PlanState.TRIAL_SNAPSHOT: "试跑快照",
+        }.get(p.state, p.state.value)
+        self.query_one("#wb-plan-summary", Static).update(f"{state_label}  v{p.version}")
         self.query_one("#wb-compat-info", Static).update(
-            f"[dim]全局兼容 (P01): OS={','.join(p.compatibility.allowed_os)} | Arch={','.join(p.compatibility.allowed_arch)}[/dim]"
+            f"OS {', '.join(p.compatibility.allowed_os)}    Arch {', '.join(p.compatibility.allowed_arch)}"
         )
 
         roles_tbl = self.query_one("#wb-roles-table", DataTable)
         roles_tbl.clear()
         for r in p.roles:
-            roles_tbl.add_row(r.role_id, r.name, str(r.min_nodes), str(len(r.instances)), key=r.role_id)
+            roles_tbl.add_row(r.role_id, r.name, str(r.min_nodes), key=r.role_id)
 
         if p.roles and not any(r.role_id == self.selected_role_id for r in p.roles):
             self.selected_role_id = p.roles[0].role_id
@@ -603,14 +602,11 @@ class ReadySpecApp(App[None]):
         templates = self.store.get_all_available_templates(self.current_plan)
         for inst in role.instances:
             tpl = templates.get(inst.template_id)
-            priv_mark = "🔒" if (tpl and tpl.privilege_group == PrivilegeGroup.PRIVILEGED) else ""
-            ov_str = ",".join(inst.overridable_params) if inst.overridable_params else "-"
+            priv_mark = "锁" if (tpl and tpl.privilege_group == PrivilegeGroup.PRIVILEGED) else ""
             inst_tbl.add_row(
-                "✔" if inst.enabled else "○",
-                inst.instance_id,
+                "开" if inst.enabled else "关",
                 f"{inst.template_id}{priv_mark}",
                 inst.importance.value,
-                ov_str,
                 inst.title or (tpl.name_zh if tpl else ""),
                 key=inst.instance_id,
             )
@@ -630,6 +626,7 @@ class ReadySpecApp(App[None]):
     def _refresh_workbench_params(self) -> None:
         meta_lbl = self.query_one("#wb-param-meta", Static)
         fields_box = self.query_one("#wb-param-fields", Vertical)
+        self._wb_loading = True
         fields_box.remove_children()
         self._wb_title_input = None
         self._wb_importance_select = None
@@ -637,7 +634,8 @@ class ReadySpecApp(App[None]):
 
         role, inst, tpl = self._get_selected_instance()
         if role is None or inst is None or tpl is None:
-            meta_lbl.update("当前角色暂无选中的检查实例（按 [a] 添加内置模板或 [c] 创建自定义 Shell）")
+            meta_lbl.update("未选中检查实例")
+            self.call_after_refresh(self._finish_param_load)
             return
 
         meta_lbl.update(
@@ -646,20 +644,21 @@ class ReadySpecApp(App[None]):
         )
         title_inp = Input(value=inst.title or tpl.name_zh)
         imp_sel: Select[Any] = Select(
-            [("必需 (REQUIRED - 阻断门禁)", "REQUIRED"), ("警告 (WARNING - 不阻断)", "WARNING"), ("信息 (INFO)", "INFO")],
+            [("必需", "REQUIRED"), ("警告", "WARNING"), ("信息", "INFO")],
             value=inst.importance.value,
             allow_blank=False,
         )
         self._wb_title_input = title_inp
         self._wb_importance_select = imp_sel
-        fields_box.mount(Label("实例标题："))
+        fields_box.mount(Label("实例标题"))
         fields_box.mount(title_inp)
+        fields_box.mount(Label("重要性"))
         fields_box.mount(imp_sel)
 
         for p_spec in tpl.parameters:
             is_explicit = p_spec.name in inst.params
             cur_val = inst.params.get(p_spec.name, p_spec.default)
-            src_badge = "[cyan](实例显式赋值)[/cyan]" if is_explicit else f"[dim](继承模板默认={p_spec.default!r})[/dim]"
+            src_badge = "实例显式赋值" if is_explicit else f"继承模板默认 {p_spec.default!r}"
             val_str = (
                 ",".join(str(x) for x in cur_val)
                 if isinstance(cur_val, list)
@@ -667,23 +666,28 @@ class ReadySpecApp(App[None]):
             )
             box = Vertical(classes="param-field-box")
             fields_box.mount(box)
-            box.mount(
-                Label(
-                    f"{p_spec.label_zh} ({p_spec.name}, {p_spec.param_type.value}"
-                    + (f", 单位:{p_spec.unit}" if p_spec.unit else "")
-                    + f") {src_badge}"
-                )
-            )
-            val_inp = Input(value=val_str)
+            unit = f"，单位 {p_spec.unit}" if p_spec.unit else ""
+            box.mount(Label(f"{p_spec.label_zh}（{p_spec.name}，{p_spec.param_type.value}{unit}）"))
+            box.mount(Label(src_badge, classes="param-source"))
             ov_chk = Checkbox(
-                "允许部署时现场覆盖 (Run Binding 可调)",
+                "允许现场覆盖",
                 value=(p_spec.name in inst.overridable_params),
             )
-            self._wb_param_widgets[p_spec.name] = (val_inp, ov_chk)
-            box.mount(val_inp)
+            if p_spec.param_type == ParamType.LIST and p_spec.enum_values:
+                choices = self._mount_choice_checks(box, p_spec, cur_val)
+                self._wb_param_widgets[p_spec.name] = (choices, ov_chk)
+            else:
+                val_widget = self._make_param_value_widget(p_spec, cur_val, val_str)
+                self._wb_param_widgets[p_spec.name] = (val_widget, ov_chk)
+                box.mount(val_widget)
             box.mount(ov_chk)
+        self.call_after_refresh(self._finish_param_load)
 
-    def _apply_workbench_param_edits(self) -> None:
+    def _finish_param_load(self) -> None:
+        self._wb_loading = False
+        self._wb_dirty = False
+
+    def _apply_workbench_param_edits(self, *, refresh: bool = True) -> None:
         role, inst, tpl = self._get_selected_instance()
         if role is None or inst is None or tpl is None:
             return
@@ -692,8 +696,8 @@ class ReadySpecApp(App[None]):
         new_title = self._wb_title_input.value.strip()
         imp_val = str(self._wb_importance_select.value)
         raw_values = {
-            name: (inp.value.strip(), chk.value)
-            for name, (inp, chk) in self._wb_param_widgets.items()
+            name: (self._read_param_widget(widget), chk.value)
+            for name, (widget, chk) in self._wb_param_widgets.items()
         }
 
         self._ensure_editable_draft_copy()
@@ -706,17 +710,64 @@ class ReadySpecApp(App[None]):
         new_params: dict[str, Any] = {}
         new_ov: list[str] = []
         for p_spec in tpl.parameters:
-            raw_txt, ov_checked = raw_values.get(p_spec.name, ("", False))
+            raw_value, ov_checked = raw_values.get(p_spec.name, ("", False))
             if ov_checked:
                 new_ov.append(p_spec.name)
-            parsed_val = self._coerce_param_input(p_spec.param_type, raw_txt)
+            parsed_val = (
+                raw_value
+                if isinstance(raw_value, list)
+                else self._coerce_param_input(p_spec.param_type, raw_value)
+            )
             if parsed_val != p_spec.default:
                 new_params[p_spec.name] = parsed_val
 
         inst.params = new_params
         inst.overridable_params = new_ov
-        self._refresh_workbench()
-        self.notify(f"已更新实例 {inst.instance_id} 参数与现场覆盖策略")
+        self._wb_dirty = False
+        if refresh:
+            self._refresh_workbench()
+
+    def _mount_choice_checks(
+        self, parent: Vertical, p_spec: ParameterSpec, cur_val: Any
+    ) -> list[tuple[str, Checkbox]]:
+        selected = {str(item) for item in cur_val} if isinstance(cur_val, list) else set()
+        if cur_val is not None and not isinstance(cur_val, list):
+            selected.add(str(cur_val))
+        candidates = list(p_spec.enum_values)
+        for extra in sorted(selected):
+            if extra not in candidates:
+                candidates.append(extra)
+        choice_box = Vertical(classes="param-choices")
+        parent.mount(choice_box)
+        checks: list[tuple[str, Checkbox]] = []
+        for item in candidates:
+            chk = Checkbox(item, value=item in selected)
+            choice_box.mount(chk)
+            checks.append((item, chk))
+        return checks
+
+    def _make_param_value_widget(
+        self, p_spec: ParameterSpec, cur_val: Any, val_str: str
+    ) -> Input | Select[Any]:
+        if p_spec.param_type == ParamType.ENUM and p_spec.enum_values:
+            current = "" if cur_val is None else str(cur_val)
+            options = [(item, item) for item in p_spec.enum_values]
+            if current and current not in p_spec.enum_values:
+                options.insert(0, (current, current))
+            selected = current if current in {item for item, _ in options} else p_spec.enum_values[0]
+            return Select(options, value=selected, allow_blank=False)
+        return Input(value=val_str)
+
+    def _read_param_widget(
+        self, widget: Input | Select[Any] | list[tuple[str, Checkbox]]
+    ) -> str | list[str]:
+        if isinstance(widget, list):
+            return [item for item, chk in widget if chk.value]
+        if isinstance(widget, Select):
+            if widget.value is Select.BLANK:
+                return ""
+            return str(widget.value)
+        return widget.value.strip()
 
     def _coerce_param_input(self, p_type: ParamType, raw: str) -> Any:
         if p_type in (ParamType.INTEGER, ParamType.PORT):
@@ -851,12 +902,68 @@ class ReadySpecApp(App[None]):
                 self._undo_deleted_stack.append((r2.role_id, idx, removed))
                 self.selected_instance_id = r2.instances[0].instance_id if r2.instances else ""
                 self._refresh_workbench()
-                self.notify(f"已删除实例 {removed.instance_id}（按 [u] 可撤销）")
+                self._set_workbench_status(
+                    f"已删除实例 {removed.instance_id}。按 u 可撤销。"
+                )
                 break
+
+    def _set_workbench_status(self, message: str) -> None:
+        self.query_one("#wb-diag-bar", Static).update(message)
+
+    def _mark_selected(self, selected: str, *ids: str) -> None:
+        for wid in ids:
+            btn = self.query_one(f"#{wid}", Button)
+            if wid == selected:
+                btn.add_class("is-selected")
+            else:
+                btn.remove_class("is-selected")
+
+    def _widget_is_workbench_field(self, widget: object) -> bool:
+        if widget is self._wb_title_input or widget is self._wb_importance_select:
+            return True
+        for value_widget, ov_chk in self._wb_param_widgets.values():
+            if widget is ov_chk or widget is value_widget:
+                return True
+            if isinstance(value_widget, list) and any(widget is chk for _, chk in value_widget):
+                return True
+        return False
+
+    def _ask_or_move(self, proceed: Callable[[], None]) -> None:
+        if not self._wb_dirty:
+            proceed()
+            return
+        self._wb_pending = proceed
+        self._set_workbench_status("有未保存修改。按 y 保留并继续，按 n 放弃。")
+
+    def _resolve_pending_edit(self, *, keep: bool) -> None:
+        pending = self._wb_pending
+        self._wb_pending = None
+        if keep:
+            self._apply_workbench_param_edits(refresh=False)
+        self._wb_dirty = False
+        self._set_workbench_status("")
+        if pending is not None:
+            pending()
+
+    def _open_new_host_type(self) -> None:
+        def on_id(rid: str | None) -> None:
+            if not rid:
+                return
+            if self.current_plan.get_role(rid):
+                self._set_workbench_status(f"主机类型 {rid} 已存在")
+                return
+            self._ensure_editable_draft_copy()
+            self.current_plan.roles.append(RoleSpec(role_id=rid, name=rid, min_nodes=1))
+            self.selected_role_id = rid
+            self.selected_instance_id = ""
+            self._refresh_workbench()
+            self._set_workbench_status(f"已添加主机类型 {rid}")
+
+        self.push_screen(HostTypeModal(), on_id)
 
     def _undo_delete_instance(self) -> None:
         if not self._undo_deleted_stack:
-            self.notify("没有可撤销的删除记录")
+            self._set_workbench_status("没有可撤销的删除")
             return
         role_id, idx, inst = self._undo_deleted_stack.pop()
         r = self.current_plan.get_role(role_id)
@@ -864,15 +971,23 @@ class ReadySpecApp(App[None]):
             r.instances.insert(min(idx, len(r.instances)), inst)
             self.selected_role_id = role_id
             self.selected_instance_id = inst.instance_id
+            self._wb_dirty = False
             self._refresh_workbench()
-            self.notify(f"已撤销删除并恢复实例 {inst.instance_id}")
+            self._set_workbench_status(f"已恢复实例 {inst.instance_id}")
 
     def action_save_draft(self) -> None:
+        view = self.query_one("#main-switcher", ContentSwitcher).current
+        if view != "view-workbench":
+            return
+        self._apply_workbench_param_edits(refresh=False)
         self._ensure_editable_draft_copy()
         self.current_plan = self.store.save_draft(self.current_plan)
+        self._wb_dirty = False
         self._refresh_workbench_plan_selector()
         self._refresh_workbench()
-        self.notify(f"草稿已原子保存: {self.current_plan.plan_id} (digest={str(self.current_plan.digest)[:20]}...)")
+        self._set_workbench_status(
+            f"已保存草稿 {self.current_plan.plan_id}@{self.current_plan.version}"
+        )
 
     def _validate_current_plan(self) -> bool:
         diags = self.store.validate_plan(self.current_plan)
@@ -1498,10 +1613,7 @@ class ReadySpecApp(App[None]):
 
             self.push_screen(PasteImportModal(self.store), on_imp)
         elif bid == "home-rerun-last":
-            if self.current_report:
-                self._rerun_from_report(partial_only=False)
-            else:
-                self.action_nav("view-run-report")
+            self.action_nav("view-run-report")
         elif bid == "home-new-plan":
             def on_created(new_p: PlanDocument | None) -> None:
                 if new_p is None:
@@ -1519,57 +1631,25 @@ class ReadySpecApp(App[None]):
         elif bid == "home-browse-tpl":
             self.action_nav("view-system")
 
-        # Workbench buttons
-        elif bid == "wb-btn-save":
-            self.action_save_draft()
-        elif bid == "wb-btn-validate":
-            self._validate_current_plan()
-        elif bid == "wb-btn-trial":
-            self._trial_run_current_draft()
-        elif bid == "wb-btn-release":
-            self._release_and_export_current_plan()
-        elif bid == "wb-btn-pane":
-            self.action_cycle_narrow_pane()
-        elif bid == "wb-add-role-btn":
-            inp = self.query_one("#wb-new-role-input", Input)
-            rid = inp.value.strip()
-            if rid:
-                self._ensure_editable_draft_copy()
-                if not self.current_plan.get_role(rid):
-                    self.current_plan.roles.append(RoleSpec(role_id=rid, name=f"{rid} 节点", min_nodes=1))
-                    self.selected_role_id = rid
-                    inp.value = ""
-                    self._refresh_workbench()
-        elif bid == "wb-add-tpl":
-            self._open_template_picker()
-        elif bid == "wb-add-shell":
-            self._open_custom_shell_editor()
-        elif bid == "wb-clone-inst":
-            self._open_clone_modal()
-        elif bid == "wb-toggle-inst":
-            self._toggle_selected_instance()
-        elif bid == "wb-del-inst":
-            self._delete_selected_instance()
-        elif bid == "wb-undo-inst":
-            self._undo_delete_instance()
-        elif bid == "wb-apply-params":
-            self._apply_workbench_param_edits()
-
-        # Run & Report sub-tabs & Wizard
         elif bid == "rr-tab-wizard":
             self.query_one("#rr-switcher", ContentSwitcher).current = "rr-pane-wizard"
+            self._mark_selected("rr-tab-wizard", "rr-tab-wizard", "rr-tab-live", "rr-tab-report")
         elif bid == "rr-tab-live":
             self.query_one("#rr-switcher", ContentSwitcher).current = "rr-pane-live"
+            self._mark_selected("rr-tab-live", "rr-tab-wizard", "rr-tab-live", "rr-tab-report")
         elif bid == "rr-tab-report" or bid == "live-goto-report":
             self.query_one("#rr-switcher", ContentSwitcher).current = "rr-pane-report"
+            self._mark_selected("rr-tab-report", "rr-tab-wizard", "rr-tab-live", "rr-tab-report")
         elif bid == "wiz-mode-ini":
             self.wizard_inv_mode = "ansible_ini"
             self.query_one("#inv-textarea", TextArea).text = DEFAULT_SAMPLE_INI
+            self._mark_selected("wiz-mode-ini", "wiz-mode-ini", "wiz-mode-ip")
             self._rebuild_wizard_role_and_overrides()
             self._refresh_wizard_preview()
         elif bid == "wiz-mode-ip":
             self.wizard_inv_mode = "quick_ip"
             self.query_one("#inv-textarea", TextArea).text = "web-01=10.20.1.11\nweb-02=10.20.1.12\ndb-01=10.20.2.21"
+            self._mark_selected("wiz-mode-ip", "wiz-mode-ini", "wiz-mode-ip")
             self._rebuild_wizard_role_and_overrides()
             self._refresh_wizard_preview()
         elif bid == "wiz-parse-btn":
@@ -1587,9 +1667,11 @@ class ReadySpecApp(App[None]):
         # Report buttons
         elif bid == "rep-view-host":
             self.report_perspective = "host"
+            self._mark_selected("rep-view-host", "rep-view-host", "rep-view-check")
             self._refresh_report_view()
         elif bid == "rep-view-check":
             self.report_perspective = "check"
+            self._mark_selected("rep-view-check", "rep-view-host", "rep-view-check")
             self._refresh_report_view()
         elif bid == "rep-toggle-anomaly":
             self._toggle_report_anomaly_filter()
@@ -1623,17 +1705,28 @@ class ReadySpecApp(App[None]):
         if sid == "wb-plan-select":
             if self._plan_key(self.current_plan) == val:
                 return
-            for p in self.store.list_plans():
-                if self._plan_key(p) == val:
-                    self.current_plan = p.model_copy(deep=True)
-                    self.selected_role_id = p.roles[0].role_id if p.roles else ""
-                    self.selected_instance_id = (
-                        p.roles[0].instances[0].instance_id
-                        if (p.roles and p.roles[0].instances)
-                        else ""
-                    )
-                    self._refresh_workbench()
-                    break
+            if self._widget_is_workbench_field(event.select):
+                self._wb_dirty = True
+            target = next((p for p in self.store.list_plans() if self._plan_key(p) == val), None)
+            if target is None:
+                return
+
+            def _switch_plan(plan: PlanDocument = target) -> None:
+                self.current_plan = plan.model_copy(deep=True)
+                self.selected_role_id = plan.roles[0].role_id if plan.roles else ""
+                self.selected_instance_id = (
+                    plan.roles[0].instances[0].instance_id
+                    if (plan.roles and plan.roles[0].instances)
+                    else ""
+                )
+                self._wb_dirty = False
+                self._refresh_workbench()
+
+            self._ask_or_move(_switch_plan)
+            return
+        if not self._wb_loading and self._widget_is_workbench_field(event.select):
+            self._wb_dirty = True
+            return
         elif sid == "wiz-plan-select":
             if self._plan_key(self.wizard_plan) == val:
                 return
@@ -1658,19 +1751,36 @@ class ReadySpecApp(App[None]):
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "sys-cat-search":
             self._refresh_system_catalog(event.value)
+            return
+        if not self._wb_loading and self._widget_is_workbench_field(event.input):
+            self._wb_dirty = True
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if not self._wb_loading and self._widget_is_workbench_field(event.checkbox):
+            self._wb_dirty = True
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         tid = event.data_table.id or ""
         rk = str(event.row_key.value) if event.row_key and event.row_key.value else ""
         if tid == "wb-roles-table" and rk and rk != self.selected_role_id:
-            self.selected_role_id = rk
-            r = self.current_plan.get_role(rk)
-            self.selected_instance_id = r.instances[0].instance_id if (r and r.instances) else ""
-            self._refresh_workbench_instances()
-            self._refresh_workbench_params()
+            def _switch_role(role_id: str = rk) -> None:
+                self.selected_role_id = role_id
+                role = self.current_plan.get_role(role_id)
+                self.selected_instance_id = (
+                    role.instances[0].instance_id if (role and role.instances) else ""
+                )
+                self._wb_dirty = False
+                self._refresh_workbench_instances()
+                self._refresh_workbench_params()
+
+            self._ask_or_move(_switch_role)
         elif tid == "wb-inst-table" and rk and rk != self.selected_instance_id:
-            self.selected_instance_id = rk
-            self._refresh_workbench_params()
+            def _switch_instance(instance_id: str = rk) -> None:
+                self.selected_instance_id = instance_id
+                self._wb_dirty = False
+                self._refresh_workbench_params()
+
+            self._ask_or_move(_switch_instance)
         elif tid == "report-table" and rk in self._report_row_evidence_map:
             self.query_one("#report-evidence-detail", Static).update(
                 self._report_row_evidence_map[rk]

@@ -119,10 +119,11 @@ def get_builtin_templates() -> dict[str, TemplateSpec]:
             params=[
                 _p(
                     "allowed_arch",
-                    "允许的 CPU 架构列表",
+                    "允许的 CPU 架构",
                     ParamType.LIST,
                     default=["x86_64"],
-                    description="支持 x86_64, aarch64",
+                    enum_values=["x86_64", "aarch64"],
+                    description="规范化架构，可多选",
                 ),
             ],
         ),

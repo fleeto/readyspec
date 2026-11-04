@@ -27,7 +27,7 @@ Screen {
     margin-right: 1;
 }
 
-.nav-active {
+.nav-active, .is-selected {
     background: $primary;
     color: $text;
     text-style: bold;
@@ -130,10 +130,27 @@ Screen {
 
 #wb-diag-bar {
     height: auto;
-    max-height: 3;
+    max-height: 4;
     padding: 0 1;
     background: $panel;
     color: $warning;
+    text-wrap: wrap;
+}
+
+#wb-inst-tools {
+    height: auto;
+    width: 100%;
+}
+
+#wb-inst-tools .toolbar-row Button {
+    min-width: 10;
+}
+
+Toast {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    text-wrap: wrap;
 }
 
 #wb-columns {
@@ -196,10 +213,31 @@ Screen {
 }
 
 .param-field-box {
+    width: 100%;
     height: auto;
     border-bottom: dashed $panel-lighten-2;
     padding-bottom: 1;
     margin-bottom: 1;
+}
+
+#wb-col-params Label,
+#wb-col-params Static,
+#wb-param-meta,
+#wb-param-fields {
+    width: 100%;
+    max-width: 100%;
+    text-wrap: wrap;
+}
+
+#wb-col-params Input,
+#wb-col-params Select,
+#wb-col-params Checkbox {
+    width: 100%;
+}
+
+#wb-col-params SelectOverlay {
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Act 3 & Act 4: Run Wizard + Live Board + Report */

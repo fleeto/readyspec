@@ -45,6 +45,36 @@ from readyspec.registry.builtin_catalog import search_templates
 from readyspec.registry.workspace_store import PlanLifecycleError, WorkspaceStore
 
 
+class HostTypeModal(ModalScreen[str | None]):
+    """One-line prompt for a new host-type id."""
+
+    BINDINGS = [Binding("escape", "cancel", "取消")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-compact"):
+            yield Label("新建主机类型", classes="card-title")
+            yield Input(placeholder="如 cache", id="ht-id")
+            yield Static("", id="ht-err")
+            with Horizontal(classes="toolbar-row"):
+                yield Button("添加", id="ht-ok")
+                yield Button("取消", id="ht-cancel")
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "ht-cancel":
+            self.dismiss(None)
+            return
+        if event.button.id != "ht-ok":
+            return
+        rid = self.query_one("#ht-id", Input).value.strip()
+        if not rid:
+            self.query_one("#ht-err", Static).update("请填写主机类型标识")
+            return
+        self.dismiss(rid)
+
+
 class NewPlanModal(ModalScreen[PlanDocument | None]):
     """Create a new editable Draft Plan."""
 
@@ -59,11 +89,11 @@ class NewPlanModal(ModalScreen[PlanDocument | None]):
             yield Input(value="核心业务服务部署前检查", id="np-name")
             yield Label("适用软件名称与版本：")
             yield Input(value="MyService 1.0", id="np-sw")
-            yield Label("首个业务角色标识（如 app / web / db）：")
+            yield Label("首个主机类型标识（如 app / web / db）：")
             yield Input(value="app", id="np-role")
             yield Static("", id="np-err")
             with Horizontal(classes="toolbar-row"):
-                yield Button("创建草稿", variant="primary", id="np-ok")
+                yield Button("创建草稿", id="np-ok")
                 yield Button("取消", id="np-cancel")
 
     def action_cancel(self) -> None:
@@ -110,7 +140,7 @@ class PasteImportModal(ModalScreen[PlanDocument | None]):
             yield TextArea("", language="yaml", id="paste-yaml-area")
             yield Static("", id="imp-status")
             with Horizontal(classes="toolbar-row"):
-                yield Button("安全校验并导入工作区", variant="primary", id="imp-submit")
+                yield Button("安全校验并导入工作区", id="imp-submit")
                 yield Button("取消", id="imp-cancel")
 
     def action_cancel(self) -> None:
@@ -174,7 +204,7 @@ class TemplatePickerModal(ModalScreen[list[TemplateSpec] | None]):
                 with VerticalScroll(id="picker-right"):
                     yield Static("在左侧上下移动高亮即可预览模板契约详情", id="picker-detail")
             with Horizontal(classes="toolbar-row"):
-                yield Button("将勾选项批量加入当前角色", variant="primary", id="picker-confirm")
+                yield Button("将勾选项批量加入当前角色", id="picker-confirm")
                 yield Button("取消", id="picker-cancel")
 
     def on_mount(self) -> None:
@@ -296,11 +326,11 @@ class CustomShellModal(ModalScreen[tuple[TemplateSpec, bool] | None]):
             with Horizontal(classes="toolbar-row"):
                 yield Input(value="0", placeholder="模拟退出码", id="cs-sim-exit")
                 yield Input(value="dir=/data status=ok", placeholder="模拟 stdout 输出", id="cs-sim-out")
-                yield Button("离线自测断言", variant="warning", id="cs-test-btn")
+                yield Button("离线自测断言", id="cs-test-btn")
             yield Static("点击『离线自测断言』立即验证判定器结论", id="cs-test-result")
 
             with Horizontal(classes="toolbar-row"):
-                yield Button("保存并加入当前角色", variant="primary", id="cs-save")
+                yield Button("保存并加入当前角色", id="cs-save")
                 yield Button("取消", id="cs-cancel")
 
     def _build_assertions(self) -> ShellAssertionSpec:
@@ -403,7 +433,7 @@ class CloneToRoleModal(ModalScreen[str | None]):
             yield Label("选择目标业务角色（复制后拥有全新稳定 ID，修改互不串改）：")
             yield Select(options, value=options[0][1] if options else Select.BLANK, id="clone-role-sel")
             with Horizontal(classes="toolbar-row"):
-                yield Button("确认复制", variant="primary", id="clone-ok")
+                yield Button("确认复制", id="clone-ok")
                 yield Button("取消", id="clone-cancel")
 
     def action_cancel(self) -> None:
@@ -435,7 +465,7 @@ class YamlViewerModal(ModalScreen[None]):
                 yield Static(f"[green]{self._saved_hint}[/green]")
             yield TextArea(self._yaml_text, language="yaml", read_only=True, id="yaml-viewer-area")
             with Horizontal(classes="toolbar-row"):
-                yield Button("关闭 [Esc]", variant="primary", id="yv-close")
+                yield Button("关闭 [Esc]", id="yv-close")
 
     def action_close(self) -> None:
         self.dismiss(None)
@@ -478,8 +508,8 @@ class CleanupActionModal(ModalScreen[dict[str, Any] | None]):
             yield Input(placeholder="若选择标记 WAIVED，请在此填写原因...", id="cln-waive-reason")
             yield Static("", id="cln-err")
             with Horizontal(classes="toolbar-row"):
-                yield Button("执行受控清理", variant="primary", id="cln-do-clean")
-                yield Button("标记为 WAIVED", variant="warning", id="cln-do-waive")
+                yield Button("执行受控清理", id="cln-do-clean")
+                yield Button("标记为 WAIVED", id="cln-do-waive")
                 yield Button("取消", id="cln-cancel")
 
     def action_cancel(self) -> None:

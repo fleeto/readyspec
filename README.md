@@ -35,12 +35,31 @@ ReadySpec 解决企业级软件交付中的一个高频痛点：**研发清楚�
 
 ## 快速安装与启动
 
-环境要求：**Linux / macOS，Python `>= 3.12`**。
+环境要求：**Linux / macOS，Python `>= 3.12`**。本机开发直接装包；界面容器只提供 TUI，不是常驻 Run Manager，也不代表六个目标平台已认证。
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+```
+
+### 界面容器
+
+镜像是 `linux/amd64` 与 `linux/arm64` 的同一标签，推到 `ghcr.io/fleeto/readyspec:0.1.0`。容器里没有 Run Manager。1 号进程是 `tini` 下的 `sleep infinity`，界面用 `exec` 打开。关闭该窗口会退出这次 TUI 及其进程内仿真，不会保住正在跑的检查。同时只能开一个 TUI，第二个会因工作区锁失败。固定用户是 `uid 10001`，不要用 `--user` 换成别的 uid。
+
+本机加载当前架构：
+
+```bash
+docker buildx build --platform linux/amd64 --load -t readyspec:0.1.0 .
+docker run -d --name readyspec -v readyspec-ws:/workspace readyspec:0.1.0
+docker exec -it readyspec readyspec tui
+```
+
+两种架构一起发布：
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/fleeto/readyspec:0.1.0 --push .
 ```
 
 ### 1. 启动四幕交互式 TUI

@@ -544,17 +544,22 @@ class WorkspaceStore:
                     field_name=p_spec.name,
                 )
             )
-        if p_spec.enum_values and str(val) not in p_spec.enum_values:
-            diagnostics.append(
-                ValidationDiagnostic(
-                    severity="ERROR",
-                    code="PARAM_INVALID_ENUM",
-                    message=f"参数 '{p_spec.name}' 值 '{val}' 不在允许枚举 {p_spec.enum_values} 内。",
-                    role_id=role_id,
-                    instance_id=inst.instance_id,
-                    field_name=p_spec.name,
+        if p_spec.enum_values:
+            candidates = [str(item) for item in val] if isinstance(val, list) else [str(val)]
+            invalid = [item for item in candidates if item not in p_spec.enum_values]
+            if invalid:
+                diagnostics.append(
+                    ValidationDiagnostic(
+                        severity="ERROR",
+                        code="PARAM_INVALID_ENUM",
+                        message=(
+                            f"参数 '{p_spec.name}' 值 {invalid} 不在允许枚举 {p_spec.enum_values} 内。"
+                        ),
+                        role_id=role_id,
+                        instance_id=inst.instance_id,
+                        field_name=p_spec.name,
+                    )
                 )
-            )
         if p_spec.param_type == ParamType.REGEX and isinstance(val, str):
             try:
                 re.compile(val)
