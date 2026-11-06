@@ -34,7 +34,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bubblewrap iproute2 python3 binutils build-essential
       - if: runner.os == 'Linux'
-        run: make test-collection
+        run: go test ./internal/compiler -run 'Collect|Collector|Symlink' -count=1 -v
       - run: go vet ./...
       - run: go test ./...
       - run: go run ./cmd/readyspec plan validate examples/minimal-plan.yaml --json
