@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +18,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fleeto/readyspec/internal/executor"
+	"github.com/fleeto/readyspec/internal/runmanager"
+	"github.com/fleeto/readyspec/internal/runstore"
 	"github.com/fleeto/readyspec/internal/webui"
 	"github.com/fleeto/readyspec/internal/workspace"
 )
@@ -57,6 +62,14 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		return err
 	}
 	defer lease.Close()
+	runs, err := runstore.Open(store)
+	if err != nil {
+		return fmt.Errorf("recover Run store: %w", err)
+	}
+	manager, err := runmanager.New(runs, executor.NewNativeSSH())
+	if err != nil {
+		return err
+	}
 	listener, err := net.Listen("tcp", options.listen)
 	if err != nil && !explicitAddress {
 		for port := 18481; port <= 18489; port++ {
@@ -71,16 +84,41 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 	}
 	defer listener.Close()
 	secure := options.cert != ""
-	handler, err := webui.New(webui.Options{Address: listener.Addr().String(), Token: token, OneTimeToken: generatedToken, Secure: secure, AllowedHosts: options.allowedHosts, Version: Version, WorkspaceLabel: filepath.Base(dir), Store: store})
+	localToken := rand.Text() + rand.Text()
+	serverIDBytes := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%s", listener.Addr(), os.Getpid(), localToken)))
+	serverID := hex.EncodeToString(serverIDBytes[:16])
+	localHost, localPort, _ := net.SplitHostPort(listener.Addr().String())
+	if ip := net.ParseIP(localHost); ip == nil || ip.IsUnspecified() || !ip.IsLoopback() {
+		localHost = "127.0.0.1"
+	}
+	localAddress := net.JoinHostPort(localHost, localPort)
+	handler, err := webui.New(webui.Options{Address: listener.Addr().String(), Token: token, OneTimeToken: generatedToken, Secure: secure, AllowedHosts: options.allowedHosts, Version: Version, WorkspaceLabel: filepath.Base(dir), Store: store, Runs: manager, LocalToken: localToken, ServerID: serverID})
 	if err != nil {
 		return err
 	}
+	instance := serverInstance{ServerID: serverID, Address: localAddress, LocalToken: localToken, PID: os.Getpid(), StartedAt: time.Now().UTC(), Secure: secure}
+	if err := store.WriteJSON("runtime/server.json", instance); err != nil {
+		return fmt.Errorf("persist local server discovery record: %w", err)
+	}
+	defer func() {
+		var current serverInstance
+		if store.ReadJSON("runtime/server.json", &current) == nil && current.ServerID == serverID {
+			_ = store.Remove("runtime/server.json")
+		}
+	}()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 32 * 1024}
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	done := make(chan struct{})
 	shutdownComplete := make(chan struct{})
+	workerDone := make(chan struct{})
 	defer close(done)
+	go func() {
+		defer close(workerDone)
+		if err := manager.Run(ctx); err != nil {
+			fmt.Fprintln(os.Stderr, "Run manager stopped after a storage or execution error")
+		}
+	}()
 	go func() {
 		defer close(shutdownComplete)
 		select {
@@ -119,9 +157,19 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 	}
 	if errors.Is(err, http.ErrServerClosed) {
 		<-shutdownComplete
+		<-workerDone
 		return nil
 	}
 	return err
+}
+
+type serverInstance struct {
+	ServerID   string    `json:"server_id"`
+	Address    string    `json:"address"`
+	LocalToken string    `json:"local_token"`
+	PID        int       `json:"pid"`
+	StartedAt  time.Time `json:"started_at"`
+	Secure     bool      `json:"secure"`
 }
 
 func workspaceDirectory(flag string) (string, error) {

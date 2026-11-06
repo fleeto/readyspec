@@ -60,6 +60,7 @@ s.listen(8)
 time.sleep(6)' &`
 			}
 			setup := `set -eu
+ip link set lo up
 python3 /dns-server.py &
 ` + listener + `
 sleep 0.7

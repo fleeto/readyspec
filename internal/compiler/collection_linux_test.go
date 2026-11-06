@@ -150,12 +150,15 @@ func collectionRoot(t *testing.T) string {
 		t.Skip("isolated collection requires bubblewrap")
 	}
 	root := t.TempDir()
-	for _, dir := range []string{"bin", "lib", "lib64", "dev", "tools", "usr/sbin", "usr/lib", "usr/lib64", "proc", "sys/module", "etc"} {
+	for _, dir := range []string{"bin", "lib", "lib64", "dev", "tools", "host-tools", "usr/sbin", "usr/lib", "usr/lib64", "proc", "sys/module", "etc"} {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0755); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := os.Symlink("/bin", filepath.Join(root, "usr/bin")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "host-tools/ip"), nil, 0700); err != nil {
 		t.Fatal(err)
 	}
 	fixtureFile(t, root, "etc/passwd", fmt.Sprintf("fixture-user:x:%d:%d::/app:/bin/sh\n", os.Getuid(), os.Getgid()))
@@ -526,12 +529,15 @@ func TestMemoryAndSwapCollectionPreservesRequiredEvidence(t *testing.T) {
 
 func sandboxCommand(root string, command ...string) *exec.Cmd {
 	args := []string{"--die-with-parent", "--unshare-all", "--ro-bind", root, "/", "--ro-bind", "/usr/bin", "/bin", "--ro-bind", "/usr/lib", "/usr/lib"}
+	if _, err := os.Stat("/usr/sbin/ip"); err == nil {
+		args = append(args, "--ro-bind", "/usr/sbin/ip", "/host-tools/ip")
+	}
 	// Distributions such as RHEL/AlmaLinux keep the Python standard library and
 	// architecture-specific runtimes under /usr/lib64 rather than /usr/lib.
 	if _, err := os.Stat("/usr/lib64"); err == nil {
 		args = append(args, "--ro-bind", "/usr/lib64", "/usr/lib64")
 	}
-	args = append(args, "--ro-bind", "/lib", "/lib", "--ro-bind", "/lib64", "/lib64", "--dev", "/dev", "--clearenv", "--setenv", "PATH", "/tools:/bin", "--setenv", "LC_ALL", "C", "--")
+	args = append(args, "--ro-bind", "/lib", "/lib", "--ro-bind", "/lib64", "/lib64", "--dev", "/dev", "--clearenv", "--setenv", "PATH", "/tools:/host-tools:/usr/sbin:/bin", "--setenv", "LC_ALL", "C", "--")
 	return exec.Command("bwrap", append(args, command...)...)
 }
 

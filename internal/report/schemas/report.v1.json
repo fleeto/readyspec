@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readyspec.dev/schemas/report.v1.json",
+  "title": "ReadySpec RunReport v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "plan_digest",
+    "run_mode",
+    "run_scope",
+    "executor_backend",
+    "run_status",
+    "verdict",
+    "started_at",
+    "finished_at",
+    "topology_results",
+    "hosts",
+    "cleanup_items",
+    "failures"
+  ],
+  "properties": {
+    "schema_version": {"const": "readyspec.report/v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "run_mode": {"enum": ["GATE", "TRIAL"]},
+    "run_scope": {"enum": ["FULL", "PARTIAL"]},
+    "executor_backend": {"enum": ["native_ssh", "mock_simulator"]},
+    "run_status": {"enum": ["COMPLETED", "PARTIAL", "FAILED", "CANCELLED"]},
+    "verdict": {"enum": ["READY", "NOT_READY", "UNKNOWN"]},
+    "termination_reason": {"type": "string"},
+    "verdict_reasons": {"type": "array", "items": {"type": "string"}},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "topology_results": {"type": "array", "items": {"$ref": "#/$defs/topology_result"}},
+    "hosts": {"type": "array", "items": {"$ref": "#/$defs/host_result"}},
+    "cleanup_items": {"type": "array", "items": {"$ref": "#/$defs/cleanup_item"}},
+    "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}}
+  },
+  "$defs": {
+    "topology_result": {
+      "type": "object",
+      "required": ["code", "status"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "host_id": {"type": "string"},
+        "role_id": {"type": "string"},
+        "status": {"enum": ["PASS", "FAIL", "ERROR", "UNSUPPORTED"]}
+      }
+    },
+    "item_result": {
+      "type": "object",
+      "required": ["role_id", "item_id", "status", "template_id", "template_version", "execution_mode", "evidence_mode"],
+      "properties": {
+        "role_id": {"type": "string"},
+        "item_id": {"type": "string"},
+        "status": {"enum": ["PASS", "FAIL", "ERROR", "UNSUPPORTED", "SKIP"]},
+        "template_id": {"type": "string"},
+        "template_version": {"type": "string"},
+        "execution_mode": {"enum": ["STANDARD", "PRIVILEGED"]},
+        "evidence_mode": {"type": "string"},
+        "evidence": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "host_result": {
+      "type": "object",
+      "required": ["host_id", "status", "item_results", "failures"],
+      "properties": {
+        "host_id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["COMPLETED", "PARTIAL", "FAILED", "CANCELLED"]},
+        "machine_id": {"type": "string"},
+        "boot_id": {"type": "string"},
+        "ssh_host_key_fp": {"type": "string"},
+        "arch": {"type": "string"},
+        "roles": {"type": "array", "items": {"type": "string"}},
+        "item_results": {"type": "array", "items": {"$ref": "#/$defs/item_result"}},
+        "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}}
+      }
+    },
+    "cleanup_item": {
+      "type": "object",
+      "required": ["cleanup_id", "host_id", "status"],
+      "properties": {
+        "cleanup_id": {"type": "string", "minLength": 1},
+        "host_id": {"type": "string", "minLength": 1},
+        "machine_id": {"type": "string"},
+        "boot_id": {"type": "string"},
+        "status": {"enum": ["PENDING", "FAILED", "UNKNOWN", "CLEAN", "IGNORED"]},
+        "remote_path": {"type": "string"},
+        "owner_token": {"type": "string"},
+        "reason": {"type": "string"},
+        "audit_reason": {"type": "string"}
+      }
+    },
+    "failure": {
+      "type": "object",
+      "required": ["code", "phase", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "phase": {"type": "string", "minLength": 1},
+        "host_id": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

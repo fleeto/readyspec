@@ -2,14 +2,21 @@ package webui_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/fleeto/readyspec/internal/executor"
+	"github.com/fleeto/readyspec/internal/report"
+	"github.com/fleeto/readyspec/internal/runmanager"
+	"github.com/fleeto/readyspec/internal/runstore"
 	"github.com/fleeto/readyspec/internal/webui"
 	"github.com/fleeto/readyspec/internal/workspace"
 )
@@ -72,6 +79,167 @@ func TestRejectsCrossOriginHostAndCSRFBypasses(t *testing.T) {
 		t.Fatalf("cookie session cannot resume after page reload: %d", w.Code)
 	}
 }
+
+func TestLoopbackDelegationTokenIsBoundToLocalPeerAndServerIdentity(t *testing.T) {
+	_, ws := newServerWithStore(t)
+	server, err := webui.New(webui.Options{Address: address, Token: token, LocalToken: "local-delegation-secret-value-012345", ServerID: "instance-1", Store: ws, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name, remote, localToken string
+		want                     int
+	}{
+		{"loopback token", "127.0.0.1:1234", "local-delegation-secret-value-012345", http.StatusOK},
+		{"remote peer", "192.0.2.8:1234", "local-delegation-secret-value-012345", http.StatusUnauthorized},
+		{"wrong token", "127.0.0.1:1234", "wrong", http.StatusUnauthorized},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "http://"+address+"/api/v1/system/info", nil)
+			r.RemoteAddr = tt.remote
+			r.Header.Set("Origin", "http://"+address)
+			r.Header.Set("X-ReadySpec-Local-Token", tt.localToken)
+			w := httptest.NewRecorder()
+			server.ServeHTTP(w, r)
+			if w.Code != tt.want {
+				t.Fatalf("status %d, body %s", w.Code, w.Body.String())
+			}
+			if tt.want == http.StatusOK && !strings.Contains(w.Body.String(), `"server_id":"instance-1"`) {
+				t.Fatalf("missing instance identity: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+func TestRunSubmitReportAndSSEUseRunManager(t *testing.T) {
+	_, ws := newServerWithStore(t)
+	store, err := runstore.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profiles := executor.Profiles{Hosts: map[string]executor.Profile{
+		"node": {Preflight: "READY", MachineID: "machine-1", BootID: "boot-1", HostKey: "SHA256:test", Arch: "x86_64", UID: 1000},
+	}}
+	manager, err := runmanager.New(store, executor.Simulator{Profiles: profiles})
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverWithRuns, err := webui.New(webui.Options{Address: address, Token: token, Store: ws, Runs: manager, Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cookie, csrf := login(t, serverWithRuns)
+	source := `schema_version: readyspec.plan/v1
+plan_id: web-run
+name: Web Run
+software_name: demo
+software_version: '1'
+version: '1.0.0'
+state: DRAFT
+topology_policy: {allowed_arch: [x86_64]}
+roles: [{role_id: app, name: App, min_nodes: 1, max_nodes: 1, allow_colocation: false, items: []}]
+embedded_templates: []
+template_lock: {}
+`
+	body, err := json.Marshal(map[string]any{
+		"plan": source, "inventory": map[string]string{"source": "node=127.0.0.1", "format": "quick"},
+		"role_map": map[string][]string{"app": {"node"}}, "field_overrides": []any{},
+		"run_mode": "TRIAL", "run_scope": "FULL", "executor_backend": "mock_simulator",
+		"idempotency_key": "web-api-test", "auth_identity": map[string]string{"method": "offline"},
+		"simulator_profiles": profiles,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := request(serverWithRuns, "POST", "/api/v1/runs", string(body), cookie, csrf)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("submit returned %d: %s", w.Code, w.Body.String())
+	}
+	var accepted struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &accepted); err != nil || accepted.RunID == "" {
+		t.Fatalf("invalid submit response: %v %s", err, w.Body.String())
+	}
+	cleanup := report.CleanupItem{CleanupID: "web-cleanup-test", HostID: "node", MachineID: "machine-1", BootID: "boot-1", Status: "PENDING", RemotePath: "/tmp/readyspec-test-owner", OwnerToken: "0123456789abcdef0123456789abcdef"}
+	if err := store.CleanupRegistered(context.Background(), accepted.RunID, cleanup); err != nil {
+		t.Fatal(err)
+	}
+	slowWriter := &blockingSSEWriter{header: make(http.Header), entered: make(chan struct{}), release: make(chan struct{})}
+	slowRequest := httptest.NewRequest("GET", "http://"+address+"/api/v1/runs/"+accepted.RunID+"/events", nil)
+	slowRequest.Header.Set("Origin", "http://"+address)
+	slowRequest.Header.Set("X-CSRF-Token", csrf)
+	slowRequest.AddCookie(cookie)
+	slowDone := make(chan struct{})
+	go func() { defer close(slowDone); serverWithRuns.ServeHTTP(slowWriter, slowRequest) }()
+	select {
+	case <-slowWriter.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("slow SSE client did not reach snapshot write")
+	}
+	if ok, err := manager.ProcessNext(context.Background()); !ok || err != nil {
+		t.Fatalf("process accepted Run: ok=%v err=%v", ok, err)
+	}
+	close(slowWriter.release)
+	select {
+	case <-slowDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("SSE stream did not finish after the client resumed reading")
+	}
+	if !strings.Contains(slowWriter.body.String(), "event: STATE") {
+		t.Fatal("event created while the snapshot was blocked was lost")
+	}
+	reportResponse := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/report", "", cookie, csrf)
+	if reportResponse.Code != http.StatusOK || !strings.Contains(reportResponse.Body.String(), `"verdict":"UNKNOWN"`) {
+		t.Fatalf("report response %d: %s", reportResponse.Code, reportResponse.Body.String())
+	}
+	if strings.Contains(reportResponse.Body.String(), cleanup.OwnerToken) {
+		t.Fatal("cleanup owner token leaked through report API")
+	}
+	cleanupList := request(serverWithRuns, "GET", "/api/v1/cleanup", "", cookie, csrf)
+	if cleanupList.Code != http.StatusOK || strings.Contains(cleanupList.Body.String(), cleanup.OwnerToken) || !strings.Contains(cleanupList.Body.String(), cleanup.CleanupID) {
+		t.Fatalf("cleanup listing %d: %s", cleanupList.Code, cleanupList.Body.String())
+	}
+	ignoreBody, _ := json.Marshal(map[string]any{"action": "IGNORE", "audit_reason": "operator verified that no cleanup is required"})
+	resolved := request(serverWithRuns, "POST", "/api/v1/runs/"+accepted.RunID+"/cleanup/"+cleanup.CleanupID, string(ignoreBody), cookie, csrf)
+	if resolved.Code != http.StatusOK || !strings.Contains(resolved.Body.String(), `"status":"IGNORED"`) || strings.Contains(resolved.Body.String(), cleanup.OwnerToken) {
+		t.Fatalf("cleanup resolution %d: %s", resolved.Code, resolved.Body.String())
+	}
+	cleanupList = request(serverWithRuns, "GET", "/api/v1/cleanup", "", cookie, csrf)
+	if strings.Contains(cleanupList.Body.String(), cleanup.CleanupID) {
+		t.Fatalf("resolved item remained pending: %s", cleanupList.Body.String())
+	}
+	events := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/events", "", cookie, csrf)
+	if events.Code != http.StatusOK || !strings.Contains(events.Body.String(), "event: snapshot") {
+		t.Fatalf("SSE snapshot response %d: %s", events.Code, events.Body.String())
+	}
+	resetRequest := httptest.NewRequest("GET", "http://"+address+"/api/v1/runs/"+accepted.RunID+"/events", nil)
+	resetRequest.Header.Set("Origin", "http://"+address)
+	resetRequest.Header.Set("Last-Event-ID", "999999")
+	resetRequest.Header.Set("X-CSRF-Token", csrf)
+	resetRequest.AddCookie(cookie)
+	resetResponse := httptest.NewRecorder()
+	serverWithRuns.ServeHTTP(resetResponse, resetRequest)
+	if resetResponse.Code != http.StatusOK || !strings.Contains(resetResponse.Body.String(), "event: reset") {
+		t.Fatalf("stale SSE cursor did not receive reset: %d %s", resetResponse.Code, resetResponse.Body.String())
+	}
+}
+
+type blockingSSEWriter struct {
+	header  http.Header
+	body    bytes.Buffer
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (w *blockingSSEWriter) Header() http.Header { return w.header }
+func (*blockingSSEWriter) WriteHeader(int)       {}
+func (w *blockingSSEWriter) Write(value []byte) (int, error) {
+	w.once.Do(func() { close(w.entered); <-w.release })
+	return w.body.Write(value)
+}
+func (*blockingSSEWriter) Flush() {}
 
 const draftSource = `schema_version: readyspec.plan/v1
 plan_id: web-demo

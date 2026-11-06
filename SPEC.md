@@ -128,6 +128,7 @@
   - 当执行 `readyspec run/plan/report/cleanup ...` 时，协调器先尝试非阻塞获取工作区文件锁：
     1. **获取成功**（当前未运行 Web 服务）：CLI 直接在当前进程内持有文件锁启动 `RunManager` 完成操作并退出，无需事先启动后台守护进程。
     2. **锁已被占用**：读取 `runtime/server.json` 验证同工作区活动 `readyspec serve` 实例身份，通过本地受控 API 提交并订阅 SSE 事件流直至完成（若该服务的等待队列已满，返回退出码 `16 WORKSPACE_BUSY`）；若锁由另一短命 CLI 进程持有，在 `--no-wait` 下立即返回退出码 `16 WORKSPACE_BUSY`，否则按等待预算轮询等待锁释放。
+  - **本机凭据委托**：私钥由 CLI 读取并解析，经已认证本地通道交接必要密钥材料至服务的任务内存保险箱；服务不得打开 CLI 提供的私钥路径。Agent 认证由服务直接连接用户明确指定、符合本地用户访问规则的同机 Unix socket 或 Windows 命名管道，固定选定公钥身份，不静默改用服务自身 Agent，也不引入任意网络转发或依赖 CLI 存活的签名代理。新任务接受前必须取得所需材料或可用 Agent 连接；接受后 CLI 退出不影响任务，但 Agent 自身锁定、退出、移除密钥或要求人工确认仍可导致认证失败，不自动替换凭据。
 
 ### 3.3 跨平台工作区持久化布局
 
@@ -140,12 +141,14 @@
 |---|---|---|
 | `plans/drafts/`、`plans/released/` | 检查方案草稿、已发布与已停用方案文件 | 用户管理；绝不因历史检查任务过期自动清理 |
 | `templates/` | 用户提升的公共检查模板（`USER_PUBLIC`） | 版本不可变 |
-| `runs/<run-id>/` | 执行配置冻结记录、单调序号事件流 `events.ndjson`、最终 `report.json` | 已完成普通任务默认保留 30 天且最多 100 条 |
+| `runs/<run-id>/` | 不含秘密的 Plan/RunConfig 冻结记录、原子接受记录 `accepted.json`、单调序号 Journal `events.ndjson`、可重建状态快照、最终 `report.json` | 已完成普通任务默认保留 30 天且最多 100 条 |
 | `cleanups/` | 待清理残留记录（`CleanupItem`） | 处于 `PENDING / FAILED / UNKNOWN` 或审计保留态时永久受保护 |
 | `exports/` | 用户主动导出的自包含检查方案与检查报告 | 不受自动历史清理影响 |
 | `runtime/` | 排他锁 `.lock` 与活动服务发现文件 `server.json` | 瞬态运行文件，服务退出自动移除 |
 
-所有状态落盘采用**同目录临时文件写入 + `fsync`/`FlushFileBuffers` + 原子重命名替换**（Windows 下严格保证关闭句柄后原子替换）。事件流尾部若因断电/崩溃出现半行损坏，启动加载时保留完整有效前缀并记录诊断，绝不将未完成原子写入的报告视为有效终态。
+冻结输入、接受记录、状态快照、报告和清理记录采用**同目录临时文件写入 + `fsync`/`FlushFileBuffers` + 原子重命名替换及目录同步**（Windows 下严格保证关闭句柄后原子替换）。事件 Journal 使用仍受工作区路径约束与排他租约保护的追加接口；每个 Run 串行分配序号、追加记录，关键转换同步成功后才确认接受或允许对应远端副作用。事件流尾部若因断电/崩溃出现半行损坏，启动加载时保留完整有效前缀并记录诊断；中间记录损坏不得跳过，须保留文件并报告存储故障。绝不将未完成原子写入的报告视为有效终态。
+
+冻结输入先落盘，最后原子写入并同步的 `accepted.json` 才代表任务已接受；其内容包含 Run ID、工作区幂等键、语义摘要、初始状态、接受时间及冻结输入引用。未提交接受记录的输入不得进入队列。幂等索引和状态快照均可重建，分别以有效接受记录和串行 Journal 为依据，不要求跨文件事务；最终结果以有效 `report.json` 为准。完整恢复顺序与 M2-1 验证关口见 [`docs/m2-implementation-design.md`](docs/m2-implementation-design.md) §§4、9、12。
 
 ---
 
@@ -160,7 +163,7 @@
 | `Role` | 节点角色标识（如 `web`、`db`）、显示名、最小/最大节点数、是否允许同机混部（`allow_colocation`）、专属 `items` 列表 | 角色间检查项完全独立，互不共享引用指针 |
 | `TopologyPolicy` | 允许的目标 CPU 架构列表（`allowed_arch`），配合各 `Role` 的节点数与混部约束 | 作为方案级固有属性直接核对，不混作目标主机 Goss 模板；OS 发行版与版本由具体检查项核对 |
 | `Plan` | 方案 ID、名称、适用软件与版本、方案版本号、状态（`DRAFT / RELEASED / ARCHIVED`）、`topology_policy`、`roles`、内嵌模板快照、模板摘要锁、发布清单、RFC 8785 语义摘要 | `RELEASED` 单文件自包含，不可修改（修改须另存新版本；停用可标为 `ARCHIVED`），绝不含凭据 |
-| `RunConfig` | 方案引用与期望摘要、任务类别（`GATE / TRIAL`）、任务范围（`FULL / PARTIAL`）、主机清单快照、角色到目标主机映射、现场参数值列表（`field_overrides`）、执行器类型、短期凭据令牌、幂等键 | 提交即冻结为当次检查任务的不可变输入，绝不反写检查方案；不设特权模板批准列表或 `root` 直连授权开关 |
+| `RunConfig` | 方案引用与期望摘要、任务类别（`GATE / TRIAL`）、任务范围（`FULL / PARTIAL`）、主机清单快照、角色到目标主机映射、现场参数值列表（`field_overrides`）、执行器类型、非秘密认证元数据、时间预算、幂等键 | 提交即冻结为不可变输入，绝不反写检查方案；磁盘快照不含密码、私钥、Agent 连接或可取回凭据的句柄，`credential_handle` 仅存在于任务内存上下文；不设特权模板批准列表或 `root` 直连授权开关 |
 | `RunReport` | 报告 Schema 版本、任务元数据、执行器标识、运行状态（`RunStatus`）、就绪结论（`Verdict`）及原因、环境与拓扑核对结果、各目标主机阶段与单项结果（`ItemResult` + 观测证据）、待清理残留列表、安全审计摘要 | 原子写入完成后归档；前端与 CLI 直接展示报告结论，不二次重算另一套 `Verdict` |
 
 ### 4.2 检查方案单文件结构与校验基线
@@ -325,7 +328,8 @@
 
 - **单活动检查任务与 FIFO 队列**：单个工作区同一时刻最多运行 1 个活动检查任务（`Run`），等待队列最多容纳 10 个排队任务；超出队列上限时拒绝提交并返回 `WORKSPACE_BUSY`（CLI 退出码 `16`）。
 - **主机并发与执行顺序**：单个检查任务默认最多并发连接 5 台目标主机；单台目标主机内 Goss 默认并发数为 10；同一台目标主机必须先完成 `STANDARD` 普通执行，再串行进入获授权的 `PRIVILEGED` 特权执行，严禁二者并发共享远端工作目录。
-- **幂等提交**：`RunConfig` 携带稳定 `idempotency_key`；相同幂等键与相同配置语义摘要重复提交时返回原任务 ID，相同幂等键但负载不同时立即拒绝并报冲突。
+- **幂等提交**：`RunConfig` 携带稳定 `idempotency_key`；工作区提交锁串行化查重、队列容量预留和接受。相同幂等键与相同配置语义摘要重复提交时返回原任务 ID，相同幂等键但负载不同时立即拒绝并报冲突。重复提交不能替换原任务凭据或引起第二次执行；新提交的未使用凭据立即销毁。摘要包含执行器、认证方式、选定公钥身份等非秘密语义，排除秘密和可取回凭据的句柄。
+- **静态校验与执行范围**：提交校验复用清单形状、绑定引用、参数覆盖和编译规则，不把角色数量或混部核对提前改为 `PLAN_ERROR`；最终拓扑遵循 §6.2。局部复测不得仅因未满足完整角色节点数量而拒绝提交。仅包含启用检查项的方式属于计划执行模式；空工件不投递、不执行，不要求 sudo 或空结果作为完成条件。
 
 ### 8.2 原生 SSH 九阶段闭环与内嵌 Goss 投递
 
@@ -333,28 +337,33 @@
 
 SSH 密钥、系统 Agent 或密码均可满足 SSH 认证；实际 UID 为 `0` 时无需 sudo 凭据，普通账户无特权检查时无需 sudo，免密 sudo 满足所需权限时也无需额外密码。sudo 校验应针对将要执行的受控命令及策略，不得仅凭账户属于某个用户组或 `sudo -v` 成功推断命令可执行，也不得执行检查脚本来试探权限；校验不得依赖交互提示或已有 sudo 缓存票据。Web UI 提供缺失凭据的补充入口，CLI 立即拒绝、不得等待输入。前置校验不代替执行时权限检查；通过校验后发生的权限变化或执行故障仍记对应检查项 `ERROR`。
 
+**sudo 无法核验与明确拒绝分离**：仅当存在启用特权项且实际 UID 非 `0` 时要求 sudo 预检。已证明允许才通过；明确拒绝或必要凭据缺失按 `AUTH_ERROR / 15` 拒绝整次任务。无法证明允许、也无法判定明确拒绝（例如不支持精确策略查询或结果无法可靠解析）时，同样拒绝整次任务，全部目标零 Goss 投递、零检查执行，不虚构 ItemResult；成功归档报告时记 `FAILED` 及核验失败原因，无其他明确必检/拓扑 `FAIL` 或更高优先级错误则为 `UNKNOWN / 11`。无法形成有效报告的控制面致命故障仍适用 `13`。不得降级为仅执行 STANDARD。预检不得留下持久 sudo 时间戳；M2-1 须验证最终受控命令的精确查询可行性，不能把上述行为决定当作技术验证已通过。
+
+全主机屏障由 RunManager 从模拟器阶段开始统一执行。重复实机身份使用 §6.2 三元组：阻止冲突主机执行，其他合格主机在屏障后继续；身份冲突贡献拓扑 `ERROR`，不得覆盖已有明确必检或拓扑 `FAIL` 的 `NOT_READY` 优先级。
+
 管理端通过 `golang.org/x/crypto/ssh` 直连 Linux 目标主机（Windows 与 Linux 管理端行为完全一致）：
 
 1. **连接与主机身份核验（`CONNECTING`）**：默认开启 `known_hosts` 主机公钥校验；支持私钥文件、系统 SSH Agent（Linux `SSH_AUTH_SOCK` / Windows `\\.\pipe\openssh-ssh-agent`）及来自内存保险箱的短期密码。仅在尚未进入执行阶段的瞬时连接/传输故障允许有限重试。
 2. **能力发现（`DISCOVERING`）**：单次 `/bin/sh` 采集发行版、内核、CPU 架构（`x86_64` / `aarch64`）、`machine-id`、`boot_id`、登录 UID、`sudo` 能力、SHA-256 校验工具（`sha256sum` → `openssl dgst -sha256`）及非 `noexec` 可执行临时目录（`STANDARD` 候选：`显式指定 → /tmp → /var/tmp → $HOME/.cache`；`PRIVILEGED` 候选：`显式指定 → /run → /var/tmp → /tmp`）。
 3. **分方式编译与残留预登记（`PREPARING`）**：生成目标主机专属 Goss 工件；在远端创建目录前先在本地持久化 `CleanupItem(PENDING)`（记录 `remote_dir`、128-bit `owner_token`、`machine_id`、`boot_id`）。
 4. **流式投递与远端摘要验真**：远端执行 `umask 0077 && mkdir <unique_dir>`（严禁 `-p` 防符号链接抢占），写入 `.readyspec_owner` 归属令牌，按发现的 CPU 架构从单二进制内嵌镜像流式解压写入原装 `Goss v0.4.9` 与 `standard-goss.yaml`，并在远端校验 SHA-256 一致（缺少校验工具或摘要不符立即 fail closed 中止）。
-5. **普通执行（`RUNNING_STANDARD`）**：先落盘“远端可能已开始执行”标记（一旦置位，任何断线或超时均严禁自动重跑）；运行 `goss -g standard-goss.yaml validate --format json --retry-timeout 0s --no-color --max-concurrent 10`，有界读取输出（上限 `16 MiB`）。
+5. **普通执行（`RUNNING_STANDARD`）**：若该方式有启用检查项，先按 `(run_id, host_id, execution_mode)` 追加并同步“远端可能已开始执行”标记，成功后才能发送执行命令（一旦置位，任何断线或超时均严禁自动重跑）；运行 `goss -g standard-goss.yaml validate --format json --retry-timeout 0s --no-color --max-concurrent 10`，有界读取输出（上限 `16 MiB`）。
 6. **受控特权执行（`RUNNING_PRIVILEGED`）**：仅对本地可信内置库摘要精确匹配的 `PRIVILEGED` 模板执行，依据模板声明的权限需求自动选择执行方式，无须额外批准。实际 UID 为 `0` 时直接执行特权闭环，无须调用 sudo；其他账户按需使用 sudo。执行前提示受影响主机、检查项及 root/sudo 执行方式；必要凭据及权限不足按前置校验拒绝，通过校验后的执行故障记对应检查项 `ERROR`，不得伪装为 `PASS` 或降级证据。非 `root` 登录下采用单次 `sudo -S -p '' /bin/sh -c` 原子闭环：原子创建 `root:root 0700` 隔离目录 → 独立拷入本地已上传的 `goss` 字节与特权规则 → **`root` 态重新计算校验 SHA-256（防普通用户态 TOCTOU 篡改）** → `env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C HOME=/root` 清洗环境与绝对路径运行 → 正常态当场自清理特权目录 → 末尾强制 `sudo -k` 清除缓存票据。root 直连同样保留隔离、摘要校验、环境清洗与清理，免除 sudo 调用及票据处理。
+   - PRIVILEGED 仅在有启用特权项时执行；发送受控命令前必须追加并同步该主机 **独立的 PRIVILEGED 执行标记**，写入失败不发命令，标记后的歧义结果禁止重跑。空 STANDARD 无需执行。正常及可控失败路径均尝试清理和 `sudo -k`，无法确认时保留清理记录，不宣称成功。
 7. **结果回收（`COLLECTING`）**、**归属校验清理（`CLEANING`）** 与 **终态归档（`FINISHED`）**：核对远端 `machine_id`、`boot_id` 与 `.readyspec_owner` 完全一致且不跟随符号链接后删除临时工作目录，将 `CleanupItem` 更新为 `CLEAN`。
 
 ### 8.3 协作式取消、异常重启与远端残留清理（`RemoteCleanup`）
 
-- **取消语义**：收到取消请求后立即停止新主机分派，将任务置为过渡态 `CANCELLING` 并尝试向活动远端命令发送协作终止信号；最终任务状态归档为 `CANCELLED`（不宣称远端派生子进程必然立即退出，未能确认清理完毕的目录保留为 `CleanupItem(PENDING/UNKNOWN)`）。
-- **崩溃重启恢复**：新进程接管工作区时，将上次异常中断遗留的 `PENDING` / `RUNNING` 任务归档为中断终态，**绝不自动重新调度执行**。
-- **待清理残留处置**：操作者在 Web UI「模板与清理」或 CLI `readyspec cleanup resolve` 中处置未结案 `CleanupItem` 时，先连接目标主机核对机器码、开机标识与 `.readyspec_owner` 归属令牌并探查 `/proc` 关联进程；若检测到存活进程，须经操作者显式确认终止后方可执行删除并置为 `CLEAN`；若确认无需远程清理，可填写审计原因标记为 **`IGNORED`（人工忽略）**。
+- **取消语义**：取消接受与终态归档选择在同一个 Run 串行入口排序；接受取消须追加并同步 Journal，立即停止新主机分派，进入 `CANCELLING` 并尝试协作终止。取消先持久化时最终归档为 `CANCELLED`，不要求终止信号送达或派生进程退出已确认；不确定性保留为 `CleanupItem(PENDING/UNKNOWN)`。已选定终态归档流程或已有有效报告时不再接受新取消，不能改写终态；崩溃前未持久化的取消不算已接受。
+- **崩溃重启恢复**：优先校验已提交的 `report.json`，有效则按报告补齐终态和最终事件，不重算 Verdict。无有效报告但 Journal 有已接受取消时归档为 `CANCELLED`；其余已接受未完成任务（含排队任务）归档为 `FAILED / CONTROLLER_INTERRUPTED`，保留证据和清理记录。**任何恢复路径都绝不自动重新调度旧任务**。
+- **待清理残留处置**：操作者在 Web UI「模板与清理」或 CLI `readyspec cleanup resolve` 中处置未结案 `CleanupItem` 时，重新提供操作级短期凭据，不依赖已销毁的 Run 保险箱；重新核验 SSH 主机身份、机器码、开机标识、`.readyspec_owner` 归属令牌及非符号链接路径归属，并探查 `/proc` 关联进程。若检测到存活进程，须经操作者显式确认后方可终止或删除并置为 `CLEAN`；CLI 使用显式非交互确认。若无需远程清理，必须填写审计原因标记为 **`IGNORED`（人工忽略）**，不伪装成 `CLEAN`，永久保留审计。操作结束销毁其凭据。
 
 ---
 
 ## 9. 安全与信任边界
 
 - **自包含快照不传递特权信任**：导入自包含检查方案时，任何声明为 `PRIVILEGED` 的模板必须与当前单二进制内置可信注册表的 ID、版本与语义摘要完全一致，单靠导入文件自称内置来源一律拒绝特权执行。
-- **短期凭据纯内存即焚**：SSH/Sudo 密码仅存入进程内存 `EphemeralVault` 换取短期随机句柄，任务结束或异常退出时在 `defer` 中立即清零覆写销毁，**绝不写入检查方案、执行配置快照、检查报告或日志**。
+- **短期凭据纯内存即焚**：SSH/Sudo 密码、私钥材料及 Agent 连接仅由任务内存上下文/`EphemeralVault` 持有，`credential_handle` 不进入磁盘 RunConfig。终态归档、排队取消/过期、提交失败及正常服务关闭时销毁任务持有的材料/连接；重复提交立即销毁新提供但未使用的凭据。**秘密、Agent 连接和可取回凭据的句柄绝不写入检查方案、执行配置快照、检查报告、事件或日志**。尽量覆写自有缓冲区，但 Go 运行时及 SSH 库可能保留副本，不承诺完整进程内存擦除；异常进程终止不依赖 `defer` 必然运行。
 - **Web 监听与跨站防护**：
   - 默认仅监听 `127.0.0.1`；所有 API 强制校验会话凭证、CSRF 令牌及 `Origin` 头，阻断恶意网页跨站请求本地端口与 DNS Rebinding。
   - 回环监听时 `Host` 头严格校验（监听地址、显式白名单或 `localhost`）；显式非回环监听面向内网部署，只校验请求端口与监听端口一致，不再按主机名拦截（见 Web 凭据与内网明文 HTTP 部署决策）。
@@ -444,6 +453,17 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
    - **规则 2（证据不足或非门禁范围封顶）**：不满足规则 1（无明确必检 `FAIL`），但存在任一启用 `REQUIRED` 项或 `TopologyPolicy` 为 `ERROR`/`UNSUPPORTED`、任务未正常完成（`RunStatus != COMPLETED`）、方案中没有任何启用的 `REQUIRED` 检查项、或当次任务属于 `TrialRun` / `PartialRun` / `mock_simulator` → **`UNKNOWN`**。
    - **规则 3（严格门禁放行）**：`Plan.state == RELEASED`、`RunConfig.run_mode == GATE`、`RunConfig.run_scope == FULL`、`executor_backend == native_ssh`、`RunStatus == COMPLETED`，存在至少一项启用的 `REQUIRED` 检查项，且 `TopologyPolicy` 与全部启用的 `REQUIRED` 检查项均为 `PASS`（非必检的 `WARNING`/`INFO` 项若为 `FAIL` 仅在报告告警，不阻断 `READY`） → **`READY`**。
 
+终态进入条件如下，`PartialRun` 范围与 `PARTIAL` 状态无关：
+
+| RunStatus | 进入条件 |
+|---|---|
+| `COMPLETED` | 全部范围内目标主机及计划执行模式均完成并取得有效规范化结果；业务 `FAIL` 或单项取证 `ERROR` 本身不表示调度未完成。 |
+| `PARTIAL` | 至少一个计划模式有有效规范化结果，但其他主机/模式因超时、断线、输出无效或其他执行故障未完成。 |
+| `FAILED` | 全局拒绝、控制面致命失败，或没有任何计划模式产生有效规范化结果；保留诊断及清理记录。 |
+| `CANCELLED` | 取消已持久化接受，停止新分派并尽力终止，归档已有证据；终止信号是否成功不影响取消终态。 |
+
+执行与结果已确认完整时，仅清理失败不改写 `COMPLETED` 或证据，按正常规则仍可能 `READY / 0`；保留清理警告并保护历史记录。预算超时不等同于主动取消：排队过期为 `FAILED / QUEUE_TIMEOUT + UNKNOWN / 11`；运行超时按有无有效模式结果为 `PARTIAL` 或 `FAILED`，已有必检/拓扑 `FAIL` 则 `NOT_READY / 10`，否则 `UNKNOWN / 11`。已接受取消保留已证实的 Verdict，但 CLI 按 §10.3 返回 `14`。以上退出码均以无更高优先级错误且报告可归档为前提，无法形成有效报告的控制面故障仍为 `13`。
+
 ### 11.2 观测证据与检查报告结构
 
 - 每条观测证据至少包含：`run_id`、`host_name`、`role_id`、`item_id`、`template_id`、`template_version`、`template_digest`、`goss_subrule_id`、`execution_identity`、`execution_mode`（`STANDARD/PRIVILEGED`）、`expected`、`observed`（经敏感脱敏且限制 `≤ 64 KiB`）、`evidence_mode`、`source`、`window_coverage`（日志类必填）、`high_risk_root_audit`、`collected_at`、`goss_version`、`compiler_version`。
@@ -472,6 +492,8 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 | 超时与体积上限 | 默认 SSH 连接 `10s`、发现 `30s`、投递 `60s`、网络探测 `5s`（上限 `30s`）、单条 Shell `15s`（上限 `120s`）、单机 Goss `5m`、单机总计 `10m`、排队 `30m`、整任务 `60m`；方案文件 `≤ 10 MiB`、单条证据 `≤ 64 KiB`、单机 JSON `≤ 16 MiB`、整份报告 `≤ 64 MiB` |
 | 历史留存与清理保护 | 已完成普通任务默认保留 `30 天` 且最多 `100 条`（取更严者）；含未结案 `CleanupItem` 的记录永久豁免自动淘汰 |
 | 离线供应链 | 运行时零外网依赖；内嵌官方原装 `Goss v0.4.9` 二进制经 SHA-256 锁定，附完整 `LICENSE` 与 `NOTICE` |
+
+**预算起点与收尾**：排队 `30m` 和整任务 `60m` 均从 `accepted.json` 提交成功时起算，整任务包含排队和预检。单主机 `10m` 累计预检及执行的处理时间，不包含等待全主机屏障的空闲时间，重连不重置；每个操作同时受阶段、剩余主机和剩余整任务预算约束，先到期者生效。超时停止受影响的新操作并尝试终止活动命令；清理归档使用独立有界上下文，不沿用已过期的执行上下文。具体收尾上限及关闭策略须在 M2-1 明确验证后落实，不能无限等待。
 
 ---
 
@@ -539,7 +561,7 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 | REQ-EXEC-06 | 目标临时目录挂载 `noexec` 时按受控候选列表回退，均不可执行则报 `ERROR`，严禁修改挂载参数 | Execution | F03/F10 | TC-EXEC-06 |
 | REQ-EXEC-07 | 单任务默认 5 主机有界并发，单台主机失败隔离不阻断其他目标主机 | Service/Execution | F09 | TC-EXEC-07 |
 | REQ-EXEC-08 | 同一目标主机严格先运行 `STANDARD`、后串行运行已获授权的 `PRIVILEGED` | Execution | F09/F10 | TC-EXEC-08 |
-| REQ-EXEC-09 | 仅在进入可能执行阶段前允许对瞬时连接故障做有限重试；一旦置位“可能已开始执行”严禁自动重跑 | Execution | F11 | TC-EXEC-09 |
+| REQ-EXEC-09 | 每主机每执行方式分别持久化“可能已开始执行”标记，成功后才发命令；标记后严禁自动重跑，仅此前瞬时连接故障可有限重试 | Execution | F11 | TC-EXEC-09 |
 | REQ-EXEC-10 | 调用 Goss 时显式关闭内部重试（`--retry-timeout 0s`）并强制执行单命令与单主机总超时预算 | Execution | F09/F11 | TC-EXEC-10 |
 | REQ-EXEC-11 | 支持协作式取消，立即停止新分派并保留已完成主机的有效证据 | Service/Execution | F11 | TC-EXEC-11 |
 | REQ-EXEC-12 | 远端清理严格验证 `machine_id`、`boot_id` 与 `.readyspec_owner` 且不跟随符号链接越界删除 | Execution | F10/F11 | TC-EXEC-12 |
@@ -552,10 +574,10 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 | REQ-RUN-01 | 跨平台工作区文件锁（Linux `flock` / Windows `LockFileEx`）保证同一工作区任一时刻仅有一个活动控制器 | Platform/Store | F09/F11 | TC-RUN-01 |
 | REQ-RUN-02 | CLI 自适应双模：有活动 `readyspec serve` 时经本地受控 API 委托执行，无活动服务时进程内持锁直跑 | Coordinator/CLI | F09/F12 | TC-RUN-02 |
 | REQ-RUN-03 | 单活动检查任务 + 最多 10 排队 FIFO；超出或 `--no-wait` 锁占用返回 `WORKSPACE_BUSY`（退出码 `16`） | Service/CLI | F09/F12 | TC-RUN-03 |
-| REQ-RUN-04 | `RunConfig` 具备幂等键保护，同键异负载拒绝提交 | Service | F09/F11 | TC-RUN-04 |
+| REQ-RUN-04 | 工作区串行提交与原子接受记录保护幂等，同键同摘要返回原Run、异负载拒绝，重复提交不替换凭据；索引可重建 | Service/Store | F09/F11 | TC-RUN-04 |
 | REQ-RUN-05 | 提交任务即冻结检查方案快照、主机清单、角色分配与现场参数值，后续修改外部文件不影响运行中任务 | Service | F04/F09 | TC-RUN-05 |
 | REQ-RUN-06 | 关闭浏览器页面不中断 `readyspec serve` 中的活动任务，重连可通过快照 + SSE 单调序号续传 | Server/Web | F09/F11 | TC-RUN-06 |
-| REQ-RUN-07 | 进程崩溃重启后，旧未完成任务转为中断终态，绝不自动重跑 | Store/Service | F11 | TC-RUN-07 |
+| REQ-RUN-07 | 重启优先按有效报告补归档，无报告但已接受取消则CANCELLED，其余旧未完成任务为中断终态，绝不自动重跑 | Store/Service | F11 | TC-RUN-07 |
 | REQ-RUN-08 | 状态文件采用同目录临时文件 + 刷盘 + 原子替换写入；事件流尾部半行损坏可安全恢复有效前缀 | Platform/Store | F11/F13 | TC-RUN-08 |
 | REQ-RUN-09 | 普通已完成任务保留 30 天且最多 100 条；含未结案 `CleanupItem` 的记录永久受保护不被淘汰 | Store | F11/F13 | TC-RUN-09 |
 | REQ-RUN-10 | `RemoteCleanup` 检测到远端存活关联进程时，须经操作者显式确认后方可终止并清理 | Execution/Server | F10/F11 | TC-RUN-10 |
@@ -568,7 +590,7 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 | REQ-SEC-01 | 严禁将非 `root` 连接通过 `sudo` 提权执行任何用户自定义 Shell | Compiler/Execution | F10 | TC-SEC-01 |
 | REQ-SEC-02 | root 登录或实际 UID 为 0 时提示实际执行身份并允许执行，不要求额外授权；强制记录 `high_risk_root_audit=true`，覆盖自定义 Shell 场景 | Service/Execution | F10 | TC-SEC-02 |
 | REQ-SEC-03 | 用户模板与外部导入模板快照不可自行获取特权资格；`PRIVILEGED` 必须精确匹配本地内置可信注册表摘要 | Registry/Security | F08/F10 | TC-SEC-03 |
-| REQ-SEC-04 | 根据可信内置模板权限声明与实际账户身份选择 root 直接执行或按需 sudo，仅提示、不额外批准；全部目标凭据与权限前置校验通过后才能执行检查，缺少必要凭据、认证失败或提权权限不足拒绝执行并返回 `AUTH_ERROR`；root、免密 sudo 与无需提权场景不得多要求密码 | Service/Security | F10 | TC-SEC-04 |
+| REQ-SEC-04 | 按可信模板与实际UID选择root或按需sudo，无额外批准；全主机屏障先于投递，明确缺凭据/认证拒绝/权限不足整次拒绝并返15；sudo无法核验同样整次零投递/检查，报告有效且无更高优先级结果时返11；root、免密sudo及无需提权不多要求密码 | Service/Security | F10 | TC-SEC-04 |
 | REQ-SEC-05 | 特权执行创建 `root:root 0700` 隔离区、`root` 态二次校验 SHA-256 并以 `env -i` 清洗环境；非 root 经单次 sudo 执行并 `sudo -k` 销票据，root 直接执行同等闭环 | Execution | F10 | TC-SEC-05 |
 | REQ-SEC-06 | 严禁修改目标主机 `sudoers` 或安装常驻提权程序 | Execution | F10 | TC-SEC-06 |
 | REQ-SEC-07 | 默认开启 SSH `known_hosts` 主机身份校验；检测不同主机名指向同一实机指纹时报错拦截 | Execution/Normalizer | F10 | TC-SEC-07 |
@@ -700,6 +722,7 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 - **CHG-006（2026-11-04，用户已确认）**：部署范围为受信任内网，允许非回环 HTTP，TLS 可选；保留访问令牌、会话、CSRF、Origin/Host 防护、明文传输提示与提交后清空前端密码状态。接受 HTTP 下令牌、会话、密码与业务数据明文传输的取舍，不强制 HTTPS。
 - **CHG-007（2026-11-04，用户已确认）**：依据账户身份和可信内置检查模板的权限需求执行，root 直连及按需 sudo 只提示并审计，无额外授权勾选或批准参数；替代旧版 `approve_root_ssh`、`--approve-root-ssh`、`--approve-privileged` 与 `ROOT_SSH_UNAPPROVED` 契约。工具自动判定权限需求，缺少必要凭据、认证失败或所需提权权限不足时在检查开始前拒绝执行，CLI 返回 `15 AUTH_ERROR`；root、免密 sudo、密钥/Agent 已满足需求时不额外要求密码。前置校验通过后的实际执行故障仍记对应检查项 `ERROR`。不改变内置特权模板可信校验、特权隔离与自定义 Shell 不自动 sudo 提权的边界。
 - **CHG-008（2026-11-05，用户已确认）**：移除方案级 `allowed_os` 及目标 OS 白名单核对，避免用硬编码发行版列表代替具体软件环境要求；`TopologyPolicy` 保留 CPU 架构、节点数量与混部约束，发行版与版本要求由 `O01 发行版与版本` 等具体检查项表达。当前 Schema 拒绝仍含 `allowed_os` 的旧方案，迁移时须删除该字段并重新校验、导出，不保留静默忽略或隐式兼容。
+- **CHG-009（2026-11-06，用户已逐项确认）**：M2 四组行为契约收敛：① sudo 明确拒绝为 `15`，无法核验同样整次零投递/检查，报告有效且无其他优先结果时为 `FAILED + UNKNOWN / 11`；② 允许本机服务任务期持有 CLI 交接私钥材料或直接连接明确指定的本机 Agent，不落盘、不替换身份、不依赖 CLI 存活；③ 原子接受记录为提交点，索引/快照可重建，每 Run 串行持久化 Journal，恢复优先报告、其次已接受取消、最后中断归档，绝不重跑；④ 整任务 `60m` 包含排队，预算超时不算主动取消，取消与归档串行排序，清理失败独立于有效结果。详见 [`docs/m2-implementation-design.md`](docs/m2-implementation-design.md)。这是行为和实施计划批准，sudo/Agent 技术可行性、Schema 与具体存储/收尾细节仍须 M2-1 验证，不代表 M2 已实现。
 
 ## 18. 参考资料与领域词汇对照
 

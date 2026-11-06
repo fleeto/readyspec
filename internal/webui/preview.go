@@ -49,7 +49,17 @@ func (s *Server) previewRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	result, err := preview.Build(p, preview.Input{Hosts: hosts, RoleMap: body.RoleMap, Overrides: body.Overrides})
+	// Static preview validates bindings and compilation. Role counts, colocation,
+	// architecture, and evidence coverage remain execution topology results so a
+	// legitimate PartialRun is not rejected as a plan error.
+	previewPlan := *p
+	previewPlan.Roles = append([]plan.Role(nil), p.Roles...)
+	for i := range previewPlan.Roles {
+		previewPlan.Roles[i].MinNodes = 0
+		previewPlan.Roles[i].MaxNodes = nil
+		previewPlan.Roles[i].AllowColocation = true
+	}
+	result, err := preview.Build(&previewPlan, preview.Input{Hosts: hosts, RoleMap: body.RoleMap, Overrides: body.Overrides})
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return

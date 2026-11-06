@@ -600,19 +600,9 @@ export default function App() {
                 description="追踪检查任务，查看就绪结论与可追溯的观测证据。"
               />
               <Notice>
-                远程检查暂不可用。你可以先完成方案编排、静态校验和导出；当前不会连接目标主机或收集
-                SSH 密码。
+                任务由本机服务持续管理。静态预览不会连接目标主机；接受任务后，服务会先完成全部目标的身份与权限预检。
               </Notice>
               <RunPreview key={JSON.stringify(document)} document={document} />
-              <section className="panel">
-                <div className="panel-heading">
-                  <h2>检查任务</h2>
-                  <span className="count">0</span>
-                </div>
-                <Empty icon={<Activity size={26} />} title="尚无检查任务">
-                  检查任务开始后，这里将展示目标主机进度、任务范围和最终就绪结论。
-                </Empty>
-              </section>
               <section className="workflow-explanation">
                 {['选择检查方案', '录入主机清单', '分配角色与现场参数', '预览并执行'].map(
                   (step, i) => (
@@ -817,7 +807,7 @@ function Overview({
         }
       />
       <Notice>
-        当前支持方案编排与静态校验。远程检查暂不可用，静态校验结果不作为部署放行依据。
+        支持方案编排、静态校验与持久化检查任务。只有归档报告中的 READY 结论可作为门禁依据。
       </Notice>
       <section className="stats-grid" aria-label="工作区统计">
         <Stat

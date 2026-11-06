@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRunCommand() *cobra.Command {
+func newRunCommand(workspacePath func() string, setExitCode func(int)) *cobra.Command {
 	run := &cobra.Command{Use: "run", Short: "Preview inspection inputs"}
 	var planFile, inventoryInput, format, overridesFile string
 	var roleFlags []string
@@ -103,6 +103,7 @@ func newRunCommand() *cobra.Command {
 	_ = command.MarkFlagRequired("plan")
 	_ = command.MarkFlagRequired("inventory")
 	run.AddCommand(command)
+	run.AddCommand(newSubmitCommand(workspacePath, setExitCode))
 	return run
 }
 

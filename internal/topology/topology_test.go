@@ -1,9 +1,10 @@
 package topology_test
 
 import (
+	"testing"
+
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/topology"
-	"testing"
 )
 
 func TestVerdictRequiresReleasedRealFullCompletedGate(t *testing.T) {
@@ -22,6 +23,43 @@ func TestVerdictRequiresReleasedRealFullCompletedGate(t *testing.T) {
 	input.Required = nil
 	if got := topology.Verdict(input); got != "UNKNOWN" {
 		t.Fatal(got)
+	}
+}
+
+func TestVerdictFailurePrecedenceAndReadinessRequirements(t *testing.T) {
+	base := topology.VerdictInput{
+		PlanState: "RELEASED", Mode: "GATE", Scope: "FULL", Executor: "native_ssh", Status: "COMPLETED",
+		Required: []string{"PASS"}, Topology: []string{"PASS"},
+	}
+	tests := []struct {
+		name   string
+		change func(*topology.VerdictInput)
+		want   string
+	}{
+		{name: "complete evidence is ready", want: "READY"},
+		{name: "topology failure outranks ineligible run", change: func(v *topology.VerdictInput) { v.Scope = "PARTIAL"; v.Topology = []string{"FAIL"} }, want: "NOT_READY"},
+		{name: "required failure outranks incomplete evidence", change: func(v *topology.VerdictInput) { v.Status = "FAILED"; v.Required = []string{"FAIL"} }, want: "NOT_READY"},
+		{name: "error evidence is unknown", change: func(v *topology.VerdictInput) { v.Topology = []string{"ERROR"} }, want: "UNKNOWN"},
+		{name: "draft plan cannot pass", change: func(v *topology.VerdictInput) { v.PlanState = "DRAFT" }, want: "UNKNOWN"},
+		{name: "trial cannot pass", change: func(v *topology.VerdictInput) { v.Mode = "TRIAL" }, want: "UNKNOWN"},
+		{name: "partial scope cannot pass", change: func(v *topology.VerdictInput) { v.Scope = "PARTIAL" }, want: "UNKNOWN"},
+		{name: "simulator cannot pass", change: func(v *topology.VerdictInput) { v.Executor = "mock_simulator" }, want: "UNKNOWN"},
+		{name: "partial run cannot pass", change: func(v *topology.VerdictInput) { v.Status = "PARTIAL" }, want: "UNKNOWN"},
+		{name: "missing required evidence is unknown", change: func(v *topology.VerdictInput) { v.Required = nil }, want: "UNKNOWN"},
+		{name: "missing topology evidence is unknown", change: func(v *topology.VerdictInput) { v.Topology = nil }, want: "UNKNOWN"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := base
+			input.Required = append([]string(nil), base.Required...)
+			input.Topology = append([]string(nil), base.Topology...)
+			if tt.change != nil {
+				tt.change(&input)
+			}
+			if got := topology.Verdict(input); got != tt.want {
+				t.Fatalf("Verdict()=%q want=%q", got, tt.want)
+			}
+		})
 	}
 }
 

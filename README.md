@@ -38,7 +38,7 @@ make build-all
 
 后端已实现安全 YAML、RFC 8785 语义摘要、新方案/模板 Schema、模板引用与快照摘要校验、工作区互斥与原子 JSON 写入、会话 Cookie、CSRF、Origin 防护，以及双架构官方 Goss 内嵌完整性校验。Host 头校验分档：回环监听保持严格校验，非回环监听（内网部署）只校验端口一致，允许通过主机名、网卡 IP、域名等任意入口访问。浏览器启动令牌通过 URL Fragment 传递，交换为会话后立即从地址栏移除；自动生成的启动令牌仅可使用一次，同一浏览器可凭 Cookie 恢复会话。Windows 权限与锁实现已交叉编译，仍需原生环境验收。
 
-当前 CLI 提供无参启动、`serve`、`plan validate`、`plan compile`、`template list`、`run preview`、帮助和版本信息。M1 已接通 36 个模板家族、37 个可信版本快照的静态编排与编译，目录统一由后端提供。内置模板（含普通执行）必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。编译输出普通/特权两份独立配置、原始属性期望、来源映射和工件摘要；只编译，不执行用户 Shell。Web“检查与报告”可录入清单、分配角色与现场参数，生成主机静态预览。真实 SSH、凭据/提权前置校验、任务执行、正式发布、SSE 与报告归档尚未实现，不生成演示检查结果。不能据静态校验或编译成功宣称环境 `READY`。旧 Python 原型保留至 M3 验收。
+CLI 提供 `serve`、`plan validate`、`plan compile`、`template list`、`run preview`、`run submit`、`report list`、`report show`、`cleanup list` 和 `cleanup resolve`。M1 已接通 36 个模板家族、37 个可信版本快照的静态编排与编译，目录统一由后端提供。内置模板（含普通执行）必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。Run 生命周期、离线模拟器、Native SSH、报告归档、Web Run API/SSE、活动服务上的本机 CLI 委托、精确 sudo 策略查询与受控特权执行已实现。sudo 密码可通过 `READYSPEC_SUDO_PASSWORD` 提供；策略拒绝或缺少凭据会在全目标屏障处拒绝整次任务。自动及人工清理会重新核对目标身份和 owner token，人工清理发现活动进程时必须显式确认。不能据静态校验、模拟器结果或编译成功宣称环境 `READY`。旧 Python 原型保留至 M3 验收。
 
 ```bash
 # 查询当前已实现模板的自包含快照
@@ -159,12 +159,15 @@ READYSPEC_AUTH_TOKEN="<at-least-32-character-random-token>" ./readyspec serve --
 
 # 提交正式门禁全量检查（核对期望方案摘要与现场参数值，按需提示 root/sudo 执行）
 ./readyspec run submit \
-  --plan order-platform@1.0.0 \
+  --plan ./order-platform-1.0.0.yaml \
   --expected-plan-digest sha256:... \
   --inventory ./hosts.ini \
-  --override db.db_data_space.path=/data2
+  --field-overrides ./field-overrides.json
 
-# 查看与处置待清理残留
+# 目标要求 sudo 密码时，从任务环境提供；不要求 sudo 密码时无需设置
+READYSPEC_SUDO_PASSWORD="$SUDO_PASSWORD" ./readyspec run submit --plan ./order-platform-1.0.0.yaml --inventory ./hosts.ini
+
+# 查看待清理残留；使用 --run-id/--cleanup-id 并提供新凭据处置
 ./readyspec cleanup list
 ```
 

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fleeto/readyspec/internal/runmanager"
 	"github.com/fleeto/readyspec/internal/template"
 	"github.com/fleeto/readyspec/internal/workspace"
 )
@@ -35,6 +36,9 @@ type Options struct {
 	Version        string
 	WorkspaceLabel string
 	Store          *workspace.Store
+	Runs           *runmanager.Manager
+	LocalToken     string
+	ServerID       string
 }
 
 type session struct {
@@ -48,6 +52,7 @@ type Server struct {
 	sessions      map[string]session
 	bootstrapUsed bool
 	plansMu       sync.Mutex
+	runs          *runmanager.Manager
 }
 
 func New(options Options) (*Server, error) {
@@ -60,10 +65,10 @@ func New(options Options) (*Server, error) {
 	if options.Store == nil {
 		return nil, fmt.Errorf("workspace store is required")
 	}
-	s := &Server{options: options, mux: http.NewServeMux(), sessions: make(map[string]session)}
+	s := &Server{options: options, mux: http.NewServeMux(), sessions: make(map[string]session), runs: options.Runs}
 	s.mux.HandleFunc("POST /api/v1/auth/session", s.authenticate)
 	s.mux.HandleFunc("GET /api/v1/system/info", s.authorize(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"version": options.Version, "workspace_label": options.WorkspaceLabel, "executor_available": false})
+		writeJSON(w, http.StatusOK, map[string]any{"version": options.Version, "workspace_label": options.WorkspaceLabel, "executor_available": s.runs != nil, "server_id": options.ServerID})
 	}))
 	s.mux.HandleFunc("GET /api/v1/plans", s.authorize(s.listPlans))
 	s.mux.HandleFunc("POST /api/v1/plans", s.authorize(s.savePlan))
@@ -81,6 +86,14 @@ func New(options Options) (*Server, error) {
 	}))
 	s.mux.HandleFunc("POST /api/v1/plans/compile", s.authorize(s.compilePlan))
 	s.mux.HandleFunc("POST /api/v1/runs/preview", s.authorize(s.previewRun))
+	s.mux.HandleFunc("POST /api/v1/runs", s.authorize(s.submitRun))
+	s.mux.HandleFunc("GET /api/v1/runs", s.authorize(s.listRuns))
+	s.mux.HandleFunc("GET /api/v1/cleanup", s.authorize(s.listCleanup))
+	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.authorize(s.getRun))
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/report", s.authorize(s.getRunReport))
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/cleanup/{cleanupID}", s.authorize(s.resolveCleanup))
+	s.mux.HandleFunc("DELETE /api/v1/runs/{id}", s.authorize(s.cancelRun))
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/events", s.authorize(s.runEvents))
 	s.mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, http.StatusNotFound, "API_NOT_FOUND") })
 	static, err := fs.Sub(assets, "dist")
 	if err != nil {
@@ -198,6 +211,10 @@ func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) authorize(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if s.localAuthorized(r) {
+			next(w, r)
+			return
+		}
 		cookie, err := r.Cookie(sessionCookie)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "SESSION_REQUIRED")
@@ -216,6 +233,18 @@ func (s *Server) authorize(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+func (s *Server) localAuthorized(r *http.Request) bool {
+	if s.options.LocalToken == "" || !constantEqual(r.Header.Get("X-ReadySpec-Local-Token"), s.options.LocalToken) {
+		return false
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func constantEqual(a, b string) bool {

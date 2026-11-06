@@ -38,7 +38,7 @@ func Execute(args []string, out, stderr io.Writer) int {
 	root.PersistentFlags().StringVar(&options.key, "tls-key", "", "HTTPS private key file")
 	root.PersistentFlags().StringSliceVar(&options.allowedHosts, "allowed-host", nil, "Additional accepted Host values, including port")
 	root.PersistentFlags().BoolVar(&options.noBrowser, "no-browser", false, "Do not launch the desktop browser")
-	exitCode := 12
+	exitCode := 0
 	startServer := func(cmd *cobra.Command, args []string) error {
 		err := serve(cmd.Context(), options, cmd.Flags().Changed("listen"), cmd.OutOrStdout())
 		if err != nil {
@@ -103,6 +103,8 @@ func Execute(args []string, out, stderr io.Writer) int {
 	}}
 	plans.AddCommand(compile)
 	root.AddCommand(plans)
+	root.AddCommand(newReportCommand(func() string { return options.workspace }, func(code int) { exitCode = code }))
+	root.AddCommand(newCleanupCommand(func() string { return options.workspace }, func(code int) { exitCode = code }))
 	templates := &cobra.Command{Use: "template", Short: "Inspect locally available check templates"}
 	var templateJSON bool
 	list := &cobra.Command{Use: "list", Short: "List implemented builtin check templates", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,12 +120,15 @@ func Execute(args []string, out, stderr io.Writer) int {
 	list.Flags().BoolVar(&templateJSON, "json", false, "Output template snapshots as JSON")
 	templates.AddCommand(list)
 	root.AddCommand(templates)
-	root.AddCommand(newRunCommand())
+	root.AddCommand(newRunCommand(func() string { return options.workspace }, func(code int) { exitCode = code }))
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(stderr, err)
+		if exitCode == 0 {
+			exitCode = 12
+		}
 		return exitCode
 	}
 	// Validation success is not a gate result: only future run submit can emit
 	// READY. This command deliberately outputs VALID rather than a Verdict.
-	return 0
+	return exitCode
 }
