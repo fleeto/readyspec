@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readyspec.dev/schemas/draft.v1.json",
+  "title": "ReadySpec editable draft shape (not execution validation)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "name", "software_name", "software_version", "version", "state", "topology_policy", "roles", "embedded_templates", "template_lock"],
+  "properties": {
+    "schema_version": {"const": "readyspec.plan/v1"},
+    "plan_id": {"type": "string", "maxLength": 128},
+    "name": {"type": "string", "maxLength": 200},
+    "software_name": {"type": "string", "maxLength": 200},
+    "software_version": {"type": "string", "maxLength": 100},
+    "version": {"type": "string", "maxLength": 64},
+    "state": {"const": "DRAFT"},
+    "description": {"type": "string", "maxLength": 2000},
+    "topology_policy": {"type": "object", "additionalProperties": false, "required": ["allowed_arch"], "properties": {
+      "allowed_arch": {"$ref": "#/$defs/strings"}
+    }},
+    "roles": {"type": "array", "items": {"$ref": "#/$defs/role"}},
+    "embedded_templates": {"type": "array", "items": {"$ref": "#/$defs/template"}},
+    "template_lock": {"type": "object", "additionalProperties": {"type": "string"}},
+    "digest": {"type": ["string", "null"]},
+    "updated_at": {"type": ["string", "null"]},
+    "release_manifest": {"type": ["object", "null"]}
+  },
+  "$defs": {
+    "id": {"$ref": "https://readyspec.dev/schemas/plan.v1.json#/$defs/id"},
+    "strings": {"type": "array", "items": {"type": "string"}},
+    "role": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role_id", "name", "min_nodes", "max_nodes", "allow_colocation", "items"],
+      "properties": {
+        "role_id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "maxLength": 200},
+        "min_nodes": {"type": "integer"}, "max_nodes": {"type": ["integer", "null"]},
+        "allow_colocation": {"type": "boolean"}, "items": {"type": "array", "items": {"$ref": "#/$defs/item"}}
+      }
+    },
+    "item": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "name", "template_id", "template_version", "template_digest", "importance", "enabled", "params", "explicit_null_params", "overridable_params"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "maxLength": 200},
+        "template_id": {"$ref": "#/$defs/id"}, "template_version": {"type": "string", "maxLength": 64},
+        "template_digest": {"type": "string"}, "importance": {"enum": ["REQUIRED", "WARNING", "INFO"]},
+        "enabled": {"type": "boolean"}, "params": {"type": "object"},
+        "explicit_null_params": {"$ref": "#/$defs/strings"}, "overridable_params": {"$ref": "#/$defs/strings"}
+      }
+    },
+    "template": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "template_id", "version", "name", "source", "domain", "execution_mode", "evidence_mode", "params_schema", "implementation", "digest"],
+      "properties": {
+        "schema_version": {"const": "readyspec.template/v1"}, "template_id": {"$ref": "#/$defs/id"},
+        "version": {"type": "string", "maxLength": 64}, "name": {"type": "string", "maxLength": 200},
+        "description": {"type": "string", "maxLength": 2000}, "source": {"enum": ["BUILTIN", "USER_PUBLIC", "PLAN_LOCAL"]},
+        "domain": {"enum": ["H", "O", "S", "N", "R", "A", "D", "L"]},
+        "execution_mode": {"enum": ["STANDARD", "PRIVILEGED"]},
+        "evidence_mode": {"enum": ["EXISTENCE", "METADATA", "CONFIG", "EFFECTIVE_STATE", "STATIC_BINARY", "ACTIVE_PROBE", "LOG_HISTORY"]},
+        "params_schema": {"type": "object"}, "implementation": {"type": "object"}, "digest": {"type": "string"}
+      },
+      "if": {"properties": {"source": {"enum": ["USER_PUBLIC", "PLAN_LOCAL"]}}},
+      "then": {"properties": {"execution_mode": {"const": "STANDARD"}}}
+    }
+  }
+}

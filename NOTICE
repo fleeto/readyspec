@@ -8,26 +8,55 @@ Third-Party Open Source Notices & License Summary
 ReadySpec is built exclusively on permissive open-source licenses
 (MIT / BSD / Apache-2.0) and intentionally excludes GPL/AGPL runtime libraries
 (such as ansible-core). Ansible INI/YAML inventory formats are parsed via
-ReadySpec's clean-room native Python parser.
+ReadySpec's clean-room parser. The Go migration retains the Python prototype
+until the new control plane and Web UI pass M3 acceptance.
 
-1. Goss (v0.4.9 — Locked Unmodified Target Inspection Binary Specification)
+1. Goss (v0.4.9 — Embedded Unmodified Official Linux Binaries)
    - Project URL: https://github.com/goss-org/goss
    - Copyright: Copyright (c) 2015 Goss Contributors / Ahmed Elsabbahy
    - License: Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
-   - Usage: ReadySpec compiles check instances into Goss YAML manifests and
-     invokes the unmodified official Goss v0.4.9 binary as an isolated child
-     process when running in real OpenSSH target mode.
+    - Usage: Official linux-amd64 and linux-arm64 binaries are embedded in the
+      Go executable and verified against pinned SHA-256 values at startup.
+      Native SSH delivery and target execution will be implemented in M2.
+    - Full license: internal/goss/assets/LICENSE.goss
 
-2. OpenSSH Client (System Binary)
+2. OpenSSH Client (Legacy Architecture Reference; Not a Go Runtime Dependency)
    - Project URL: https://www.openssh.com/
    - License: BSD-style Permissive License
-   - Usage: Invoked as an external OS process for SSH transport.
+    - Usage: The new Go control plane will use native SSH rather than invoking
+      an external OpenSSH client. No OpenSSH executable is bundled.
 
-3. Python Runtime Libraries (Permissive MIT / BSD)
+3. Legacy Python Prototype Libraries (Permissive MIT / BSD)
    - Textual (https://github.com/Textualize/textual) — MIT License
    - Rich (https://github.com/Textualize/rich) — MIT License
    - Typer (https://github.com/fastapi/typer) — MIT License
    - Pydantic v2 (https://github.com/pydantic/pydantic) — MIT License
    - jsonschema (https://github.com/python-jsonschema/jsonschema) — MIT License
    - rfc8785 (https://github.com/trailofbits/rfc8785.py) — Apache-2.0 / MIT
-   - PyYAML (https://github.com/yaml/pyyaml) — MIT License
+    - PyYAML (https://github.com/yaml/pyyaml) — MIT License
+
+4. Go Control Plane Libraries (Versions Locked in go.mod and go.sum)
+   - github.com/spf13/cobra — Apache-2.0
+   - github.com/spf13/pflag — BSD-3-Clause
+   - github.com/inconshreveable/mousetrap — Apache-2.0
+   - go.yaml.in/yaml/v3 — Apache-2.0 / MIT
+   - github.com/santhosh-tekuri/jsonschema/v6 — Apache-2.0
+   - github.com/cyberphone/json-canonicalization — Apache-2.0
+     Copyright 2018 Anders Rundgren
+   - golang.org/x/sys — BSD-3-Clause
+   - golang.org/x/text — BSD-3-Clause
+   - Go standard library — BSD-3-Clause
+
+The Go build statically links these libraries; upstream copyrights and license
+terms continue to apply. Full dependency licenses are reproduced in third_party/;
+include these files and the Goss license when distributing executables.
+No GPL, LGPL or AGPL dependency is introduced.
+
+5. Embedded Web UI
+   - React / React DOM / scheduler — MIT
+   - Lucide React — ISC
+   - yaml — ISC
+   - Tailwind CSS (generated stylesheet) — MIT
+   - Full bundled dependency licenses and versions: third_party/frontend.LICENSE
+   - Frontend build and test tools are development dependencies only. They are
+     not required at runtime. No CDN, external fonts or browser runtime is bundled.

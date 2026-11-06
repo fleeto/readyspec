@@ -1,0 +1,63 @@
+name: Go and Web UI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web run format:check
+      - run: npm --prefix web test
+      - run: npm --prefix web run build
+      - if: runner.os == 'Linux'
+        name: Install isolated collection test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap iproute2 python3 binutils build-essential
+      - if: runner.os == 'Linux'
+        run: make test-collection
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go run ./cmd/readyspec plan validate examples/minimal-plan.yaml --json
+      - run: go build ./cmd/readyspec
+        env:
+          CGO_ENABLED: "0"
+      - if: runner.os == 'Linux'
+        run: go test -race ./...
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web run build
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm --prefix web run test:e2e

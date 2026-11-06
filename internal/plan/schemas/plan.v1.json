@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readyspec.dev/schemas/plan.v1.json",
+  "title": "ReadySpec Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "name", "software_name", "software_version", "version", "state", "topology_policy", "roles", "embedded_templates", "template_lock"],
+  "properties": {
+    "schema_version": {"const": "readyspec.plan/v1"},
+    "plan_id": {"$ref": "#/$defs/id"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 200},
+    "software_name": {"type": "string", "minLength": 1, "maxLength": 200},
+    "software_version": {"type": "string", "minLength": 1, "maxLength": 100},
+    "version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "state": {"enum": ["DRAFT", "RELEASED", "ARCHIVED"]},
+    "description": {"type": "string", "maxLength": 2000},
+    "topology_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["allowed_arch"],
+      "properties": {
+        "allowed_arch": {"type": "array", "uniqueItems": true, "items": {"enum": ["x86_64", "aarch64"]}}
+      }
+    },
+    "roles": {"type": "array", "items": {"$ref": "#/$defs/role"}},
+    "embedded_templates": {"type": "array", "items": {"$ref": "https://readyspec.dev/schemas/template.v1.json"}},
+    "template_lock": {"type": "object", "additionalProperties": {"$ref": "#/$defs/digest"}},
+    "release_manifest": {"type": ["object", "null"]},
+    "digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "updated_at": {"type": ["string", "null"]}
+  },
+  "allOf": [{
+    "if": {"properties": {"state": {"enum": ["RELEASED", "ARCHIVED"]}}},
+    "then": {"required": ["digest", "release_manifest"], "properties": {"digest": {"$ref": "#/$defs/digest"}, "release_manifest": {"type": "object"}}}
+  }],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "maxLength": 128},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "names": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "role": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role_id", "name", "min_nodes", "max_nodes", "allow_colocation", "items"],
+      "properties": {
+        "role_id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 200},
+        "min_nodes": {"type": "integer", "minimum": 0},
+        "max_nodes": {"type": ["integer", "null"], "minimum": 1},
+        "allow_colocation": {"type": "boolean"},
+        "items": {"type": "array", "items": {"$ref": "#/$defs/item"}}
+      }
+    },
+    "item": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "name", "template_id", "template_version", "template_digest", "importance", "enabled", "params", "explicit_null_params", "overridable_params"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 200},
+        "template_id": {"$ref": "#/$defs/id"},
+        "template_version": {"type": "string", "minLength": 1, "maxLength": 64},
+        "template_digest": {"$ref": "#/$defs/digest"},
+        "importance": {"enum": ["REQUIRED", "WARNING", "INFO"]},
+        "enabled": {"type": "boolean"},
+        "params": {"type": "object"},
+        "explicit_null_params": {"$ref": "#/$defs/names"},
+        "overridable_params": {"$ref": "#/$defs/names"}
+      }
+    }
+  }
+}

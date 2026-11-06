@@ -1,0 +1,58 @@
+package webui
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+
+	"github.com/fleeto/readyspec/internal/inventory"
+	"github.com/fleeto/readyspec/internal/plan"
+	"github.com/fleeto/readyspec/internal/preview"
+)
+
+func (s *Server) previewRun(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Source         string `json:"source"`
+		NormalizeDraft bool   `json:"normalize_draft"`
+		Inventory      struct {
+			Source string `json:"source"`
+			Format string `json:"format"`
+		} `json:"inventory"`
+		RoleMap   map[string][]string `json:"role_map"`
+		Overrides []preview.Override  `json:"field_overrides"`
+	}
+	if err := readJSON(w, r, &body); err != nil {
+		requestBodyError(w, err)
+		return
+	}
+	validated, err := validateSource(planRequest{Source: body.Source, NormalizeDraft: body.NormalizeDraft})
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	raw, err := json.Marshal(validated.Document)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "PLAN_ERROR: invalid document")
+		return
+	}
+	p, err := plan.Load(bytes.NewReader(raw))
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	format := body.Inventory.Format
+	if format == "" {
+		format = "quick"
+	}
+	hosts, err := inventory.Parse(body.Inventory.Source, format)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	result, err := preview.Build(p, preview.Input{Hosts: hosts, RoleMap: body.RoleMap, Overrides: body.Overrides})
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}

@@ -1,0 +1,19 @@
+schema_version: readyspec.plan/v1
+plan_id: minimal-demo
+name: Minimal draft
+software_name: demo
+software_version: "1.0"
+version: "1.0.0"
+state: DRAFT
+description: Static validation example; add check items before running a trial.
+topology_policy:
+  allowed_arch: [x86_64, aarch64]
+roles:
+  - role_id: app
+    name: Application
+    min_nodes: 1
+    max_nodes: null
+    allow_colocation: false
+    items: []
+embedded_templates: []
+template_lock: {}
