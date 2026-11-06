@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/fleeto/readyspec/internal/executor"
@@ -87,6 +88,38 @@ func newCleanupCommand(workspacePath func() string, setExitCode func(int)) *cobr
 				setExitCode(15)
 				return fmt.Errorf("AUTH_ERROR: choose --auth password, private_key, or agent")
 			}
+			credentialPayload := map[string]string{
+				"password":      string(credential.Password),
+				"sudo_password": string(credential.SudoPassword),
+				"agent_socket":  credential.AgentSocket,
+			}
+			if authMethod == "private_key" && keyFile != "" {
+				key, readErr := readBoundedFile(keyFile)
+				if readErr != nil {
+					setExitCode(15)
+					return fmt.Errorf("AUTH_ERROR: cleanup private key cannot be read")
+				}
+				credentialPayload["private_key"] = string(key)
+				credentialPayload["passphrase"] = os.Getenv("READYSPEC_SSH_KEY_PASSPHRASE")
+				for i := range key {
+					key[i] = 0
+				}
+			}
+			action := "CLEAN"
+			if ignoreReason != "" {
+				action = "IGNORE"
+			}
+			payload, _ := json.Marshal(map[string]any{
+				"action": action, "audit_reason": ignoreReason,
+				"confirm_terminate": confirmTerminate, "credential": credentialPayload,
+			})
+			if data, requestErr := localRunRequest(cmd.Context(), workspacePath(), "POST", "/api/v1/cleanups/"+url.PathEscape(cleanupID)+"/resolve", payload); requestErr == nil {
+				_, writeErr := cmd.OutOrStdout().Write(append(data, '\n'))
+				return writeErr
+			} else if isLocalServiceResponse(requestErr) {
+				setExitCode(13)
+				return requestErr
+			}
 			dir, err := workspaceDirectory(workspacePath())
 			if err != nil {
 				setExitCode(13)
@@ -144,6 +177,28 @@ func newCleanupCommand(workspacePath func() string, setExitCode func(int)) *cobr
 	resolve.Flags().StringVar(&ignoreReason, "ignore-reason", "", "Audit reason to mark this item IGNORED")
 	cleanup.AddCommand(resolve)
 	list := &cobra.Command{Use: "list", Short: "List unresolved remote cleanup items", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		if data, err := localRunRequest(cmd.Context(), workspacePath(), "GET", "/api/v1/cleanups", nil); err == nil {
+			if jsonOutput {
+				_, writeErr := cmd.OutOrStdout().Write(append(data, '\n'))
+				return writeErr
+			}
+			var result struct {
+				Items []struct {
+					RunID string             `json:"run_id"`
+					Item  report.CleanupItem `json:"item"`
+				} `json:"items"`
+			}
+			if json.Unmarshal(data, &result) == nil {
+				for _, row := range result.Items {
+					if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\n", row.RunID, row.Item.HostID, row.Item.Status); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+		} else if isLocalServiceResponse(err) {
+			return err
+		}
 		dir, err := workspaceDirectory(workspacePath())
 		if err != nil {
 			setExitCode(13)

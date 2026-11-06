@@ -285,12 +285,22 @@ func userHomeDir() string {
 }
 
 func (e *NativeSSH) Preflight(ctx context.Context, req PreflightRequest) PreflightResult {
+	if req.Journal != nil {
+		if err := req.Journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "CONNECTING"); err != nil {
+			return PreflightResult{Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist connection phase"}}
+		}
+	}
 	conn, err := e.connect(ctx, req.RunID, req.Host.Inventory.ID, req.Host.Inventory.Address, req.Host.Inventory.Port, req.Host.Inventory.Username, req.Host.AuthMethod, req.Host.PublicKeyFingerprint)
 	if err != nil {
 		class := classifySSHConnectFailure(err)
 		return PreflightResult{Failure: &Failure{Class: class, Phase: "SSH_AUTHENTICATION", Message: "SSH connection or host key verification failed"}}
 	}
 	defer conn.Close()
+	if req.Journal != nil {
+		if err := req.Journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "DISCOVERING"); err != nil {
+			return PreflightResult{Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist discovery phase"}}
+		}
+	}
 	facts, err := discover(ctx, conn.client)
 	if err != nil {
 		return PreflightResult{Failure: &Failure{Class: FailureIdentity, Phase: "DISCOVERY", Message: "target identity facts could not be verified"}}
@@ -335,6 +345,9 @@ func discover(ctx context.Context, client *ssh.Client) (HostFacts, error) {
 }
 
 func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Journal) (outcome HostOutcome) {
+	if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "CONNECTING"); err != nil {
+		return HostOutcome{Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist connection phase"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+	}
 	conn, err := e.connect(ctx, req.RunID, req.Host.Inventory.ID, req.Host.Inventory.Address, req.Host.Inventory.Port, req.Host.Inventory.Username, req.Host.AuthMethod, req.Host.PublicKeyFingerprint)
 	if err != nil {
 		class := classifySSHConnectFailure(err)
@@ -345,6 +358,9 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		return HostOutcome{Failure: &Failure{Class: class, Phase: phase, Message: "target reconnect or host identity verification failed"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 	}
 	defer conn.Close()
+	if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "DISCOVERING"); err != nil {
+		return HostOutcome{Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist discovery phase"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+	}
 	facts, err := discover(ctx, conn.client)
 	if err != nil || facts.MachineID != req.Facts.MachineID || facts.BootID != req.Facts.BootID || facts.UID != req.Facts.UID {
 		return HostOutcome{Failure: &Failure{Class: FailureIdentity, Phase: "REVALIDATE", Message: "target identity or privilege facts changed after preflight"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
@@ -420,6 +436,9 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		}
 		gossPath := remotePath + "/goss"
 		configPath := remotePath + "/" + strings.ToLower(artifact.ExecutionMode) + ".yaml"
+		if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "UPLOADING_"+artifact.ExecutionMode); err != nil {
+			return failedOutcome(result, "JOURNAL", "cannot persist upload phase")
+		}
 		if _, err := runSSH(ctx, conn.client, "cat > '"+gossPath+"' && chmod 700 -- '"+gossPath+"'", gossBinary); err != nil {
 			return failedOutcome(result, "UPLOAD", "embedded Goss upload failed")
 		}
@@ -465,7 +484,7 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		if err != nil && !isCheckFailure(err) {
 			return failedOutcome(result, "EXECUTE", "Goss execution failed or returned invalid output")
 		}
-		if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "COLLECTING"); err != nil {
+		if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "COLLECTING_"+artifact.ExecutionMode); err != nil {
 			return failedOutcome(result, "JOURNAL", "cannot persist collection phase")
 		}
 		normalized, err := compiler.Normalize(artifact, output)

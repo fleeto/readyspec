@@ -18,8 +18,9 @@ func (s *Server) previewRun(w http.ResponseWriter, r *http.Request) {
 			Source string `json:"source"`
 			Format string `json:"format"`
 		} `json:"inventory"`
-		RoleMap   map[string][]string `json:"role_map"`
-		Overrides []preview.Override  `json:"field_overrides"`
+		RoleMap        map[string][]string `json:"role_map"`
+		Overrides      []preview.Override  `json:"field_overrides"`
+		PartialHostIDs []string            `json:"partial_host_ids,omitempty"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		requestBodyError(w, err)
@@ -49,6 +50,17 @@ func (s *Server) previewRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	if len(body.PartialHostIDs) > 0 {
+		selected := make(map[string]bool, len(body.PartialHostIDs))
+		for _, id := range body.PartialHostIDs {
+			selected[id] = true
+		}
+		hosts, body.RoleMap, body.Overrides = filterPartialInputs(hosts, body.RoleMap, body.Overrides, selected)
+		if len(hosts) != len(selected) {
+			writeError(w, http.StatusUnprocessableEntity, "PARTIAL_HOST_NOT_IN_INVENTORY")
+			return
+		}
+	}
 	// Static preview validates bindings and compilation. Role counts, colocation,
 	// architecture, and evidence coverage remain execution topology results so a
 	// legitimate PartialRun is not rejected as a plan error.
@@ -64,5 +76,13 @@ func (s *Server) previewRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, result)
+	var response map[string]any
+	rawResult, err := json.Marshal(result)
+	if err != nil || json.Unmarshal(rawResult, &response) != nil {
+		writeError(w, http.StatusInternalServerError, "PREVIEW_RESPONSE_ERROR")
+		return
+	}
+	response["validated_plan"] = validated.Document
+	response["plan_digest"] = validated.Digest
+	writeJSON(w, http.StatusOK, response)
 }

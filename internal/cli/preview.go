@@ -104,6 +104,7 @@ func newRunCommand(workspacePath func() string, setExitCode func(int)) *cobra.Co
 	_ = command.MarkFlagRequired("inventory")
 	run.AddCommand(command)
 	run.AddCommand(newSubmitCommand(workspacePath, setExitCode))
+	run.AddCommand(newRunControlCommands(workspacePath, setExitCode)...)
 	return run
 }
 

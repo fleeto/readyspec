@@ -27,9 +27,14 @@ class Client {
       this.sessionExpiryListeners.delete(listener)
     }
   }
-  async request<T>(path: string, body?: unknown): Promise<T> {
+  async request<T>(
+    path: string,
+    body?: unknown,
+    options: { method?: string; signal?: AbortSignal } = {},
+  ): Promise<T> {
     const response = await fetch(`/api/v1${path}`, {
-      method: body === undefined ? 'GET' : 'POST',
+      method: options.method ?? (body === undefined ? 'GET' : 'POST'),
+      signal: options.signal,
       credentials: 'same-origin',
       headers: {
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -52,6 +57,26 @@ class Client {
         Array.isArray(data.diagnostics) ? data.diagnostics : [],
       )
     return data as T
+  }
+  async download(path: string, signal?: AbortSignal) {
+    const response = await fetch(`/api/v1${path}`, {
+      credentials: 'same-origin',
+      signal,
+      headers: this.csrf ? { 'X-CSRF-Token': this.csrf } : {},
+    })
+    if (response.status === 401) {
+      this.csrf = ''
+      for (const listener of this.sessionExpiryListeners) listener()
+      throw new ApiError('会话已过期，请重新认证后继续。', 401)
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: '下载失败。' }))
+      throw new ApiError(data.error ?? '下载失败。', response.status)
+    }
+    return {
+      blob: await response.blob(),
+      disposition: response.headers.get('Content-Disposition') ?? '',
+    }
   }
   async subscribe(
     path: string,
@@ -83,14 +108,15 @@ class Client {
       const chunk = await reader.read()
       if (chunk.done) break
       buffer += decoder.decode(chunk.value, { stream: true })
-      let boundary = buffer.indexOf('\n\n')
-      while (boundary >= 0) {
-        const block = buffer.slice(0, boundary)
-        buffer = buffer.slice(boundary + 2)
+      let separator = /\r\n\r\n|\n\n|\r\r/
+      let match = separator.exec(buffer)
+      while (match) {
+        const block = buffer.slice(0, match.index)
+        buffer = buffer.slice(match.index + match[0].length)
         let id = ''
         let name = 'message'
         const data: string[] = []
-        for (const line of block.split('\n')) {
+        for (const line of block.split(/\r\n|\n|\r/)) {
           if (line.startsWith('id:')) id = line.slice(3).trim()
           else if (line.startsWith('event:')) name = line.slice(6).trim()
           else if (line.startsWith('data:')) data.push(line.slice(5).trimStart())
@@ -104,9 +130,10 @@ class Client {
           }
           onEvent({ id, name, data: value })
         }
-        boundary = buffer.indexOf('\n\n')
+        match = separator.exec(buffer)
       }
     }
+    buffer += decoder.decode()
     await reader.cancel().catch(() => undefined)
   }
   async login(token = '') {

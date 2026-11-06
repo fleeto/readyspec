@@ -26,6 +26,7 @@
     "run_mode": {"enum": ["GATE", "TRIAL"]},
     "run_scope": {"enum": ["FULL", "PARTIAL"]},
     "executor_backend": {"enum": ["native_ssh", "mock_simulator"]},
+    "auth_method": {"type": "string"},
     "run_status": {"enum": ["COMPLETED", "PARTIAL", "FAILED", "CANCELLED"]},
     "verdict": {"enum": ["READY", "NOT_READY", "UNKNOWN"]},
     "termination_reason": {"type": "string"},
@@ -59,6 +60,7 @@
         "template_version": {"type": "string"},
         "execution_mode": {"enum": ["STANDARD", "PRIVILEGED"]},
         "evidence_mode": {"type": "string"},
+        "parameter_sources": {"type": "object", "additionalProperties": {"type": "string"}},
         "evidence": {"type": "array", "items": {"type": "object"}}
       }
     },
@@ -72,6 +74,7 @@
         "boot_id": {"type": "string"},
         "ssh_host_key_fp": {"type": "string"},
         "arch": {"type": "string"},
+        "login_uid": {"type": "integer", "minimum": 0},
         "roles": {"type": "array", "items": {"type": "string"}},
         "item_results": {"type": "array", "items": {"$ref": "#/$defs/item_result"}},
         "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}}

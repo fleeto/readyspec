@@ -16,6 +16,7 @@ type CleanupRow = {
     status: string
     remote_path?: string
     reason?: string
+    audit_reason?: string
   }
 }
 
@@ -46,14 +47,22 @@ export function Templates({
   >({})
   const [cleanupBusy, setCleanupBusy] = useState('')
   const [cleanupError, setCleanupError] = useState('')
+  const [processPrompt, setProcessPrompt] = useState<{
+    id: string
+    host: string
+    path: string
+  } | null>(null)
+  const [cleanupState, setCleanupState] = useState<'open' | 'all'>('open')
   const [tab, setTab] = useState('templates'),
     [domain, setDomain] = useState(''),
     [query, setQuery] = useState(''),
     [selected, setSelected] = useState<CatalogEntry | null>(null)
   const refreshCleanup = useCallback(async () => {
-    const result = await api.request<{ items: CleanupRow[] }>('/cleanup')
+    const result = await api.request<{ items: CleanupRow[] }>(
+      cleanupState === 'all' ? '/cleanups?state=all' : '/cleanups',
+    )
     setCleanupItems(result.items ?? [])
-  }, [])
+  }, [cleanupState])
   useEffect(() => {
     let active = true
     void api
@@ -61,16 +70,27 @@ export function Templates({
       .then((result) => {
         if (active) {
           setAvailable(result.items ?? [])
-          setCatalog(
-            result.definitions ??
-              (result.items ?? []).map((t) => ({
+          setCatalog([
+            ...(result.definitions ??
+              (result.items ?? [])
+                .filter((t) => t.source === 'BUILTIN')
+                .map((t) => ({
+                  id: t.template_id,
+                  name: t.name,
+                  summary: '',
+                  evidence: t.evidence_mode,
+                  privileged: t.execution_mode === 'PRIVILEGED',
+                }))),
+            ...(result.items ?? [])
+              .filter((t) => t.source === 'USER_PUBLIC')
+              .map((t) => ({
                 id: t.template_id,
                 name: t.name,
-                summary: '',
+                summary: `${t.source} · ${t.version}`,
                 evidence: t.evidence_mode,
-                privileged: t.execution_mode === 'PRIVILEGED',
+                privileged: false,
               })),
-          )
+          ])
         }
       })
       .catch((err) => {
@@ -90,6 +110,20 @@ export function Templates({
       active = false
     }
   }, [tab, refreshCleanup])
+  useEffect(() => {
+    if (tab !== 'cleanup') {
+      setCleanupCredentials({})
+      setProcessPrompt(null)
+    }
+  }, [tab])
+  useEffect(
+    () =>
+      api.onSessionExpired(() => {
+        setCleanupCredentials({})
+        setProcessPrompt(null)
+      }),
+    [],
+  )
   const filtered = catalog.filter(
     (t) =>
       (!domain || t.id.startsWith(domain)) &&
@@ -258,10 +292,26 @@ export function Templates({
             <div className="panel-heading">
               <h2>待清理残留</h2>
               <span className="count">{cleanupItems.length}</span>
+              <label className="search-field">
+                <span>显示</span>
+                <select
+                  aria-label="清理审计筛选"
+                  value={cleanupState}
+                  onChange={(event) => setCleanupState(event.target.value as 'open' | 'all')}
+                >
+                  <option value="open">未结案</option>
+                  <option value="all">全部审计记录</option>
+                </select>
+              </label>
             </div>
             {cleanupItems.length === 0 ? (
-              <Empty icon={<ShieldCheck size={27} />} title="暂无待清理残留">
-                所有远端临时目录都已清理或有审计记录地忽略。
+              <Empty
+                icon={<ShieldCheck size={27} />}
+                title={cleanupState === 'all' ? '暂无清理审计记录' : '暂无未结案清理记录'}
+              >
+                {cleanupState === 'all'
+                  ? '当前工作区没有已归档的远端清理记录。'
+                  : '当前没有需要处置的远端清理记录。'}
               </Empty>
             ) : (
               <div className="table-scroll">
@@ -284,7 +334,7 @@ export function Templates({
                         setCleanupBusy(id)
                         setCleanupError('')
                         try {
-                          await api.request(
+                          const outcome = await api.request<CleanupRow['item']>(
                             `/runs/${encodeURIComponent(runID)}/cleanup/${encodeURIComponent(item.cleanup_id)}`,
                             {
                               action,
@@ -299,6 +349,23 @@ export function Templates({
                               },
                             },
                           )
+                          if (
+                            action === 'CLEAN' &&
+                            outcome.status === 'UNKNOWN' &&
+                            outcome.reason?.includes('associated processes are active')
+                          ) {
+                            setCleanupCredentials((old) => ({
+                              ...old,
+                              [id]: { auditReason: old[id]?.auditReason, confirmTerminate: false },
+                            }))
+                            setProcessPrompt({
+                              id,
+                              host: item.host_id,
+                              path: item.remote_path ?? '路径未记录',
+                            })
+                            await refreshCleanup()
+                            return
+                          }
                           setCleanupCredentials((old) => {
                             const next = { ...old }
                             delete next[id]
@@ -307,6 +374,13 @@ export function Templates({
                           await refreshCleanup()
                         } catch (err) {
                           setCleanupError(err instanceof Error ? err.message : '清理处置失败')
+                          setCleanupCredentials((old) => ({
+                            ...old,
+                            [id]: {
+                              auditReason: old[id]?.auditReason,
+                              confirmTerminate: old[id]?.confirmTerminate,
+                            },
+                          }))
                         } finally {
                           setCleanupBusy('')
                         }
@@ -317,6 +391,8 @@ export function Templates({
                             <code>{runID}</code>
                             <small className="cell-secondary">
                               {item.host_id} · {item.cleanup_id}
+                              {item.machine_id ? ` · machine ${item.machine_id}` : ''}
+                              {item.boot_id ? ` · boot ${item.boot_id}` : ''}
                             </small>
                           </td>
                           <td>
@@ -329,75 +405,85 @@ export function Templates({
                               {item.reason || item.remote_path}
                             </small>
                           </td>
-                          <td>
-                            {authMethod === 'password' ? (
-                              <input
-                                aria-label={`${item.host_id} 新密码`}
-                                type="password"
-                                value={form.password ?? ''}
-                                onChange={(e) => update({ password: e.target.value })}
-                              />
-                            ) : null}
-                            <input
-                              aria-label={`${item.host_id} 新 sudo 密码`}
-                              type="password"
-                              placeholder="sudo 密码（如需）"
-                              value={form.sudoPassword ?? ''}
-                              onChange={(e) => update({ sudoPassword: e.target.value })}
-                            />
-                            {authMethod === 'private_key' ? (
-                              <>
-                                <textarea
-                                  aria-label={`${item.host_id} 新私钥`}
-                                  value={form.privateKey ?? ''}
-                                  onChange={(e) => update({ privateKey: e.target.value })}
-                                />
+                          {item.status === 'CLEAN' || item.status === 'IGNORED' ? (
+                            <td colSpan={2}>
+                              审计原因：
+                              {item.audit_reason ||
+                                (item.status === 'CLEAN' ? '已核验清理' : '未记录')}
+                            </td>
+                          ) : (
+                            <>
+                              <td>
+                                {authMethod === 'password' ? (
+                                  <input
+                                    aria-label={`${item.host_id} 新密码`}
+                                    type="password"
+                                    value={form.password ?? ''}
+                                    onChange={(e) => update({ password: e.target.value })}
+                                  />
+                                ) : null}
                                 <input
-                                  aria-label={`${item.host_id} 私钥口令`}
+                                  aria-label={`${item.host_id} 新 sudo 密码`}
                                   type="password"
-                                  value={form.passphrase ?? ''}
-                                  onChange={(e) => update({ passphrase: e.target.value })}
+                                  placeholder="sudo 密码（如需）"
+                                  value={form.sudoPassword ?? ''}
+                                  onChange={(e) => update({ sudoPassword: e.target.value })}
                                 />
-                              </>
-                            ) : null}
-                            {authMethod === 'agent' ? (
-                              <input
-                                aria-label={`${item.host_id} Agent socket`}
-                                value={form.agentSocket ?? ''}
-                                onChange={(e) => update({ agentSocket: e.target.value })}
-                              />
-                            ) : null}
-                            <label>
-                              <input
-                                type="checkbox"
-                                checked={!!form.confirmTerminate}
-                                onChange={(e) => update({ confirmTerminate: e.target.checked })}
-                              />
-                              确认可终止关联进程
-                            </label>
-                          </td>
-                          <td>
-                            <button
-                              className="button small"
-                              disabled={cleanupBusy === id || authMethod === 'offline'}
-                              onClick={() => void resolve('CLEAN')}
-                            >
-                              重新核验并清理
-                            </button>
-                            <input
-                              aria-label={`${item.host_id} 忽略原因`}
-                              placeholder="忽略原因（必填）"
-                              value={form.auditReason ?? ''}
-                              onChange={(e) => update({ auditReason: e.target.value })}
-                            />
-                            <button
-                              className="button small"
-                              disabled={cleanupBusy === id || !form.auditReason?.trim()}
-                              onClick={() => void resolve('IGNORE')}
-                            >
-                              记录忽略
-                            </button>
-                          </td>
+                                {authMethod === 'private_key' ? (
+                                  <>
+                                    <textarea
+                                      aria-label={`${item.host_id} 新私钥`}
+                                      value={form.privateKey ?? ''}
+                                      onChange={(e) => update({ privateKey: e.target.value })}
+                                    />
+                                    <input
+                                      aria-label={`${item.host_id} 私钥口令`}
+                                      type="password"
+                                      value={form.passphrase ?? ''}
+                                      onChange={(e) => update({ passphrase: e.target.value })}
+                                    />
+                                  </>
+                                ) : null}
+                                {authMethod === 'agent' ? (
+                                  <input
+                                    aria-label={`${item.host_id} Agent socket`}
+                                    value={form.agentSocket ?? ''}
+                                    onChange={(e) => update({ agentSocket: e.target.value })}
+                                  />
+                                ) : null}
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!form.confirmTerminate}
+                                    onChange={(e) => update({ confirmTerminate: e.target.checked })}
+                                  />
+                                  确认可终止关联进程
+                                </label>
+                              </td>
+                              <td>
+                                <button
+                                  className="button small"
+                                  disabled={cleanupBusy === id || authMethod === 'offline'}
+                                  onClick={() => void resolve('CLEAN')}
+                                >
+                                  重新核验并清理
+                                </button>
+                                <input
+                                  aria-label={`${item.host_id} 忽略原因`}
+                                  placeholder="忽略原因（必填）"
+                                  value={form.auditReason ?? ''}
+                                  onChange={(e) => update({ auditReason: e.target.value })}
+                                />
+                                <button
+                                  className="button small"
+                                  disabled={cleanupBusy === id || !form.auditReason?.trim()}
+                                  onClick={() => void resolve('IGNORE')}
+                                >
+                                  记录忽略
+                                </button>
+                              </td>
+                            </>
+                          )}
                         </tr>
                       )
                     })}
@@ -406,6 +492,37 @@ export function Templates({
               </div>
             )}
           </section>
+          {processPrompt && (
+            <Modal title="检测到关联进程" onClose={() => setProcessPrompt(null)}>
+              <div className="modal-body">
+                <Notice tone="warning">
+                  主机 {processPrompt.host} 的目录 {processPrompt.path}{' '}
+                  仍被进程使用。尚未尝试终止进程或删除目录。
+                </Notice>
+                <p>
+                  如需继续，请确认可能终止这些进程。关闭此对话框会取消处置；重新操作时需再次提供认证信息。
+                </p>
+                <div className="modal-actions">
+                  <button className="button" onClick={() => setProcessPrompt(null)}>
+                    取消
+                  </button>
+                  <button
+                    className="button danger"
+                    onClick={() => {
+                      setCleanupCredentials((old) => ({
+                        ...old,
+                        [processPrompt.id]: { ...old[processPrompt.id], confirmTerminate: true },
+                      }))
+                      setProcessPrompt(null)
+                      setCleanupError('已确认可能终止关联进程。请重新输入凭据后再次执行清理。')
+                    }}
+                  >
+                    确认并继续
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          )}
         </>
       )}
       {selected && (

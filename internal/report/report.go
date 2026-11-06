@@ -33,6 +33,7 @@ type HostResult struct {
 	BootID      string                `json:"boot_id,omitempty"`
 	HostKeyFP   string                `json:"ssh_host_key_fp,omitempty"`
 	Arch        string                `json:"arch,omitempty"`
+	LoginUID    *int                  `json:"login_uid,omitempty"`
 	Roles       []string              `json:"roles"`
 	ItemResults []compiler.ItemResult `json:"item_results"`
 	Failures    []Failure             `json:"failures"`
@@ -57,6 +58,7 @@ type RunReport struct {
 	RunMode           string            `json:"run_mode"`
 	RunScope          string            `json:"run_scope"`
 	ExecutorBackend   string            `json:"executor_backend"`
+	AuthMethod        string            `json:"auth_method,omitempty"`
 	RunStatus         string            `json:"run_status"`
 	Verdict           string            `json:"verdict"`
 	TerminationReason string            `json:"termination_reason,omitempty"`

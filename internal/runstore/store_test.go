@@ -22,6 +22,7 @@ import (
 const draftPlan = `schema_version: readyspec.plan/v1
 plan_id: runstore-test
 name: Runstore test
+description: ""
 software_name: demo
 software_version: '1'
 version: '1.0.0'
@@ -176,6 +177,9 @@ func TestCrashRecoveryArchivesAcceptedRunWithoutRerun(t *testing.T) {
 	got, err := recovered.Get(run.Acceptance.RunID)
 	if err != nil || got.Report == nil || got.Status != "FAILED" || got.Report.TerminationReason != "CONTROLLER_INTERRUPTED" {
 		t.Fatalf("recovered run=%+v err=%v", got, err)
+	}
+	if got.Plan.Digest != p.Digest || got.Plan.SourceDocument["description"] != "" {
+		t.Fatalf("recovery did not retain the digest-bound plan document: digest=%s document=%#v", got.Plan.Digest, got.Plan.SourceDocument)
 	}
 	if _, ok, err := recovered.EnqueueNext(); err != nil || ok {
 		t.Fatalf("recovered accepted run was requeued: dispatched=%v err=%v", ok, err)

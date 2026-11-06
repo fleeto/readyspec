@@ -40,7 +40,7 @@
 - **SHOULD / 应当**：默认设计；例外需要记录理由和风险。
 - **MAY / 可以**：不改变核心语义的可选实现。
 - **P0**：正式发布阻断范围；**P1/P2**：后续增强，不可伪装成已实现。
-- **统一语言与仓库过渡期说明**：本规格及所有新编写的 Schema、Go 代码、API、CLI 与 Web UI 文案**必须严格遵循 [`GLOSSARY.md`](./GLOSSARY.md)** 中定义的标准名词，禁止使用 `_Avoid_` 所列旧词。当前分支中尚未移除的旧版 Python 原型目录（`src/readyspec/`、`tests/`）属于待被 `M0–M3` Go/Web 实现替换的历史遗留物，在 `M3` 验收完成后统一删除。
+- **统一语言与仓库过渡期说明**：本规格及所有新编写的 Schema、Go 代码、API、CLI 与 Web UI 文案**必须严格遵循 [`GLOSSARY.md`](./GLOSSARY.md)** 中定义的标准名词，禁止使用 `_Avoid_` 所列旧词。M3 验收前保留的 Python 原型及旧测试现已由 Go/Web 实现和替代用例覆盖，并随 M3 验收从仓库移除。
 
 ### 1.2 已确认的产品与架构决策
 
@@ -467,6 +467,8 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 ### 11.2 观测证据与检查报告结构
 
 - 每条观测证据至少包含：`run_id`、`host_name`、`role_id`、`item_id`、`template_id`、`template_version`、`template_digest`、`goss_subrule_id`、`execution_identity`、`execution_mode`（`STANDARD/PRIVILEGED`）、`expected`、`observed`（经敏感脱敏且限制 `≤ 64 KiB`）、`evidence_mode`、`source`、`window_coverage`（日志类必填）、`high_risk_root_audit`、`collected_at`、`goss_version`、`compiler_version`。
+- 每个 `ItemResult` 的 `parameter_sources` 记录现场参数解析来源（模板默认、检查项值、组级覆盖或主机级覆盖），只记录来源类别，不记录参数值；报告详情按检查项展示该映射。兼容读取旧报告时，缺少来源字段显示“未记录”。
+- Run 报告可记录非秘密的 `auth_method` 及目标主机登录 `login_uid`、架构，供操作者核对实际连接身份；旧归档缺少这些可选字段时显示“未记录”。`login_uid` 描述 SSH 登录身份，不代表 `sudo` 子进程的有效身份，也不记录密码、私钥、Agent endpoint 或公钥指纹。
 - JSON 检查报告（`readyspec.report/v1`）是机器可读的唯一权威结果事实源；Web UI 与 CLI 直接读取并呈现已归档报告，绝不在展示层二次重算 `Verdict`。
 
 ---
@@ -687,7 +689,7 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 1. **M0（基础设施与跨平台原语）**：落地 `GLOSSARY.md`、`SPEC.md` 与 `DESIGN.md` 裁剪声明；建立 Go 模块与跨平台适配层（`flock`/`LockFileEx`、原子写、Windows DACL）、SafeYAML、RFC 8785 JCS 摘要、新版 JSON Schema，拉取并校验内嵌双架构官方 `Goss v0.4.9`。
 2. **M1（核心控制面与编译归一化引擎）**：实现 36 项预置 `CheckTemplate`、`WorkspaceStore`、Ansible INI/YAML 与快速主机表解析器、三级参数线性解析、Goss 智能合并编译器、`TopologyPolicy` 与 `Verdict` 归一化引擎及全量单元测试。
 3. **M2（双执行器、Run Manager 与自适应 CLI/API）**：实现 `NativeSSHExecutor`（含进程内回环 SSH Server + 真实内嵌 Goss 全链路集成测试）、`MockSimulatorExecutor`、`RunManager`、受控 HTTP/SSE 服务与自适应双模 CLI（严格验证退出码 `0 / 10~16`）。
-4. **M3（Web UI 四视图控制台与单二进制合流）**：按 `DESIGN.md` 实现 React + TypeScript + Tailwind 前端并通过组件测试，静态产物编译嵌入 Go 单二进制，清理移除旧版 Python/Docker 遗留目录。
+4. **M3（Web UI 四视图控制台与单二进制合流）**：按 `DESIGN.md` 实现 React + TypeScript 前端和 Go 原生生命周期、公共模板、断言、Run 历史及清理闭环；静态产物编译嵌入 Go 单二进制。旧 Python/Docker 遗留物仅在替代用例与迁移验收后清理。
 5. **M4（三架构交叉构建与矩阵验收）**：构建并检验 `windows/amd64`、`linux/amd64`、`linux/arm64` 单二进制产物，执行端到端验收场景、性能压测与六目标 Linux 平台实机认证。
 
 ---
@@ -714,6 +716,7 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 | **CHG-003** | 2026-11-03 | 确立四视图核心工作流、双模式主机清单录入、`$RS_PARAM_<KEY>` 只读注入与局部复测禁放行规则 | §5/§10/§11、`REQ-SEC-08`、`F06/F07` | 局部复测（`PartialRun`）与仿真执行（`mock_simulator`）严禁产出放行级 `READY` 或退出码 `0` | 已批准 |
 | **CHG-004** | 2026-11-03 | 宽松开源许可证裁剪：采用净室自研 Ansible Inventory 解析器与未经修改的官方 `Goss v0.4.9`，保持全栈 `Apache-2.0 / MIT / BSD` 零 `GPL` 依赖 | §1.2/§3.1 | 随仓维护完整 `LICENSE` 与 `NOTICE` 第三方开源声明 | 已批准 |
 | **CHG-005** | 2026-11-04 | **重大架构、设计规范与领域词汇升级**：① 管理端从 Python + Docker + Textual TUI 全面重构为 **Go 原生后端 + 内嵌 React Web UI + 内嵌双架构官方 Goss v0.4.9** 的零依赖单二进制（交付 `windows/amd64`、`linux/amd64`、`linux/arm64` 三个可执行产物）；② 同时交付纯 Go 原生 SSH 执行器与内置仿真执行器，CLI 与 Web 服务采用跨平台文件锁 + 本地受控 API 自适应双模协调；③ 引入 `DESIGN.md` 作为 Web UI 唯一视觉与组件令牌来源（在 `DESIGN.md` 顶部明确排除 CMDB/持续监控/流水线/事故管理章节）；④ 建立根目录 `GLOSSARY.md`，一步到位统一全栈命名（收敛为 36 项预置 `CheckTemplate` + 方案级 `TopologyPolicy`、`Plan` 三态、`CheckItem`、`RunConfig`、`GateRun/TrialRun`、`FullRun/PartialRun`、`ItemResult`、`Verdict`、`EvidenceMode`、`RemoteCleanup/CleanupItem/IGNORED`）；⑤ 锁死 CLI 退出码 8 步有序推导优先级，并新增独立退出码 `16 WORKSPACE_BUSY` 以保持 `15 AUTH_ERROR` 语义纯粹 | 全文各章、`GLOSSARY.md`、`DESIGN.md`、`README.md`、Schema/CLI/API | Web 服务默认仅监听 `127.0.0.1` 并强制会话/CSRF/`Origin` 校验，非回环监听强制访问令牌鉴权并警示非 TLS 明文风险；Windows 采用 `%LOCALAPPDATA%` 用户专属 DACL 与 `LockFileEx`；在 `M3` 完成前保留旧 Python 目录并于 `M3` 统一移除 | 已由用户确认批准 |
+| **CHG-006** | 2026-11-06 | M3 增量：方案生命周期使用不可变 RELEASED 与 ARCHIVED 快照和 `readyspec.release-manifest/v1`；GATE 接受前核对发布清单；加入标准权限的 USER_PUBLIC 模板提升、基础 Shell 断言及纯函数自测；任务历史可读取冻结配置、阶段投影、报告证据与清理审计。具体兼容、HTTP/CLI 契约和验收限制及最终验证记录见 [`docs/m3-implementation-design.md`](./docs/m3-implementation-design.md)。 | 方案 Schema/CLI/API、模板 Schema/API、Run API、Web 四视图 | 旧外部发布物缺失或无法核验清单时拒绝执行；试跑/模拟/局部结果不能作为正式 GATE READY 依据；M4 平台认证和正式性能验收仍未包含 | M3 实现验收完成 |
 
 ---
 

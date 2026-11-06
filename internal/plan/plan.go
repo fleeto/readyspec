@@ -11,6 +11,7 @@ import (
 
 	"github.com/fleeto/readyspec/internal/safeyaml"
 	"github.com/fleeto/readyspec/internal/semantic"
+	"github.com/fleeto/readyspec/internal/shellassert"
 	"github.com/fleeto/readyspec/internal/template"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -34,6 +35,17 @@ type Plan struct {
 	ReleaseManifest   map[string]any    `json:"release_manifest,omitempty"`
 	Digest            string            `json:"digest"`
 	UpdatedAt         string            `json:"updated_at,omitempty"`
+	SourceDocument    map[string]any    `json:"-"`
+}
+
+// DocumentJSON returns the validated source document when available. Keeping
+// that representation preserves optional empty fields that are part of the
+// semantic digest across Run freeze and replay.
+func DocumentJSON(value *Plan) ([]byte, error) {
+	if value != nil && value.SourceDocument != nil {
+		return json.Marshal(value.SourceDocument)
+	}
+	return json.Marshal(value)
 }
 
 type TopologyPolicy struct {
@@ -79,6 +91,7 @@ type CheckTemplate struct {
 
 var compiledSchema = sync.OnceValues(func() (*jsonschema.Schema, error) { return compileEmbedded("plan.v1.json") })
 var compiledDraftSchema = sync.OnceValues(func() (*jsonschema.Schema, error) { return compileEmbedded("draft.v1.json") })
+var compiledTemplateSchema = sync.OnceValues(func() (*jsonschema.Schema, error) { return compileEmbedded("template.v1.json") })
 
 func compileEmbedded(name string) (*jsonschema.Schema, error) {
 	c := jsonschema.NewCompiler()
@@ -127,6 +140,7 @@ func Load(r io.Reader) (*Plan, error) {
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, fmt.Errorf("PLAN_ERROR: decode plan")
 	}
+	p.SourceDocument = doc
 	templates := make(map[string]string, len(p.EmbeddedTemplates))
 	parameters := make(map[string]map[string]any, len(p.EmbeddedTemplates))
 	for _, value := range doc["embedded_templates"].([]any) {
@@ -199,6 +213,46 @@ func Load(r io.Reader) (*Plan, error) {
 	}
 	p.Digest = digest
 	return &p, nil
+}
+
+// ValidateTemplate validates an immutable template snapshot independently of
+// any plan item values. User templates are always ordinary CUSTOM_SHELL checks.
+func ValidateTemplate(document map[string]any) (*CheckTemplate, error) {
+	raw, err := json.Marshal(document)
+	if err != nil {
+		return nil, fmt.Errorf("TEMPLATE_ERROR: invalid document")
+	}
+	value, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("TEMPLATE_ERROR: invalid document")
+	}
+	schema, err := compiledTemplateSchema()
+	if err != nil {
+		return nil, fmt.Errorf("INFRA_ERROR: compile embedded template schema")
+	}
+	if err := schema.Validate(value); err != nil {
+		return nil, fmt.Errorf("TEMPLATE_SCHEMA_ERROR: invalid template snapshot")
+	}
+	var snapshot CheckTemplate
+	if err := json.Unmarshal(raw, &snapshot); err != nil {
+		return nil, fmt.Errorf("TEMPLATE_ERROR: decode template")
+	}
+	if _, err := compileParameters(snapshot.ParamsSchema); err != nil {
+		return nil, err
+	}
+	digest, err := semantic.TemplateDigest(document)
+	if err != nil || snapshot.Digest != digest {
+		return nil, fmt.Errorf("TEMPLATE_DIGEST_MISMATCH")
+	}
+	if snapshot.Source != "BUILTIN" {
+		if snapshot.ExecutionMode != "STANDARD" || snapshot.Implementation["kind"] != "CUSTOM_SHELL" {
+			return nil, fmt.Errorf("TEMPLATE_PERMISSION_REJECTED")
+		}
+		if _, err := shellassert.BuildAssertions(snapshot.Implementation["assertions"], snapshot.Implementation["expect_exit_code"]); err != nil {
+			return nil, err
+		}
+	}
+	return &snapshot, nil
 }
 
 func trustedTemplate(doc map[string]any) bool {

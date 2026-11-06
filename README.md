@@ -5,7 +5,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 
-> **当前分支状态说明（`feat/single-binary-webui`）**：本项目已完成架构与领域词汇基线修订（见 [`SPEC.md`](./SPEC.md) `CHG-005`、[`GLOSSARY.md`](./GLOSSARY.md) 与 [`DESIGN.md`](./DESIGN.md)），确立为 **Go 原生后端 + 内嵌 Web UI + 内嵌双架构官方 `Goss v0.4.9`** 的跨平台单可执行文件形态。仓库当前处于按 `M0–M4` 里程碑实施替换阶段，待 Go 与 Web UI 模块验收完成后将移除遗留的旧版 Python 原型目录（`src/readyspec/`）。
+> **当前实现状态**：Go 原生后端、内嵌 Web UI、双架构官方 `Goss v0.4.9`、M2 Run 控制面及 M3 生命周期/控制台能力正在合流。M3 设计与代码进度见 [`docs/m3-implementation-design.md`](./docs/m3-implementation-design.md)；尚未完成 M3 行为验收与旧原型清理，不要据此宣称 M3 已验收。
 
 ---
 
@@ -38,7 +38,7 @@ make build-all
 
 后端已实现安全 YAML、RFC 8785 语义摘要、新方案/模板 Schema、模板引用与快照摘要校验、工作区互斥与原子 JSON 写入、会话 Cookie、CSRF、Origin 防护，以及双架构官方 Goss 内嵌完整性校验。Host 头校验分档：回环监听保持严格校验，非回环监听（内网部署）只校验端口一致，允许通过主机名、网卡 IP、域名等任意入口访问。浏览器启动令牌通过 URL Fragment 传递，交换为会话后立即从地址栏移除；自动生成的启动令牌仅可使用一次，同一浏览器可凭 Cookie 恢复会话。Windows 权限与锁实现已交叉编译，仍需原生环境验收。
 
-CLI 提供 `serve`、`plan validate`、`plan compile`、`template list`、`run preview`、`run submit`、`report list`、`report show`、`cleanup list` 和 `cleanup resolve`。M1 已接通 36 个模板家族、37 个可信版本快照的静态编排与编译，目录统一由后端提供。内置模板（含普通执行）必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。Run 生命周期、离线模拟器、Native SSH、报告归档、Web Run API/SSE、活动服务上的本机 CLI 委托、精确 sudo 策略查询与受控特权执行已实现。sudo 密码可通过 `READYSPEC_SUDO_PASSWORD` 提供；策略拒绝或缺少凭据会在全目标屏障处拒绝整次任务。自动及人工清理会重新核对目标身份和 owner token，人工清理发现活动进程时必须显式确认。不能据静态校验、模拟器结果或编译成功宣称环境 `READY`。旧 Python 原型保留至 M3 验收。
+CLI 提供 `serve`、`plan validate/compile/list/release/archive/import/export`、`template list`、`run preview/submit/status/cancel`、`report list/show/export`、`cleanup list/resolve`。生命周期与报告命令在同工作区服务运行时委托到本机服务，服务未运行时使用工作区锁直接访问记录。发布与导入使用工作区生命周期记录；GATE 任务必须带可验证发布清单。内置模板必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。Run 生命周期、离线模拟器、Native SSH、报告归档、Web Run API/SSE、活动服务上的本机 CLI 委托、精确 sudo 策略查询与受控特权执行已实现。sudo 密码可通过 `READYSPEC_SUDO_PASSWORD` 提供；策略拒绝或缺少凭据会在全目标屏障处拒绝整次任务。自动及人工清理会重新核对目标身份和 owner token，人工清理发现活动进程时必须显式确认。离线单二进制 smoke 已覆盖嵌入页面、方案发布/导出/停用，以及模板、报告和清理 CLI 委托；完整 M3 行为验收仍未完成，浏览器 E2E 尚未通过，因此不能据此宣称 M3 已验收或环境 `READY`。旧 Python 原型须在替代用例和 M3 验收后再清理。
 
 ```bash
 # 查询当前已实现模板的自包含快照
@@ -48,7 +48,7 @@ CLI 提供 `serve`、`plan validate`、`plan compile`、`template list`、`run p
 ./dist/readyspec plan compile ./your-plan.yaml
 ```
 
-当前注册模板覆盖 `H01–H04`、`O01–O04`、`S01–S05`、`N01–N06`、`R01–R05`、`A01–A04`、`D01–D05`、`L01–L03`。R04 默认版本读取目标 PID 的有效限制，额外 `1.0.0-config` 版本读取 systemd Unit 配置并标记为 `CONFIG` 证据。A03 生成特权工件；L02/L03 使用 `STANDARD` 并检查系统日志文件可读性，权限不足返回 `ERROR`。**M1 验收已完成**；采集证据与 M1/M4 范围边界见 [模板验收对应表](docs/m1-template-acceptance.md)。六个目标平台的认证矩阵、真实 SSH 执行及后续里程碑仍按 SPEC 的 M2/M4 计划推进。
+当前注册模板覆盖 `H01–H04`、`O01–O04`、`S01–S05`、`N01–N06`、`R01–R05`、`A01–A04`、`D01–D05`、`L01–L03`。R04 默认版本读取目标 PID 的有效限制，额外 `1.0.0-config` 版本读取 systemd Unit 配置并标记为 `CONFIG` 证据。A03 生成特权工件；L02/L03 使用 `STANDARD` 并检查系统日志文件可读性，权限不足返回 `ERROR`。**M1 验收已完成**；采集证据与 M1/M4 范围边界见 [模板验收对应表](docs/m1-template-acceptance.md)。M2 执行控制面已实现；M3 行为与打包验收仍在进行，六平台认证矩阵归属 M4。
 
 H01 架构证据同时保留 `uname_raw`（含原始换行）和 `normalized_architecture`。`amd64` / `arm64` 分别归一为 `x86_64` / `aarch64`；有效但不在允许集合的架构判 FAIL，空、多行或其他格式异常以及命令失败判 ERROR。归一化不会覆盖原始观测。
 
@@ -100,7 +100,7 @@ L02/L03 除事件查询外，还审计未按内核/服务筛选的系统日志�
 
 S02/S03 会保留未声明为业务要求的文件身份与挂载元数据，并标记为 `observation_only`。S04/S05 目标需提供 GNU `stat`、`cat` 和可读的 `/proc/self/mountinfo`；采集只读文件系统计数，报告总量、非特权可用量、inode 比例、挂载点及精确文件系统类型。容量判定使用 `f_bavail`，不会把保留块计入非特权可用空间，也不会通过写测试文件测量空间。
 
-自定义开发工作区可使用 `./dist/readyspec serve --workspace ./.readyspec_workspace --no-browser`。环境变量 `READYSPEC_WORKSPACE` 优先于命令行参数；同工作区已有服务时，第二个服务返回 `16 WORKSPACE_BUSY`。当前纯静态 `plan validate` 不需获取工作区锁，其他 CLI 的服务委托能力尚待实现。
+自定义开发工作区可使用 `./dist/readyspec serve --workspace ./.readyspec_workspace --no-browser`。环境变量 `READYSPEC_WORKSPACE` 优先于命令行参数；同工作区已有服务时，第二个服务返回 `16 WORKSPACE_BUSY`。纯静态 `plan validate` 不需获取工作区锁；方案生命周期、报告、运行控制与清理等工作区操作会委托给活动服务，连接失败时才回退到工作区直读写。
 
 前端开发与浏览器验证见 [`web/README.md`](./web/README.md)。`internal/webui/dist/` 保存可直接嵌入 Go 的构建产物，修改前端源码后须重新运行 `make web` 或 `make build`。
 

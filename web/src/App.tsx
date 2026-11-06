@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError, type Diagnostic } from './api'
 import { RunPreview } from './RunPreview'
+import { RunHistory } from './RunHistory'
 import { Badge, Empty, Field, Modal, Notice, Spinner } from './components'
 import {
   formatTime,
@@ -68,6 +69,10 @@ export default function App() {
   const [plans, setPlans] = useState<SavedPlan[]>([])
   const [document, setDocument] = useState<Plan>(newPlan)
   const [draftKey, setDraftKey] = useState<string | null>(null)
+  const [draftRevision, setDraftRevision] = useState<string | null>(null)
+  const [recordKey, setRecordKey] = useState<string | null>(null)
+  const [recordRevision, setRecordRevision] = useState<string | null>(null)
+  const [runPlan, setRunPlan] = useState<{ document: Plan; recordKey: string | null } | null>(null)
   const [editorEpoch, setEditorEpoch] = useState(0)
   const [saveEpoch, setSaveEpoch] = useState(0)
   const editorIdentity = useRef(0)
@@ -88,6 +93,10 @@ export default function App() {
     }
   })
   const [importing, setImporting] = useState(false)
+  const [importIntent, setImportIntent] = useState<'workbench' | 'run'>('workbench')
+  const [rerunConfig, setRerunConfig] = useState<Record<string, unknown> | null>(null)
+  const [runSubmissionUncertain, setRunSubmissionUncertain] = useState(false)
+  const runSubmissionUncertainRef = useRef(false)
   const [help, setHelp] = useState(false)
   const [confirm, setConfirm] = useState<{ title: string; action: () => void } | null>(null)
   const revision = useRef(0)
@@ -170,13 +179,50 @@ export default function App() {
     }
   }, [theme])
   useEffect(() => {
-    const listener = () => setPage(pageFromHash())
+    runSubmissionUncertainRef.current = runSubmissionUncertain
+  }, [runSubmissionUncertain])
+  useEffect(() => {
+    const listener = () => {
+      const next = pageFromHash()
+      if (runSubmissionUncertainRef.current && next !== 'runs') {
+        location.hash = 'runs'
+        setPage('runs')
+        setConfirm({
+          title: '任务接受状态尚未确认。放弃后将不能用原幂等键重试。',
+          action: () => {
+            runSubmissionUncertainRef.current = false
+            setRunSubmissionUncertain(false)
+            location.hash = next
+            setPage(next)
+          },
+        })
+        return
+      }
+      setPage(next)
+    }
     window.addEventListener('hashchange', listener)
     return () => window.removeEventListener('hashchange', listener)
   }, [])
   const navigate = (next: Page) => {
+    if (runSubmissionUncertainRef.current && next !== 'runs') {
+      setConfirm({
+        title: '任务接受状态尚未确认。放弃后将不能用原幂等键重试。',
+        action: () => {
+          runSubmissionUncertainRef.current = false
+          setRunSubmissionUncertain(false)
+          location.hash = next
+          setPage(next)
+          setMobileNav(false)
+        },
+      })
+      return
+    }
     location.hash = next
     setPage(next)
+    if (next === 'runs' && page !== 'runs') {
+      setRunPlan(null)
+      setRerunConfig(null)
+    }
     setMobileNav(false)
     setError('')
     setNotice('')
@@ -249,11 +295,19 @@ export default function App() {
     setNotice('')
     setError('')
   }
-  function replace(next: Plan, saved = false, key: string | null = null) {
+  function replace(
+    next: Plan,
+    saved = false,
+    key: string | null = null,
+    savedRevision: string | null = null,
+  ) {
     revision.current++
     editorIdentity.current++
     setEditorEpoch(editorIdentity.current)
     setDraftKey(key)
+    setDraftRevision(savedRevision)
+    setRecordKey(saved && next.state !== 'DRAFT' ? key : null)
+    setRecordRevision(saved && next.state !== 'DRAFT' ? savedRevision : null)
     setDocument(structuredClone(next))
     setDirty(!saved)
     setDigest(next.digest ?? '')
@@ -282,8 +336,12 @@ export default function App() {
         const result = await api.request<DraftSave>('/plans', {
           source: stringify(document),
           ...(draftKey ? { draft_key: draftKey } : {}),
+          ...(draftKey && draftRevision ? { expected_revision: draftRevision } : {}),
         })
-        if (editorIdentity.current === instance) setDraftKey(result.draft_key)
+        if (editorIdentity.current === instance) {
+          setDraftKey(result.draft_key)
+          setDraftRevision(result.revision)
+        }
         if (revision.current !== current) {
           setNotice('操作已完成，但你又修改了方案。当前修改仍需重新校验或保存。')
           await refreshPlans()
@@ -324,6 +382,109 @@ export default function App() {
   async function refreshPlans() {
     const response = await api.request<{ items: SavedPlan[] }>('/plans')
     setPlans(response.items)
+  }
+
+  async function releaseDraft() {
+    if (!draftKey || !draftRevision || dirty) {
+      setError('请先保存当前草稿，再发布已保存的修订。')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      const record = await api.request<{
+        record_key: string
+        revision: string
+        release_snapshot: Plan
+      }>(`/plans/${encodeURIComponent(draftKey)}/release`, {
+        expected_revision: draftRevision,
+      })
+      setDocument(record.release_snapshot)
+      setDigest(record.release_snapshot.digest ?? '')
+      setDraftKey(null)
+      setDraftRevision(null)
+      setRecordKey(record.record_key)
+      setRecordRevision(record.revision)
+      setDirty(false)
+      await refreshPlans()
+      const manifest = record.release_snapshot.release_manifest as
+        Record<string, unknown> | undefined
+      setNotice(
+        `方案版本已发布并冻结。摘要：${String(manifest?.released_plan_digest ?? record.release_snapshot.digest ?? '未记录')}；模板锁 ${Object.keys((manifest?.template_lock as object) ?? {}).length} 项。`,
+      )
+    } catch (err) {
+      setError(message(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function archivePlan() {
+    if (!recordKey || !recordRevision || document.state !== 'RELEASED') return
+    setBusy(true)
+    setError('')
+    try {
+      const record = await api.request<{
+        record_key: string
+        revision: string
+        archive_snapshot: Plan
+      }>(`/plans/${encodeURIComponent(recordKey)}/archive`, {
+        expected_revision: recordRevision,
+      })
+      setDocument(record.archive_snapshot)
+      setDigest(record.archive_snapshot.digest ?? '')
+      setRecordRevision(record.revision)
+      await refreshPlans()
+      setNotice('方案版本已停用，历史检查任务保持不变。')
+    } catch (err) {
+      setError(message(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function requestDeleteDraft() {
+    if (!draftKey || !draftRevision) return
+    setConfirm({
+      title: '删除当前草稿？此操作不会影响已归档的检查任务。',
+      action: () => {
+        void (async () => {
+          setBusy(true)
+          setError('')
+          try {
+            await api.request(
+              `/plans/${encodeURIComponent(draftKey)}`,
+              { expected_revision: draftRevision },
+              { method: 'DELETE' },
+            )
+            await refreshPlans()
+            replace(newPlan())
+            setNotice('草稿已删除。')
+          } catch (cause) {
+            setError(message(cause))
+          } finally {
+            setBusy(false)
+          }
+        })()
+      },
+    })
+  }
+
+  function newVersionDraft() {
+    const parts = document.version.split('.')
+    const tail = Number(parts.at(-1))
+    if (!Number.isSafeInteger(tail) || tail < 0) {
+      setError('当前版本不支持自动递增，请手动创建数字版本草稿。')
+      return
+    }
+    parts[parts.length - 1] = String(tail + 1)
+    const next = structuredClone(document)
+    next.state = 'DRAFT'
+    next.version = parts.join('.')
+    delete next.digest
+    delete next.release_manifest
+    delete next.updated_at
+    replace(next)
   }
 
   if (auth === 'loading')
@@ -569,8 +730,11 @@ export default function App() {
             <Overview
               plans={plans}
               onNew={() => guard(() => replace(newPlan()))}
-              onImport={() => setImporting(true)}
-              onOpen={(p) => guard(() => replace(p.document, true, p.key))}
+              onImport={() => {
+                setImportIntent('run')
+                setImporting(true)
+              }}
+              onOpen={(p) => guard(() => replace(p.document, true, p.key, p.revision))}
               onTemplates={() => navigate('templates')}
               onRuns={() => navigate('runs')}
             />
@@ -579,6 +743,7 @@ export default function App() {
             <Workbench
               key={editorEpoch}
               document={document}
+              draftKey={draftKey}
               selectedIssue={selectedIssue}
               plans={plans}
               dirty={dirty}
@@ -587,9 +752,16 @@ export default function App() {
               saveEpoch={saveEpoch}
               mutate={mutate}
               onNew={() => guard(() => replace(newPlan()))}
-              onOpen={(p) => guard(() => replace(p.document, true, p.key))}
-              onImport={() => setImporting(true)}
+              onOpen={(p) => guard(() => replace(p.document, true, p.key, p.revision))}
+              onImport={() => {
+                setImportIntent('workbench')
+                setImporting(true)
+              }}
               onAction={(a) => void perform(a)}
+              onRelease={() => void releaseDraft()}
+              onArchive={() => void archivePlan()}
+              onNewVersion={newVersionDraft}
+              onDeleteDraft={requestDeleteDraft}
             />
           )}
           {page === 'runs' && (
@@ -602,7 +774,55 @@ export default function App() {
               <Notice>
                 任务由本机服务持续管理。静态预览不会连接目标主机；接受任务后，服务会先完成全部目标的身份与权限预检。
               </Notice>
-              <RunPreview key={JSON.stringify(document)} document={document} />
+              <RunPreview
+                key={`${JSON.stringify(runPlan?.document ?? document)}:${rerunConfig ? JSON.stringify(rerunConfig) : ''}`}
+                document={runPlan?.document ?? document}
+                planRecordKey={runPlan ? runPlan.recordKey : recordKey}
+                selectedPlanKey={runPlan?.recordKey ?? recordKey ?? draftKey ?? ''}
+                plans={plans}
+                onSelectPlan={(selected) => {
+                  setRunPlan({
+                    document: selected.document,
+                    recordKey: selected.document.state === 'DRAFT' ? null : selected.key,
+                  })
+                  setRerunConfig(null)
+                }}
+                onSubmissionUncertain={setRunSubmissionUncertain}
+                rerunConfig={rerunConfig}
+              />
+              <RunHistory
+                onRerun={(config) => {
+                  const rawPlan = config.plan
+                  if (typeof rawPlan !== 'string') {
+                    setError('历史任务缺少冻结方案，无法重跑。')
+                    return
+                  }
+                  try {
+                    const parsed = JSON.parse(rawPlan) as Plan
+                    const planRecord =
+                      typeof config.plan_record_key === 'string' && config.plan_record_key !== ''
+                        ? config.plan_record_key
+                        : null
+                    const selectedRecord = plans.find((item) => item.key === planRecord)
+                    if (
+                      parsed.state === 'ARCHIVED' ||
+                      (planRecord !== null &&
+                        (!selectedRecord || selectedRecord.document.state === 'ARCHIVED'))
+                    ) {
+                      setError(
+                        '该方案版本已停用。请选择当前有效发布版本，或创建新草稿后以试跑方式重跑。',
+                      )
+                      return
+                    }
+                    setRunPlan({ document: parsed, recordKey: planRecord })
+                    setRerunConfig(config)
+                    setError('')
+                    setNotice('已载入最近一次非秘密配置；请重新输入认证信息并生成预览。')
+                  } catch {
+                    setError('历史任务的冻结方案无法读取。')
+                  }
+                }}
+              />
               <section className="workflow-explanation">
                 {['选择检查方案', '录入主机清单', '分配角色与现场参数', '预览并执行'].map(
                   (step, i) => (
@@ -637,9 +857,12 @@ export default function App() {
       {importing && (
         <ImportDialog
           onClose={() => setImporting(false)}
-          onImport={(p) => {
+          onImport={(p, key, savedRevision) => {
             setImporting(false)
-            guard(() => replace(p))
+            guard(() => {
+              replace(p, Boolean(key), key ?? null, savedRevision ?? null)
+              if (importIntent === 'run') navigate('runs')
+            })
           }}
         />
       )}
@@ -653,7 +876,8 @@ export default function App() {
             <p>草稿保存在当前服务的工作区。浏览器刷新后，尚未保存的编辑不会保留。</p>
             <p>
               静态校验不会执行
-              Shell，也不会连接目标主机。远程执行暂不可用，模板目录中的预置定义目前仅供查阅。
+              Shell，也不会连接目标主机。接受任务后由本机服务执行预检与采集；正式放行只以完整原生
+              SSH 门禁报告为依据。
             </p>
             <p>
               root / sudo 需求由检查项决定；正式执行时只需提供满足要求的凭据，无须额外勾选批准。
@@ -784,6 +1008,35 @@ function Overview({
   onRuns: () => void
 }) {
   const [query, setQuery] = useState('')
+  const [recentRuns, setRecentRuns] = useState<
+    {
+      run_id: string
+      status: string
+      accepted_at: string
+      plan_id: string
+      plan_name: string
+      plan_version: string
+      run_mode: string
+      run_scope: string
+      executor_backend: string
+      verdict?: string
+    }[]
+  >([])
+  const [runsError, setRunsError] = useState('')
+  useEffect(() => {
+    let active = true
+    void api
+      .request<{ items: typeof recentRuns }>('/runs')
+      .then((value) => {
+        if (active) setRecentRuns(value.items.slice(0, 8))
+      })
+      .catch((cause) => {
+        if (active) setRunsError(message(cause))
+      })
+    return () => {
+      active = false
+    }
+  }, [])
   const filtered = plans.filter((p) =>
     `${p.document.name} ${p.document.plan_id}`.toLowerCase().includes(query.toLowerCase()),
   )
@@ -856,6 +1109,55 @@ function Overview({
             </button>
           </div>
         </div>
+      </section>
+      <section className="panel">
+        <div className="panel-heading">
+          <div className="heading-inline">
+            <h2>近期检查任务</h2>
+            <span className="count">{recentRuns.length}</span>
+          </div>
+          <button className="text-button" onClick={onRuns}>
+            查看检查与报告 <ArrowRight size={15} />
+          </button>
+        </div>
+        {runsError ? (
+          <Notice tone="warning">暂时无法读取近期任务：{runsError}</Notice>
+        ) : recentRuns.length === 0 ? (
+          <Empty icon={<Activity size={20} />} title="暂无检查任务">
+            导入方案并进入检查向导后，可以在这里查看任务进度与归档报告。
+          </Empty>
+        ) : (
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>方案</th>
+                  <th>类别 / 范围</th>
+                  <th>执行器</th>
+                  <th>任务状态</th>
+                  <th>结论</th>
+                  <th>接受时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentRuns.map((run) => (
+                  <tr key={run.run_id}>
+                    <td>
+                      {run.plan_name || run.plan_id} · {run.plan_version}
+                    </td>
+                    <td>
+                      {run.run_mode} / {run.run_scope}
+                    </td>
+                    <td>{run.executor_backend}</td>
+                    <td>{run.status}</td>
+                    <td>{run.verdict ?? '尚无归档报告'}</td>
+                    <td>{formatTime(run.accepted_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
       <section className="panel">
         <div className="panel-heading">
@@ -968,7 +1270,13 @@ function Stat({
   )
 }
 
-function ImportDialog({ onClose, onImport }: { onClose: () => void; onImport: (p: Plan) => void }) {
+function ImportDialog({
+  onClose,
+  onImport,
+}: {
+  onClose: () => void
+  onImport: (p: Plan, key?: string, revision?: string) => void
+}) {
   const [source, setSource] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false)
@@ -985,7 +1293,25 @@ function ImportDialog({ onClose, onImport }: { onClose: () => void; onImport: (p
               source,
               normalize_draft: false,
             })
-            onImport(result.document)
+            if (result.document.state === 'DRAFT') {
+              onImport(result.document)
+            } else {
+              const imported = await api.request<{
+                record: {
+                  record_key: string
+                  revision: string
+                  release_snapshot: Plan | null
+                  archive_snapshot: Plan | null
+                }
+                created: boolean
+              }>('/plans/import', { source })
+              const record = imported.record
+              onImport(
+                record.archive_snapshot ?? record.release_snapshot ?? result.document,
+                record.record_key,
+                record.revision,
+              )
+            }
           } catch (err) {
             setError(message(err))
           } finally {

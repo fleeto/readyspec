@@ -12,6 +12,11 @@ import (
 type Simulator struct{ Profiles Profiles }
 
 func (s Simulator) Preflight(ctx context.Context, req PreflightRequest) PreflightResult {
+	if req.Journal != nil {
+		if err := req.Journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "SIMULATING_PREFLIGHT"); err != nil {
+			return PreflightResult{Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist simulator phase"}}
+		}
+	}
 	if err := ctx.Err(); err != nil {
 		return PreflightResult{Failure: &Failure{Class: FailureExecution, Phase: "PREFLIGHT", Message: "simulator preflight cancelled"}}
 	}
@@ -47,14 +52,11 @@ func (s Simulator) Execute(ctx context.Context, req ExecuteRequest, journal Jour
 		if len(artifact.Items) == 0 {
 			continue
 		}
-		if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "RUNNING_"+artifact.ExecutionMode); err != nil {
+		if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "SIMULATING_"+artifact.ExecutionMode); err != nil {
 			return HostOutcome{Results: out.Results, Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist execution phase"}, Modes: out.Modes}
 		}
 		if err := journal.ExecutionStarted(ctx, req.RunID, req.Host.Inventory.ID, artifact.ExecutionMode); err != nil {
 			return HostOutcome{Results: out.Results, Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist execution marker"}, Modes: out.Modes}
-		}
-		if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "COLLECTING"); err != nil {
-			return HostOutcome{Results: out.Results, Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist collection phase"}, Modes: out.Modes}
 		}
 		modeComplete := true
 		for _, item := range artifact.Items {
@@ -76,7 +78,7 @@ func (s Simulator) Execute(ctx context.Context, req ExecuteRequest, journal Jour
 		out.Modes[artifact.ExecutionMode] = modeComplete
 	}
 	if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "FINISHED"); err != nil {
-		return HostOutcome{Results: out.Results, Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist final phase"}, Modes: out.Modes}
+		return failedOutcome(out, "JOURNAL", "cannot persist simulator completion phase")
 	}
 	return out
 }

@@ -3,6 +3,7 @@ package runmanager
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -14,6 +15,7 @@ import (
 	"github.com/fleeto/readyspec/internal/executor"
 	"github.com/fleeto/readyspec/internal/inventory"
 	"github.com/fleeto/readyspec/internal/plan"
+	"github.com/fleeto/readyspec/internal/planstore"
 	"github.com/fleeto/readyspec/internal/preview"
 	"github.com/fleeto/readyspec/internal/report"
 	"github.com/fleeto/readyspec/internal/runstore"
@@ -28,6 +30,10 @@ type Manager struct {
 }
 
 func (m *Manager) Submit(request runstore.Request, credentials map[string]executor.Credential) (*runstore.Run, bool, error) {
+	if err := validatePlanState(request); err != nil {
+		wipeCredentials(credentials)
+		return nil, false, err
+	}
 	if request.Config.Backend != "native_ssh" {
 		wipeCredentials(credentials)
 		return m.store.Accept(request)
@@ -63,6 +69,32 @@ func (m *Manager) Submit(request runstore.Request, credentials map[string]execut
 	})
 	wipe()
 	return accepted, created, err
+}
+
+func validatePlanState(request runstore.Request) error {
+	if request.Plan == nil {
+		return fmt.Errorf("PLAN_ERROR: missing plan")
+	}
+	if request.Plan.State == "ARCHIVED" {
+		return fmt.Errorf("PLAN_ARCHIVED: archived plans cannot be executed")
+	}
+	if request.Config.Mode == "GATE" {
+		if request.Plan.State != "RELEASED" {
+			return fmt.Errorf("PLAN_GATE_REQUIRES_RELEASED")
+		}
+		raw, err := plan.DocumentJSON(request.Plan)
+		if err != nil {
+			return fmt.Errorf("PLAN_ERROR: cannot validate release manifest")
+		}
+		var document map[string]any
+		if err := json.Unmarshal(raw, &document); err != nil {
+			return fmt.Errorf("PLAN_ERROR: cannot validate release manifest")
+		}
+		if err := planstore.VerifyManifest(document); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Manager) List() []runstore.Run { return m.store.List() }
@@ -314,7 +346,7 @@ func (m *Manager) execute(ctx, parentCtx context.Context, run *runstore.Run, imp
 			defer func() { <-semaphore }()
 			stageCtx, stageCancel := context.WithTimeout(ctx, time.Duration(run.Config.Budgets.HostSeconds)*time.Second)
 			started := time.Now()
-			result := implementation.Preflight(stageCtx, executor.PreflightRequest{RunID: run.Acceptance.RunID, Plan: run.Plan, Config: previewInput, Host: host, Artifacts: artifactsByHost[host.Inventory.ID]})
+			result := implementation.Preflight(stageCtx, executor.PreflightRequest{RunID: run.Acceptance.RunID, Plan: run.Plan, Config: previewInput, Host: host, Artifacts: artifactsByHost[host.Inventory.ID], Journal: m.store})
 			processing := time.Since(started)
 			stageErr := stageCtx.Err()
 			stageCancel()
@@ -324,6 +356,11 @@ func (m *Manager) execute(ctx, parentCtx context.Context, run *runstore.Run, imp
 					class, phase = executor.FailureHostTimeout, "BUDGET"
 				}
 				result.Failure = &executor.Failure{Class: class, Phase: phase, Message: "host processing budget expired"}
+			}
+			if result.Failure != nil {
+				if phaseErr := m.store.Phase(context.Background(), run.Acceptance.RunID, host.Inventory.ID, "FINISHED"); phaseErr != nil {
+					result.Failure = &executor.Failure{Class: executor.FailureExecution, Phase: "JOURNAL", Message: "preflight outcome could not be durably recorded"}
+				}
 			}
 			classified[index] = preflightResult{input: host, value: result, processingTime: processing}
 		}(i, host)
@@ -397,6 +434,9 @@ func (m *Manager) execute(ctx, parentCtx context.Context, run *runstore.Run, imp
 		}
 		hostCtx, hostCancel := context.WithTimeout(ctx, remaining)
 		outcome := implementation.Execute(hostCtx, executor.ExecuteRequest{RunID: run.Acceptance.RunID, Plan: run.Plan, Config: previewInput, Host: item.input, Facts: item.value.Facts, Artifacts: artifactsByHost[item.input.Inventory.ID]}, m.store)
+		if outcome.Failure != nil {
+			_ = m.store.Phase(context.Background(), run.Acceptance.RunID, item.input.Inventory.ID, "FINISHED")
+		}
 		hostErr := hostCtx.Err()
 		hostCancel()
 		if errors.Is(hostErr, context.DeadlineExceeded) && ctx.Err() == nil && !isCancellationAccepted(m.store, run.Acceptance.RunID) {
@@ -443,6 +483,10 @@ func (m *Manager) execute(ctx, parentCtx context.Context, run *runstore.Run, imp
 			HostID: item.input.Inventory.ID, Status: status, MachineID: item.value.Facts.MachineID,
 			BootID: item.value.Facts.BootID, HostKeyFP: item.value.Facts.HostKey, Arch: item.value.Facts.Arch,
 			Roles: item.input.Roles, ItemResults: outcome.Results, Failures: failures,
+		}
+		if item.value.Facts.MachineID != "" {
+			uid := item.value.Facts.UID
+			hostResult.LoginUID = &uid
 		}
 		if err := m.store.AppendHostOutcome(run.Acceptance.RunID, hostResult); err != nil {
 			return err
@@ -518,7 +562,8 @@ func (m *Manager) archive(run *runstore.Run, status, reason, verdict string, hos
 	value := report.RunReport{
 		SchemaVersion: "readyspec.report/v1", RunID: run.Acceptance.RunID, PlanDigest: run.Config.PlanDigest,
 		RunMode: run.Config.Mode, RunScope: run.Config.Scope, ExecutorBackend: run.Config.Backend,
-		RunStatus: status, Verdict: verdict, TerminationReason: reason,
+		AuthMethod: run.Config.Auth.Method,
+		RunStatus:  status, Verdict: verdict, TerminationReason: reason,
 		VerdictReasons: []string{}, StartedAt: run.Acceptance.AcceptedAt, FinishedAt: now,
 		TopologyResults: topologyResults, Hosts: hosts, CleanupItems: cleanup, Failures: failures,
 	}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/semantic"
+	"github.com/fleeto/readyspec/internal/shellassert"
 	"github.com/fleeto/readyspec/internal/template"
 )
 
@@ -29,17 +30,19 @@ type Origin struct {
 	Numeric         bool   `json:"numeric,omitempty"`
 	Source          string `json:"source"`
 	ObservationOnly bool   `json:"observation_only,omitempty"`
+	Frame           string `json:"frame,omitempty"`
 }
 
 type ItemResult struct {
-	RoleID          string     `json:"role_id"`
-	ItemID          string     `json:"item_id"`
-	Status          string     `json:"status"`
-	TemplateID      string     `json:"template_id"`
-	TemplateVersion string     `json:"template_version"`
-	ExecutionMode   string     `json:"execution_mode"`
-	EvidenceMode    string     `json:"evidence_mode"`
-	Evidence        []Evidence `json:"evidence,omitempty"`
+	RoleID           string            `json:"role_id"`
+	ItemID           string            `json:"item_id"`
+	Status           string            `json:"status"`
+	TemplateID       string            `json:"template_id"`
+	TemplateVersion  string            `json:"template_version"`
+	ExecutionMode    string            `json:"execution_mode"`
+	EvidenceMode     string            `json:"evidence_mode"`
+	ParameterSources map[string]string `json:"parameter_sources,omitempty"`
+	Evidence         []Evidence        `json:"evidence,omitempty"`
 }
 
 type Evidence struct {
@@ -278,6 +281,10 @@ func compile(p *plan.Plan, input HostInput, mode string) (Artifact, error) {
 			for name, value := range values {
 				a.ParameterSources[item.ItemID][name] = value.Source
 			}
+			a.Items[len(a.Items)-1].ParameterSources = make(map[string]string, len(values))
+			for name, value := range values {
+				a.Items[len(a.Items)-1].ParameterSources[name] = value.Source
+			}
 			addOrigins := func(origins ...Origin) {
 				for i := range origins {
 					origins[i].Source = collectionSource(item.TemplateID, values)
@@ -353,8 +360,19 @@ func compile(p *plan.Plan, input HostInput, mode string) (Artifact, error) {
 				if expected == nil {
 					expected = 0
 				}
-				commands[key] = map[string]any{"exec": "/bin/sh -c " + shellQuote(prefix.String()+script), "exit-status": expected, "timeout": 10000}
-				addOrigins(Origin{Type: "Command", RoleID: role.RoleID, ItemID: item.ItemID, Resource: key, Property: "exit-status", Expected: expected})
+				assertions, err := shellassert.BuildAssertions(snapshot.Implementation["assertions"], expected)
+				if err != nil {
+					return a, &Diagnostic{Code: "CUSTOM_ASSERTION_INVALID", Message: "自定义检查断言无效或与退出码冲突", RoleID: role.RoleID, ItemID: item.ItemID}
+				}
+				frame := "__READYSPEC_START_" + strings.TrimPrefix(key, "check-") + "__"
+				command := prefix.String() + "printf '%s\\n' " + shellQuote(frame) + ";\n" + script
+				commands[key] = map[string]any{"exec": "/bin/sh -c " + shellQuote(command), "exit-status": map[string]any{"ge": 0}, "stdout": map[string]any{"match-regexp": "(?s).*"}, "stderr": map[string]any{"match-regexp": "(?s).*"}, "timeout": 10000}
+				observation := map[string]any{"assertions": assertions}
+				addOrigins(
+					Origin{Type: "Command", RoleID: role.RoleID, ItemID: item.ItemID, Resource: key, Property: "exit-status", Expected: observation, Evaluator: "CUSTOM_SHELL", Frame: frame},
+					Origin{Type: "Command", RoleID: role.RoleID, ItemID: item.ItemID, Resource: key, Property: "stdout", Expected: observation, Evaluator: "CUSTOM_SHELL", Frame: frame, ObservationOnly: true},
+					Origin{Type: "Command", RoleID: role.RoleID, ItemID: item.ItemID, Resource: key, Property: "stderr", Expected: observation, Evaluator: "CUSTOM_SHELL", Frame: frame, ObservationOnly: true},
+				)
 				continue
 			}
 			if resource, kind, key, properties, ok := nativeResource(item.TemplateID, values); ok {
@@ -525,20 +543,7 @@ func Normalize(a Artifact, raw []byte) ([]ItemResult, error) {
 		return nil, fmt.Errorf("GOSS_RESULT_ERROR: response too large")
 	}
 	var report struct {
-		Results []struct {
-			Resource   string          `json:"resource-id"`
-			Type       string          `json:"resource-type"`
-			Property   string          `json:"property"`
-			Successful *bool           `json:"successful"`
-			Skipped    bool            `json:"skipped"`
-			Err        json.RawMessage `json:"err"`
-			StartTime  string          `json:"start-time"`
-			EndTime    string          `json:"end-time"`
-			Duration   int64           `json:"duration"`
-			Matcher    struct {
-				Actual any `json:"actual"`
-			} `json:"matcher-result"`
-		} `json:"results"`
+		Results []gossObservation `json:"results"`
 	}
 	if err := json.Unmarshal(raw, &report); err != nil {
 		return nil, fmt.Errorf("GOSS_RESULT_ERROR: invalid JSON")
@@ -546,6 +551,17 @@ func Normalize(a Artifact, raw []byte) ([]ItemResult, error) {
 	results := append([]ItemResult{}, a.Items...)
 	for i := range results {
 		if results[i].Status == "SKIP" {
+			continue
+		}
+		customShell := false
+		for _, origin := range a.Origins {
+			if origin.RoleID == results[i].RoleID && origin.ItemID == results[i].ItemID && origin.Evaluator == "CUSTOM_SHELL" {
+				customShell = true
+				break
+			}
+		}
+		if customShell {
+			results[i] = normalizeCustomShell(results[i], a.Origins, report.Results)
 			continue
 		}
 		status := "PASS"
@@ -772,6 +788,102 @@ func Normalize(a Artifact, raw []byte) ([]ItemResult, error) {
 		results[i].Status = status
 	}
 	return results, nil
+}
+
+type gossObservation struct {
+	Resource   string          `json:"resource-id"`
+	Type       string          `json:"resource-type"`
+	Property   string          `json:"property"`
+	Successful *bool           `json:"successful"`
+	Skipped    bool            `json:"skipped"`
+	Err        json.RawMessage `json:"err"`
+	StartTime  string          `json:"start-time"`
+	EndTime    string          `json:"end-time"`
+	Duration   int64           `json:"duration"`
+	Matcher    struct {
+		Actual any `json:"actual"`
+	} `json:"matcher-result"`
+}
+
+func normalizeCustomShell(result ItemResult, origins []Origin, observations []gossObservation) ItemResult {
+	var selected []Origin
+	for _, origin := range origins {
+		if origin.RoleID == result.RoleID && origin.ItemID == result.ItemID && origin.Evaluator == "CUSTOM_SHELL" {
+			selected = append(selected, origin)
+		}
+	}
+	if len(selected) != 3 {
+		result.Status = "ERROR"
+		return result
+	}
+	actual := map[string]gossObservation{}
+	for _, origin := range selected {
+		var found []gossObservation
+		for _, observation := range observations {
+			if observation.Type == origin.Type && observation.Resource == origin.Resource && observation.Property == origin.Property {
+				found = append(found, observation)
+			}
+		}
+		if len(found) != 1 || found[0].Skipped || found[0].Successful == nil || len(found[0].Err) > 0 && string(found[0].Err) != "null" {
+			result.Status = "ERROR"
+			result.Evidence = append(result.Evidence, Evidence{Resource: origin.Resource, Property: origin.Property, Expected: nil, Actual: "观察缺失或执行失败", Error: true, Source: origin.Source, StartTime: firstTime(found, true), EndTime: firstTime(found, false)})
+			return result
+		}
+		actual[origin.Property] = found[0]
+	}
+	exitValue, ok := actual["exit-status"].Matcher.Actual.(float64)
+	stdout, stdoutOK := actual["stdout"].Matcher.Actual.(string)
+	stderr, stderrOK := actual["stderr"].Matcher.Actual.(string)
+	frame := selected[0].Frame + "\n"
+	if !ok || !stdoutOK || !stderrOK || !strings.HasPrefix(stdout, frame) {
+		result.Status = "ERROR"
+		for _, property := range []string{"exit-status", "stdout", "stderr"} {
+			observation := actual[property]
+			value := observation.Matcher.Actual
+			if property == "stdout" {
+				value = "无法确认受控 Shell 已启动"
+			}
+			result.Evidence = append(result.Evidence, Evidence{Resource: observation.Resource, Property: property, Actual: value, Error: true, Source: selected[0].Source, StartTime: observation.StartTime, EndTime: observation.EndTime, DurationNS: observation.Duration})
+		}
+		return result
+	}
+	stdout = strings.TrimPrefix(stdout, frame)
+	expected, _ := selected[0].Expected.(map[string]any)
+	assertions, _ := expected["assertions"].([]map[string]any)
+	if assertions == nil {
+		if values, ok := expected["assertions"].([]any); ok {
+			for _, value := range values {
+				if assertion, ok := value.(map[string]any); ok {
+					assertions = append(assertions, assertion)
+				}
+			}
+		}
+	}
+	if exitValue < 0 || exitValue > 255 || exitValue != float64(int(exitValue)) {
+		result.Status = "ERROR"
+		return result
+	}
+	evaluated := shellassert.Evaluate(assertions, shellassert.Observation{ExitCode: int(exitValue), Stdout: stdout, Stderr: stderr})
+	result.Status = evaluated.Status
+	for _, property := range []string{"exit-status", "stdout", "stderr"} {
+		observation := actual[property]
+		value := observation.Matcher.Actual
+		if property == "stdout" {
+			value = stdout
+		}
+		result.Evidence = append(result.Evidence, Evidence{Resource: observation.Resource, Property: property, Expected: assertions, Actual: value, Error: evaluated.Status == "ERROR", Source: selected[0].Source, StartTime: observation.StartTime, EndTime: observation.EndTime, DurationNS: observation.Duration, ObservationOnly: property != "exit-status"})
+	}
+	return result
+}
+
+func firstTime(observations []gossObservation, start bool) string {
+	if len(observations) == 0 {
+		return ""
+	}
+	if start {
+		return observations[0].StartTime
+	}
+	return observations[0].EndTime
 }
 
 func numericCommand(id string, values map[string]plan.ResolvedParam) (string, map[string]any, error) {

@@ -146,7 +146,7 @@ template_lock: {}
 		"role_map": map[string][]string{"app": {"node"}}, "field_overrides": []any{},
 		"run_mode": "TRIAL", "run_scope": "FULL", "executor_backend": "mock_simulator",
 		"idempotency_key": "web-api-test", "auth_identity": map[string]string{"method": "offline"},
-		"simulator_profiles": profiles,
+		"simulator_profiles": profiles, "budgets": map[string]any{"run_seconds": 300},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -160,6 +160,24 @@ template_lock: {}
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &accepted); err != nil || accepted.RunID == "" {
 		t.Fatalf("invalid submit response: %v %s", err, w.Body.String())
+	}
+	rerunResponse := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/rerun-config", "", cookie, csrf)
+	if rerunResponse.Code != http.StatusOK {
+		t.Fatalf("rerun config returned %d: %s", rerunResponse.Code, rerunResponse.Body.String())
+	}
+	var rerun struct {
+		InventoryInput map[string]string `json:"inventory_input"`
+		Simulator      executor.Profiles `json:"simulator_profiles"`
+		Budgets        runstore.Budgets  `json:"budgets"`
+	}
+	if err := json.Unmarshal(rerunResponse.Body.Bytes(), &rerun); err != nil {
+		t.Fatal(err)
+	}
+	if rerun.InventoryInput["source"] != "node=127.0.0.1" || rerun.InventoryInput["format"] != "quick" {
+		t.Fatalf("rerun lost original inventory input: %+v", rerun.InventoryInput)
+	}
+	if rerun.Simulator.Hosts["node"].MachineID != "machine-1" || rerun.Budgets.RunSeconds != 300 {
+		t.Fatalf("rerun lost simulator/budget inputs: simulator=%+v budgets=%+v", rerun.Simulator, rerun.Budgets)
 	}
 	cleanup := report.CleanupItem{CleanupID: "web-cleanup-test", HostID: "node", MachineID: "machine-1", BootID: "boot-1", Status: "PENDING", RemotePath: "/tmp/readyspec-test-owner", OwnerToken: "0123456789abcdef0123456789abcdef"}
 	if err := store.CleanupRegistered(context.Background(), accepted.RunID, cleanup); err != nil {
@@ -190,7 +208,7 @@ template_lock: {}
 		t.Fatal("event created while the snapshot was blocked was lost")
 	}
 	reportResponse := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/report", "", cookie, csrf)
-	if reportResponse.Code != http.StatusOK || !strings.Contains(reportResponse.Body.String(), `"verdict":"UNKNOWN"`) {
+	if reportResponse.Code != http.StatusOK || !strings.Contains(reportResponse.Body.String(), `"verdict":"UNKNOWN"`) || !strings.Contains(reportResponse.Body.String(), `"auth_method":"offline"`) || !strings.Contains(reportResponse.Body.String(), `"login_uid":1000`) || strings.Contains(reportResponse.Body.String(), `"cleanup_items":null`) {
 		t.Fatalf("report response %d: %s", reportResponse.Code, reportResponse.Body.String())
 	}
 	if strings.Contains(reportResponse.Body.String(), cleanup.OwnerToken) {
@@ -209,6 +227,10 @@ template_lock: {}
 	if strings.Contains(cleanupList.Body.String(), cleanup.CleanupID) {
 		t.Fatalf("resolved item remained pending: %s", cleanupList.Body.String())
 	}
+	auditList := request(serverWithRuns, "GET", "/api/v1/cleanups?state=all", "", cookie, csrf)
+	if auditList.Code != http.StatusOK || !strings.Contains(auditList.Body.String(), cleanup.CleanupID) || !strings.Contains(auditList.Body.String(), "operator verified that no cleanup is required") || strings.Contains(auditList.Body.String(), cleanup.OwnerToken) {
+		t.Fatalf("cleanup audit listing %d: %s", auditList.Code, auditList.Body.String())
+	}
 	events := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/events", "", cookie, csrf)
 	if events.Code != http.StatusOK || !strings.Contains(events.Body.String(), "event: snapshot") {
 		t.Fatalf("SSE snapshot response %d: %s", events.Code, events.Body.String())
@@ -222,6 +244,29 @@ template_lock: {}
 	serverWithRuns.ServeHTTP(resetResponse, resetRequest)
 	if resetResponse.Code != http.StatusOK || !strings.Contains(resetResponse.Body.String(), "event: reset") {
 		t.Fatalf("stale SSE cursor did not receive reset: %d %s", resetResponse.Code, resetResponse.Body.String())
+	}
+	var secondSubmission map[string]any
+	if err := json.Unmarshal(body, &secondSubmission); err != nil {
+		t.Fatal(err)
+	}
+	secondSubmission["idempotency_key"] = "web-api-cancel-test"
+	secondBody, err := json.Marshal(secondSubmission)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondAccepted := request(serverWithRuns, "POST", "/api/v1/runs", string(secondBody), cookie, csrf)
+	if secondAccepted.Code != http.StatusAccepted {
+		t.Fatalf("second submit returned %d: %s", secondAccepted.Code, secondAccepted.Body.String())
+	}
+	var secondRun struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.Unmarshal(secondAccepted.Body.Bytes(), &secondRun); err != nil || secondRun.RunID == "" {
+		t.Fatalf("invalid second submit response: %v %s", err, secondAccepted.Body.String())
+	}
+	cancelled := request(serverWithRuns, "POST", "/api/v1/runs/"+secondRun.RunID+"/cancel", `{}`, cookie, csrf)
+	if cancelled.Code != http.StatusAccepted || !strings.Contains(cancelled.Body.String(), `"status":"CANCELLED"`) {
+		t.Fatalf("cancel response %d: %s", cancelled.Code, cancelled.Body.String())
 	}
 }
 
@@ -357,6 +402,7 @@ func TestDraftSaveAndExportValidationNeverExecuteShell(t *testing.T) {
 		Document map[string]any `json:"document"`
 		Digest   string         `json:"digest"`
 		DraftKey string         `json:"draft_key"`
+		Revision string         `json:"revision"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
@@ -389,10 +435,13 @@ func TestDraftSaveAndExportValidationNeverExecuteShell(t *testing.T) {
 	result.Document["embedded_templates"].([]any)[0].(map[string]any)["params_schema"] = map[string]any{"type": "object", "properties": map[string]any{"count": map[string]any{"type": "integer"}}}
 	result.Document["roles"].([]any)[0].(map[string]any)["items"].([]any)[0].(map[string]any)["params"] = map[string]any{"count": "unfinished"}
 	document, _ = json.Marshal(result.Document)
-	body, _ = json.Marshal(map[string]any{"source": string(document), "draft_key": result.DraftKey})
+	body, _ = json.Marshal(map[string]any{"source": string(document), "draft_key": result.DraftKey, "expected_revision": result.Revision})
 	w = request(s, "POST", "/api/v1/plans", string(body), cookie, csrf)
 	if w.Code != http.StatusOK {
 		t.Fatalf("invalid parameter draft cannot be saved: %d %s", w.Code, w.Body.String())
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
 	}
 	body, _ = json.Marshal(map[string]any{"source": string(document), "normalize_draft": true})
 	w = request(s, "POST", "/api/v1/plans/validate", string(body), cookie, csrf)
@@ -507,11 +556,12 @@ func TestDraftRecordKeepsIdentityWhenPlanFieldsChange(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	var saved struct {
-		Key string `json:"draft_key"`
+		Key      string `json:"draft_key"`
+		Revision string `json:"revision"`
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &saved)
 	source := strings.Replace(draftSource, "plan_id: web-demo", "plan_id: renamed", 1)
-	body, _ = json.Marshal(map[string]any{"source": source, "draft_key": saved.Key})
+	body, _ = json.Marshal(map[string]any{"source": source, "draft_key": saved.Key, "expected_revision": saved.Revision})
 	w = request(s, "POST", "/api/v1/plans", string(body), cookie, csrf)
 	if w.Code != http.StatusOK {
 		t.Fatalf("cannot update same draft: %d %s", w.Code, w.Body.String())

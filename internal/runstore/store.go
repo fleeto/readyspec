@@ -64,16 +64,21 @@ type AuthIdentity struct {
 
 // RunConfig contains only durable, non-secret execution inputs.
 type RunConfig struct {
-	PlanDigest string              `json:"plan_digest"`
-	Mode       string              `json:"run_mode"`
-	Scope      string              `json:"run_scope"`
-	Backend    string              `json:"executor_backend"`
-	Inventory  []inventory.Host    `json:"inventory"`
-	RoleMap    map[string][]string `json:"role_map"`
-	Overrides  []preview.Override  `json:"field_overrides,omitempty"`
-	Auth       AuthIdentity        `json:"auth_identity"`
-	Simulator  executor.Profiles   `json:"simulator_profiles,omitempty"`
-	Budgets    Budgets             `json:"budgets"`
+	PlanDigest         string              `json:"plan_digest"`
+	PlanRecordKey      string              `json:"plan_record_key,omitempty"`
+	Mode               string              `json:"run_mode"`
+	Scope              string              `json:"run_scope"`
+	Backend            string              `json:"executor_backend"`
+	Inventory          []inventory.Host    `json:"inventory"`
+	InventorySource    string              `json:"inventory_source,omitempty"`
+	InventoryFormat    string              `json:"inventory_format,omitempty"`
+	PartialSourceRunID string              `json:"partial_source_run_id,omitempty"`
+	PartialHostIDs     []string            `json:"partial_host_ids,omitempty"`
+	RoleMap            map[string][]string `json:"role_map"`
+	Overrides          []preview.Override  `json:"field_overrides,omitempty"`
+	Auth               AuthIdentity        `json:"auth_identity"`
+	Simulator          executor.Profiles   `json:"simulator_profiles,omitempty"`
+	Budgets            Budgets             `json:"budgets"`
 }
 
 type Request struct {
@@ -100,6 +105,7 @@ type Event struct {
 	At       time.Time       `json:"at"`
 	HostID   string          `json:"host_id,omitempty"`
 	Mode     string          `json:"execution_mode,omitempty"`
+	Attempt  int             `json:"attempt,omitempty"`
 	Status   string          `json:"status,omitempty"`
 	Data     json.RawMessage `json:"data,omitempty"`
 }
@@ -148,15 +154,11 @@ func Open(ws *workspace.Store) (*Store, error) {
 		if err := validateAcceptance(id, accepted); err != nil {
 			return nil, err
 		}
-		var frozenPlan plan.Plan
-		if err := ws.ReadJSON(accepted.PlanPath, &frozenPlan); err != nil {
+		var frozenPlanDocument map[string]any
+		if err := ws.ReadJSON(accepted.PlanPath, &frozenPlanDocument); err != nil {
 			return nil, fmt.Errorf("read frozen plan for %s: %w", id, err)
 		}
-		var config RunConfig
-		if err := ws.ReadJSON(accepted.ConfigPath, &config); err != nil {
-			return nil, fmt.Errorf("read frozen config for %s: %w", id, err)
-		}
-		frozenJSON, err := json.Marshal(frozenPlan)
+		frozenJSON, err := json.Marshal(frozenPlanDocument)
 		if err != nil {
 			return nil, fmt.Errorf("encode frozen plan for %s", id)
 		}
@@ -164,10 +166,14 @@ func Open(ws *workspace.Store) (*Store, error) {
 		if err != nil {
 			return nil, fmt.Errorf("frozen Plan %s no longer validates", id)
 		}
+		frozenPlan := *validatedPlan
+		var config RunConfig
+		if err := ws.ReadJSON(accepted.ConfigPath, &config); err != nil {
+			return nil, fmt.Errorf("read frozen config for %s: %w", id, err)
+		}
 		if config.PlanDigest != accepted.PlanDigest || frozenPlan.Digest != accepted.PlanDigest || validatedPlan.Digest != accepted.PlanDigest {
 			return nil, fmt.Errorf("accepted Run %s plan digest does not match frozen config", id)
 		}
-		frozenPlan = *validatedPlan
 		run := &Run{Acceptance: accepted, Plan: &frozenPlan, Config: config, Status: "PENDING", Events: []Event{}}
 		if err := s.replay(run); err != nil {
 			run.RecoveryError = "RUN_STORAGE_ERROR"
@@ -229,10 +235,14 @@ func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(),
 	if err := validateConfig(req.Config); err != nil {
 		return nil, false, err
 	}
+	rawPlan, err := plan.DocumentJSON(req.Plan)
+	if err != nil {
+		return nil, false, fmt.Errorf("PLAN_ERROR: cannot freeze Plan")
+	}
 	digest, err := semantic.Digest(struct {
-		Plan   *plan.Plan `json:"plan"`
-		Config RunConfig  `json:"config"`
-	}{req.Plan, req.Config})
+		Plan   json.RawMessage `json:"plan"`
+		Config RunConfig       `json:"config"`
+	}{rawPlan, req.Config})
 	if err != nil {
 		return nil, false, fmt.Errorf("PLAN_ERROR: cannot digest Run input")
 	}
@@ -246,10 +256,6 @@ func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(),
 	}
 	if len(s.queue) >= maxWaitingRuns {
 		return nil, false, ErrQueueFull
-	}
-	rawPlan, err := json.Marshal(req.Plan)
-	if err != nil {
-		return nil, false, fmt.Errorf("PLAN_ERROR: cannot freeze Plan")
 	}
 	rawConfig, err := json.Marshal(req.Config)
 	if err != nil {
@@ -274,7 +280,7 @@ func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(),
 	}()
 	base := path.Join("runs", id)
 	planPath, configPath := path.Join(base, "plan.json"), path.Join(base, "config.json")
-	if err := s.workspace.WriteJSON(planPath, req.Plan); err != nil {
+	if err := s.workspace.WriteJSON(planPath, json.RawMessage(rawPlan)); err != nil {
 		return nil, false, fmt.Errorf("INFRA_ERROR: persist frozen Plan: %w", err)
 	}
 	if err := s.workspace.WriteJSON(configPath, json.RawMessage(rawConfig)); err != nil {
@@ -295,7 +301,6 @@ func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(),
 	s.runs[id] = run
 	s.idempotency[req.IdempotencyKey] = id
 	s.queue = append(s.queue, id)
-	_ = rawPlan // retained above as a validation boundary before committing acceptance
 	copy := cloneRun(run)
 	return &copy, true, nil
 }
@@ -464,7 +469,35 @@ func (s *Store) Phase(_ context.Context, runID, hostID, phase string) error {
 	if hostID == "" || phase == "" {
 		return fmt.Errorf("invalid execution phase event")
 	}
-	_, err := s.appendLocked(run, Event{Kind: "PHASE", HostID: hostID, Status: phase})
+	mode := ""
+	for _, prefix := range []string{"RUNNING_", "UPLOADING_", "COLLECTING_", "SIMULATING_"} {
+		if strings.HasPrefix(phase, prefix) {
+			mode = strings.TrimPrefix(phase, prefix)
+			break
+		}
+	}
+	attempt := 1
+	if mode != "" {
+		attempt = 0
+		for _, event := range run.Events {
+			if event.Kind == "EXECUTION_STARTED" && event.HostID == hostID && event.Mode == mode {
+				attempt++
+			}
+		}
+		if attempt == 0 {
+			attempt = 1
+		}
+	}
+	for i := len(run.Events) - 1; i >= 0; i-- {
+		event := run.Events[i]
+		if event.Kind == "PHASE" && event.HostID == hostID && event.Mode == mode {
+			if event.Status == phase {
+				return nil
+			}
+			break
+		}
+	}
+	_, err := s.appendLocked(run, Event{Kind: "PHASE", HostID: hostID, Mode: mode, Attempt: attempt, Status: phase})
 	return err
 }
 

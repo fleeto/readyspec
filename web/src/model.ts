@@ -61,6 +61,8 @@ export interface SavedPlan {
   key: string
   document: Plan
   updated_at: string
+  revision: string
+  kind?: 'draft' | 'released' | 'archive_only'
 }
 export interface Validation {
   document: Plan
@@ -69,6 +71,7 @@ export interface Validation {
 export interface DraftSave {
   document: Plan
   draft_key: string
+  revision: string
   validated: false
 }
 export interface SystemInfo {

@@ -218,6 +218,13 @@ func TestAllTemplatesBehaviorContracts(t *testing.T) {
 				if a.ParameterSources["sample"][key] != "host" {
 					t.Fatal("host origin missing")
 				}
+				if a.Items[0].ParameterSources[key] != "host" {
+					t.Fatalf("compiled item lost host parameter source: %+v", a.Items[0].ParameterSources)
+				}
+				results, err := compiler.Normalize(a, []byte(`{"results":[]}`))
+				if err != nil || len(results) != 1 || results[0].ParameterSources[key] != "host" {
+					t.Fatalf("normalized item lost host parameter source: results=%+v err=%v", results, err)
+				}
 				item.OverridableParams = []string{}
 			})
 			t.Run("independent_property_mapping", func(t *testing.T) {

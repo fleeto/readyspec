@@ -29,9 +29,11 @@ import {
   type SavedPlan,
 } from './model'
 import { Templates } from './Templates'
+import { api } from './api'
 
 interface Props {
   document: Plan
+  draftKey: string | null
   selectedIssue?: { role_id?: string; item_id?: string } | null
   plans: SavedPlan[]
   dirty: boolean
@@ -43,6 +45,10 @@ interface Props {
   onImport: () => void
   onOpen: (p: SavedPlan) => void
   onAction: (action: 'validate' | 'save' | 'export' | 'compile') => void
+  onRelease: () => void
+  onArchive: () => void
+  onNewVersion: () => void
+  onDeleteDraft: () => void
 }
 
 type DeletionUndo = { templates: CheckTemplate[]; index: number } & (
@@ -51,6 +57,7 @@ type DeletionUndo = { templates: CheckTemplate[]; index: number } & (
 
 export function Workbench({
   document: plan,
+  draftKey,
   selectedIssue,
   plans,
   dirty,
@@ -62,6 +69,10 @@ export function Workbench({
   onOpen,
   onImport,
   onAction,
+  onRelease,
+  onArchive,
+  onNewVersion,
+  onDeleteDraft,
 }: Props) {
   const [roleID, setRoleID] = useState('')
   const [itemID, setItemID] = useState('')
@@ -282,6 +293,34 @@ export function Workbench({
           <button className="button" onClick={() => onAction('compile')} disabled={busy}>
             静态编译
           </button>
+          {editable ? (
+            <>
+              <button
+                className="button primary"
+                onClick={onRelease}
+                disabled={busy || dirty || !plan.plan_id || !plan.version}
+                title={dirty ? '先保存草稿，再发布该修订' : undefined}
+              >
+                发布版本
+              </button>
+              {draftKey && (
+                <button className="button danger" onClick={onDeleteDraft} disabled={busy}>
+                  删除草稿
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button className="button" onClick={onNewVersion} disabled={busy}>
+                创建新版本草稿
+              </button>
+              {plan.state === 'RELEASED' && (
+                <button className="button danger" onClick={onArchive} disabled={busy}>
+                  停用版本
+                </button>
+              )}
+            </>
+          )}
           <button
             className="button primary"
             onClick={() => onAction('save')}
@@ -317,7 +356,12 @@ export function Workbench({
               <option value="">打开已保存方案…</option>
               {plans.map((p) => (
                 <option value={p.key} key={p.key}>
-                  {p.document.name || '未命名方案'} · {p.document.version}
+                  {p.document.name || '未命名方案'} · {p.document.version} ·{' '}
+                  {p.document.state === 'DRAFT'
+                    ? '草稿'
+                    : p.document.state === 'RELEASED'
+                      ? '已发布'
+                      : '已停用'}
                 </option>
               ))}
             </select>
@@ -747,6 +791,7 @@ export function Workbench({
                       }
                     />
                   </Field>
+                  <ShellAssertionSelfTest template={template} />
                   <Notice>
                     脚本随 SSH 登录身份执行，不自动 sudo 提权。root 登录时会以 root 身份运行。
                   </Notice>
@@ -817,6 +862,98 @@ export function Workbench({
         </Modal>
       )}
     </>
+  )
+}
+
+function ShellAssertionSelfTest({ template }: { template: CheckTemplate }) {
+  const [stdout, setStdout] = useState('')
+  const [stderr, setStderr] = useState('')
+  const [exitCode, setExitCode] = useState(Number(template.implementation.expect_exit_code ?? 0))
+  const [simulateStartFailure, setSimulateStartFailure] = useState(false)
+  const [result, setResult] = useState('')
+  const [promotion, setPromotion] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <section className="panel selftest-panel">
+      <h4>断言自测（不执行脚本）</h4>
+      <p className="muted">输入模拟采集结果，服务器只运行基础断言求值函数。</p>
+      <div className="two-columns">
+        <Field label="模拟退出码">
+          <input
+            type="number"
+            min="0"
+            max="255"
+            value={exitCode}
+            onChange={(event) => setExitCode(Number(event.target.value))}
+          />
+        </Field>
+        <Field label="模拟 stdout">
+          <textarea rows={3} value={stdout} onChange={(event) => setStdout(event.target.value)} />
+        </Field>
+      </div>
+      <Field label="模拟 stderr">
+        <textarea rows={3} value={stderr} onChange={(event) => setStderr(event.target.value)} />
+      </Field>
+      <label>
+        <input
+          type="checkbox"
+          checked={simulateStartFailure}
+          onChange={(event) => setSimulateStartFailure(event.target.checked)}
+        />
+        模拟命令启动失败（不运行脚本）
+      </label>
+      <button
+        className="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          try {
+            const value = await api.request<{ status: string; diagnostics: string[] }>(
+              '/shell-selftest',
+              {
+                assertions: template.implementation.assertions ?? [],
+                expect_exit_code: template.implementation.expect_exit_code ?? 0,
+                observation: { exit_code: exitCode, stdout, stderr },
+                simulate_start_failure: simulateStartFailure,
+              },
+            )
+            setResult(
+              `${value.status}${value.diagnostics.length ? ` · ${value.diagnostics.join(' ')}` : ''}`,
+            )
+          } catch (cause) {
+            setResult(cause instanceof Error ? cause.message : '自测失败')
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        {busy ? '正在求值…' : '运行断言自测'}
+      </button>
+      {template.source === 'PLAN_LOCAL' && (
+        <button
+          className="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setPromotion('')
+            try {
+              const value = await api.request<{ digest: string }>('/templates/promote', {
+                template,
+              })
+              setPromotion(`已加入公共模板库：${value.digest}`)
+            } catch (cause) {
+              setPromotion(cause instanceof Error ? cause.message : '公共模板提升失败')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          {busy ? '处理中…' : '提升为公共模板'}
+        </button>
+      )}
+      {result && <output className="selftest-result">{result}</output>}
+      {promotion && <output className="selftest-result">{promotion}</output>}
+    </section>
   )
 }
 

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fleeto/readyspec/internal/planstore"
 	"github.com/fleeto/readyspec/internal/runmanager"
 	"github.com/fleeto/readyspec/internal/template"
 	"github.com/fleeto/readyspec/internal/workspace"
@@ -53,6 +54,7 @@ type Server struct {
 	bootstrapUsed bool
 	plansMu       sync.Mutex
 	runs          *runmanager.Manager
+	plans         *planstore.Store
 }
 
 func New(options Options) (*Server, error) {
@@ -65,19 +67,53 @@ func New(options Options) (*Server, error) {
 	if options.Store == nil {
 		return nil, fmt.Errorf("workspace store is required")
 	}
-	s := &Server{options: options, mux: http.NewServeMux(), sessions: make(map[string]session), runs: options.Runs}
+	plans, err := planstore.New(options.Store)
+	if err != nil {
+		return nil, err
+	}
+	s := &Server{options: options, mux: http.NewServeMux(), sessions: make(map[string]session), runs: options.Runs, plans: plans}
 	s.mux.HandleFunc("POST /api/v1/auth/session", s.authenticate)
 	s.mux.HandleFunc("GET /api/v1/system/info", s.authorize(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"version": options.Version, "workspace_label": options.WorkspaceLabel, "executor_available": s.runs != nil, "server_id": options.ServerID})
 	}))
 	s.mux.HandleFunc("GET /api/v1/plans", s.authorize(s.listPlans))
+	s.mux.HandleFunc("GET /api/v1/plans/{key}", s.authorize(s.getPlan))
 	s.mux.HandleFunc("POST /api/v1/plans", s.authorize(s.savePlan))
+	s.mux.HandleFunc("DELETE /api/v1/plans/{key}", s.authorize(s.deleteDraft))
+	s.mux.HandleFunc("POST /api/v1/plans/{key}/release", s.authorize(s.releasePlan))
+	s.mux.HandleFunc("POST /api/v1/plans/{key}/archive", s.authorize(s.archivePlan))
+	s.mux.HandleFunc("POST /api/v1/plans/import", s.authorize(s.importPlan))
+	s.mux.HandleFunc("GET /api/v1/plans/{key}/export", s.authorize(s.exportPlan))
 	s.mux.HandleFunc("POST /api/v1/plans/validate", s.authorize(s.validatePlan))
 	s.mux.HandleFunc("GET /api/v1/templates", s.authorize(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"items": template.List(), "definitions": template.Catalog()})
+		public, err := s.plans.PublicTemplates()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "PUBLIC_TEMPLATE_STORE_ERROR")
+			return
+		}
+		items := template.List()
+		for _, item := range public {
+			items = append(items, item.Snapshot)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"items": items, "definitions": template.Catalog()})
 	}))
+	s.mux.HandleFunc("POST /api/v1/templates/promote", s.authorize(s.promoteTemplate))
+	s.mux.HandleFunc("POST /api/v1/shell-selftest", s.authorize(s.shellSelfTest))
 	s.mux.HandleFunc("GET /api/v1/templates/{id}/{version}", s.authorize(func(w http.ResponseWriter, r *http.Request) {
 		snapshot, ok := template.Lookup(r.PathValue("id"), r.PathValue("version"))
+		if !ok {
+			public, err := s.plans.PublicTemplates()
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "PUBLIC_TEMPLATE_STORE_ERROR")
+				return
+			}
+			for _, item := range public {
+				if item.TemplateID == r.PathValue("id") && item.Version == r.PathValue("version") {
+					snapshot, ok = item.Snapshot, true
+					break
+				}
+			}
+		}
 		if !ok {
 			writeError(w, http.StatusNotFound, "TEMPLATE_NOT_FOUND")
 			return
@@ -86,12 +122,17 @@ func New(options Options) (*Server, error) {
 	}))
 	s.mux.HandleFunc("POST /api/v1/plans/compile", s.authorize(s.compilePlan))
 	s.mux.HandleFunc("POST /api/v1/runs/preview", s.authorize(s.previewRun))
+	s.mux.HandleFunc("POST /api/v1/inventory/parse", s.authorize(s.parseInventory))
 	s.mux.HandleFunc("POST /api/v1/runs", s.authorize(s.submitRun))
 	s.mux.HandleFunc("GET /api/v1/runs", s.authorize(s.listRuns))
 	s.mux.HandleFunc("GET /api/v1/cleanup", s.authorize(s.listCleanup))
+	s.mux.HandleFunc("GET /api/v1/cleanups", s.authorize(s.listCleanup))
 	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.authorize(s.getRun))
 	s.mux.HandleFunc("GET /api/v1/runs/{id}/report", s.authorize(s.getRunReport))
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/cleanup/{cleanupID}", s.authorize(s.resolveCleanup))
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/cancel", s.authorize(s.cancelRun))
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/rerun-config", s.authorize(s.rerunConfig))
+	s.mux.HandleFunc("POST /api/v1/cleanups/{cleanupID}/resolve", s.authorize(s.resolveCleanupGlobal))
 	s.mux.HandleFunc("DELETE /api/v1/runs/{id}", s.authorize(s.cancelRun))
 	s.mux.HandleFunc("GET /api/v1/runs/{id}/events", s.authorize(s.runEvents))
 	s.mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, http.StatusNotFound, "API_NOT_FOUND") })

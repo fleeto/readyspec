@@ -96,7 +96,8 @@ func TestCustomShellCompilationKeepsParameterOutOfSource(t *testing.T) {
 		command = entry["exec"].(string)
 	}
 	out, err := exec.Command("/bin/sh", "-c", command).Output()
-	if err != nil || string(out) != item.Params["VALUE"] {
+	frame, actual, hasFrame := strings.Cut(string(out), "\n")
+	if err != nil || !hasFrame || !strings.HasPrefix(frame, "__READYSPEC_START_") || actual != item.Params["VALUE"] {
 		t.Fatalf("parameter changed execution: output=%q err=%v", out, err)
 	}
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {

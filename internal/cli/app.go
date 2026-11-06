@@ -8,15 +8,17 @@ import (
 	"io"
 	"os"
 
+	"github.com/fleeto/readyspec/internal/buildinfo"
 	"github.com/fleeto/readyspec/internal/compiler"
 	"github.com/fleeto/readyspec/internal/goss"
 	"github.com/fleeto/readyspec/internal/plan"
+	"github.com/fleeto/readyspec/internal/planstore"
 	"github.com/fleeto/readyspec/internal/template"
 	"github.com/fleeto/readyspec/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.2.0-dev"
+const Version = buildinfo.Version
 
 func Execute(args []string, out, stderr io.Writer) int {
 	if err := goss.Verify(); err != nil {
@@ -102,6 +104,7 @@ func Execute(args []string, out, stderr io.Writer) int {
 		return json.NewEncoder(cmd.OutOrStdout()).Encode(artifact)
 	}}
 	plans.AddCommand(compile)
+	plans.AddCommand(newPlanLifecycleCommands(func() string { return options.workspace }, func(code int) { exitCode = code })...)
 	root.AddCommand(plans)
 	root.AddCommand(newReportCommand(func() string { return options.workspace }, func(code int) { exitCode = code }))
 	root.AddCommand(newCleanupCommand(func() string { return options.workspace }, func(code int) { exitCode = code }))
@@ -109,6 +112,34 @@ func Execute(args []string, out, stderr io.Writer) int {
 	var templateJSON bool
 	list := &cobra.Command{Use: "list", Short: "List implemented builtin check templates", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		entries := template.List()
+		if data, err := localRunRequest(cmd.Context(), options.workspace, "GET", "/api/v1/templates", nil); err == nil {
+			var response struct {
+				Items []map[string]any `json:"items"`
+			}
+			if json.Unmarshal(data, &response) == nil {
+				entries = response.Items
+			}
+		} else if isLocalServiceResponse(err) {
+			return err
+		} else if dir, dirErr := workspaceDirectory(options.workspace); dirErr == nil {
+			if ws, openErr := workspace.Open(dir); openErr == nil {
+				if lease, lockErr := ws.TryLock(); lockErr == nil {
+					if plans, planErr := planstore.New(ws); planErr == nil {
+						if public, listErr := plans.PublicTemplates(); listErr == nil {
+							for _, item := range public {
+								entries = append(entries, item.Snapshot)
+							}
+						} else {
+							_ = lease.Close()
+							_ = ws.Close()
+							return listErr
+						}
+					}
+					_ = lease.Close()
+				}
+				_ = ws.Close()
+			}
+		}
 		if templateJSON {
 			return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{"items": entries})
 		}

@@ -25,8 +25,16 @@ func validReport() report.RunReport {
 
 func TestValidateRunReportRequiresValidSchemaAndCleanupAudit(t *testing.T) {
 	value := validReport()
+	value.Hosts = []report.HostResult{{
+		HostID: "node-1", Status: "COMPLETED", Roles: []string{"app"},
+		ItemResults: []compiler.ItemResult{{
+			RoleID: "app", ItemID: "disk", Status: "PASS", TemplateID: "S01", TemplateVersion: "1.0.0",
+			ExecutionMode: "STANDARD", EvidenceMode: "EXISTENCE",
+			ParameterSources: map[string]string{"path": "host", "filetype": "template"},
+		}}, Failures: []report.Failure{},
+	}}
 	if err := report.Validate(value); err != nil {
-		t.Fatal(err)
+		t.Fatalf("valid report with parameter provenance rejected: %v", err)
 	}
 	value.CleanupItems = []report.CleanupItem{{CleanupID: "cleanup-1", HostID: "node-1", Status: "IGNORED"}}
 	if err := report.Validate(value); err == nil {

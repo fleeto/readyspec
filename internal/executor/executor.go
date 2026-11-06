@@ -37,6 +37,7 @@ type PreflightRequest struct {
 	Config    preview.Input
 	Host      HostInput
 	Artifacts compiler.ExecutionArtifacts
+	Journal   Journal
 }
 
 type HostFacts struct {

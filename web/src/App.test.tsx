@@ -63,6 +63,7 @@ test('incomplete JSON parameter text stays in the draft instead of saving the ol
   render(
     <Workbench
       document={document}
+      draftKey={null}
       plans={[]}
       dirty={false}
       digest=""
@@ -73,6 +74,10 @@ test('incomplete JSON parameter text stays in the draft instead of saving the ol
       onImport={() => {}}
       onOpen={() => {}}
       onAction={() => {}}
+      onRelease={() => {}}
+      onArchive={() => {}}
+      onNewVersion={() => {}}
+      onDeleteDraft={() => {}}
     />,
   )
   const user = userEvent.setup()

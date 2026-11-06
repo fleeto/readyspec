@@ -19,7 +19,7 @@
     "implementation": {
       "oneOf": [
         {"type":"object","additionalProperties":false,"required":["kind","compiler","compiler_version"],"properties":{"kind":{"const":"BUILTIN"},"compiler":{"type":"string","minLength":1},"compiler_version":{"type":"string","minLength":1},"requires":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}}}},
-        {"type":"object","additionalProperties":false,"required":["kind","command","expect_exit_code"],"properties":{"kind":{"const":"CUSTOM_SHELL"},"command":{"type":"string","minLength":1},"expect_exit_code":{"type":"integer","minimum":0,"maximum":255}}}
+        {"type":"object","additionalProperties":false,"required":["kind","command","expect_exit_code"],"properties":{"kind":{"const":"CUSTOM_SHELL"},"command":{"type":"string","minLength":1},"expect_exit_code":{"type":"integer","minimum":0,"maximum":255},"assertions":{"type":"array","maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["stream","operator"],"properties":{"stream":{"enum":["exit_code","stdout","stderr"]},"operator":{"enum":["equals","contains","not_contains","regex","number_equals","number_not_equals","number_gt","number_gte","number_lt","number_lte","number_range"]},"value":{"type":["string","number","integer"]},"pattern":{"type":"string","maxLength":4096},"extract_regex":{"type":"string","maxLength":4096},"min":{"type":"number"},"max":{"type":"number"}}}}}}
       ]
     },
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}

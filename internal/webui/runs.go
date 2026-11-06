@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/fleeto/readyspec/internal/executor"
 	"github.com/fleeto/readyspec/internal/inventory"
 	"github.com/fleeto/readyspec/internal/plan"
+	"github.com/fleeto/readyspec/internal/planstore"
 	"github.com/fleeto/readyspec/internal/preview"
 	"github.com/fleeto/readyspec/internal/report"
 	"github.com/fleeto/readyspec/internal/runstore"
@@ -21,17 +24,21 @@ import (
 )
 
 type runSubmission struct {
-	Plan           string                    `json:"plan"`
-	Inventory      inventoryInput            `json:"inventory"`
-	RoleMap        map[string][]string       `json:"role_map"`
-	Overrides      []preview.Override        `json:"field_overrides"`
-	Mode           string                    `json:"run_mode"`
-	Scope          string                    `json:"run_scope"`
-	Backend        string                    `json:"executor_backend"`
-	IdempotencyKey string                    `json:"idempotency_key"`
-	Auth           runstore.AuthIdentity     `json:"auth_identity"`
-	Credentials    map[string]credentialBody `json:"credentials,omitempty"`
-	Simulator      executor.Profiles         `json:"simulator_profiles,omitempty"`
+	Plan               string                    `json:"plan"`
+	PlanRecordKey      string                    `json:"plan_record_key,omitempty"`
+	Inventory          inventoryInput            `json:"inventory"`
+	RoleMap            map[string][]string       `json:"role_map"`
+	Overrides          []preview.Override        `json:"field_overrides"`
+	Mode               string                    `json:"run_mode"`
+	Scope              string                    `json:"run_scope"`
+	Backend            string                    `json:"executor_backend"`
+	IdempotencyKey     string                    `json:"idempotency_key"`
+	Auth               runstore.AuthIdentity     `json:"auth_identity"`
+	Credentials        map[string]credentialBody `json:"credentials,omitempty"`
+	Simulator          executor.Profiles         `json:"simulator_profiles,omitempty"`
+	Budgets            runstore.Budgets          `json:"budgets,omitempty"`
+	PartialSourceRunID string                    `json:"partial_source_run_id,omitempty"`
+	PartialHostIDs     []string                  `json:"partial_host_ids,omitempty"`
 }
 
 type inventoryInput struct {
@@ -55,14 +62,17 @@ type cleanupResolution struct {
 }
 
 type runSummary struct {
-	RunID      string    `json:"run_id"`
-	Status     string    `json:"status"`
-	AcceptedAt time.Time `json:"accepted_at"`
-	PlanDigest string    `json:"plan_digest"`
-	Verdict    string    `json:"verdict,omitempty"`
-	RunMode    string    `json:"run_mode"`
-	RunScope   string    `json:"run_scope"`
-	Backend    string    `json:"executor_backend"`
+	RunID       string    `json:"run_id"`
+	PlanID      string    `json:"plan_id"`
+	PlanName    string    `json:"plan_name"`
+	PlanVersion string    `json:"plan_version"`
+	Status      string    `json:"status"`
+	AcceptedAt  time.Time `json:"accepted_at"`
+	PlanDigest  string    `json:"plan_digest"`
+	Verdict     string    `json:"verdict,omitempty"`
+	RunMode     string    `json:"run_mode"`
+	RunScope    string    `json:"run_scope"`
+	Backend     string    `json:"executor_backend"`
 }
 
 func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +90,27 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "PLAN_ERROR: invalid plan")
 		return
 	}
+	if p.State == "ARCHIVED" || body.Mode == "GATE" && p.State != "RELEASED" {
+		writeError(w, http.StatusUnprocessableEntity, "PLAN_STATE_NOT_EXECUTABLE")
+		return
+	}
+	if body.Mode == "GATE" {
+		document, marshalErr := plan.DocumentJSON(p)
+		var value map[string]any
+		if marshalErr != nil || json.Unmarshal(document, &value) != nil || planstore.VerifyManifest(value) != nil {
+			writeError(w, http.StatusUnprocessableEntity, "RELEASE_MANIFEST_UNVERIFIABLE")
+			return
+		}
+	}
+	if body.PlanRecordKey != "" {
+		s.plansMu.Lock()
+		defer s.plansMu.Unlock()
+		record, recordErr := s.plans.Get(body.PlanRecordKey)
+		if recordErr != nil || record.ArchiveSnapshot != nil || record.ReleaseSnapshot == nil || record.ReleaseFingerprint != p.Digest {
+			writeError(w, http.StatusConflict, "PLAN_RECORD_NOT_ACTIVE")
+			return
+		}
+	}
 	format := body.Inventory.Format
 	if format == "" {
 		format = "quick"
@@ -88,6 +119,64 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, "PLAN_ERROR: invalid inventory")
 		return
+	}
+	if body.Scope == "PARTIAL" {
+		parent, parentErr := s.runs.Get(body.PartialSourceRunID)
+		if parentErr != nil || parent.Report == nil || parent.Config.PlanDigest != p.Digest {
+			writeError(w, http.StatusConflict, "PARTIAL_SOURCE_RUN_UNAVAILABLE")
+			return
+		}
+		selected := make(map[string]bool, len(body.PartialHostIDs))
+		filtered, validationError := validatePartialSelection(*parent, p.Digest, hosts, body.PartialHostIDs, selected)
+		if validationError != "" {
+			status := http.StatusUnprocessableEntity
+			if validationError == "PARTIAL_SOURCE_RUN_UNAVAILABLE" || validationError == "PARTIAL_INVENTORY_CHANGED" {
+				status = http.StatusConflict
+			}
+			writeError(w, status, validationError)
+			return
+		}
+		hosts = filtered
+		for roleID, hostIDs := range body.RoleMap {
+			kept := hostIDs[:0]
+			for _, hostID := range hostIDs {
+				if selected[hostID] {
+					kept = append(kept, hostID)
+				}
+			}
+			if len(kept) == 0 {
+				delete(body.RoleMap, roleID)
+			} else {
+				body.RoleMap[roleID] = kept
+			}
+		}
+		groupSelected := map[string]bool{}
+		for _, host := range hosts {
+			for _, group := range host.Groups {
+				groupSelected[group] = true
+			}
+		}
+		keptOverrides := body.Overrides[:0]
+		for _, override := range body.Overrides {
+			if override.Scope == "host" && selected[override.Target] || override.Scope == "group" && groupSelected[override.Target] {
+				keptOverrides = append(keptOverrides, override)
+			}
+		}
+		body.Overrides = keptOverrides
+		if body.Simulator.Hosts != nil {
+			profiles := make(map[string]executor.Profile, len(selected))
+			for hostID, profile := range body.Simulator.Hosts {
+				if selected[hostID] {
+					profiles[hostID] = profile
+				}
+			}
+			body.Simulator.Hosts = profiles
+		}
+		for hostID := range body.Credentials {
+			if !selected[hostID] {
+				delete(body.Credentials, hostID)
+			}
+		}
 	}
 	if body.IdempotencyKey == "" {
 		body.IdempotencyKey = "web-" + rand.Text()
@@ -147,9 +236,12 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 		wipeCredentials(credentials)
 	}
 	config := runstore.RunConfig{
-		PlanDigest: p.Digest, Mode: body.Mode, Scope: body.Scope, Backend: body.Backend,
+		PlanDigest: p.Digest, PlanRecordKey: body.PlanRecordKey,
+		InventorySource: body.Inventory.Source, InventoryFormat: format,
+		Mode: body.Mode, Scope: body.Scope, Backend: body.Backend,
 		Inventory: hosts, RoleMap: body.RoleMap, Overrides: body.Overrides,
-		Auth: body.Auth, Simulator: body.Simulator,
+		Auth: body.Auth, Simulator: body.Simulator, Budgets: body.Budgets,
+		PartialSourceRunID: body.PartialSourceRunID, PartialHostIDs: append([]string(nil), body.PartialHostIDs...),
 	}
 	accepted, created, err := s.runs.Submit(runstore.Request{IdempotencyKey: body.IdempotencyKey, Plan: p, Config: config}, credentials)
 	if err != nil {
@@ -193,6 +285,7 @@ func (s *Server) listRuns(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	items := s.runs.List()
+	sort.Slice(items, func(i, j int) bool { return items[i].Acceptance.AcceptedAt.After(items[j].Acceptance.AcceptedAt) })
 	result := make([]runSummary, 0, len(items))
 	for _, run := range items {
 		result = append(result, summarize(run))
@@ -200,7 +293,7 @@ func (s *Server) listRuns(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": result})
 }
 
-func (s *Server) listCleanup(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) listCleanup(w http.ResponseWriter, r *http.Request) {
 	if s.runs == nil {
 		writeError(w, http.StatusServiceUnavailable, "RUN_MANAGER_UNAVAILABLE")
 		return
@@ -213,7 +306,7 @@ func (s *Server) listCleanup(w http.ResponseWriter, _ *http.Request) {
 	rows := []cleanupRow{}
 	for _, run := range s.runs.List() {
 		for _, item := range s.runs.CleanupItems(run.Acceptance.RunID) {
-			if item.Status == "CLEAN" || item.Status == "IGNORED" {
+			if r.URL.Query().Get("state") != "all" && (item.Status == "CLEAN" || item.Status == "IGNORED") {
 				continue
 			}
 			item.OwnerToken = ""
@@ -223,10 +316,172 @@ func (s *Server) listCleanup(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": rows})
 }
 
+func (s *Server) rerunConfig(w http.ResponseWriter, r *http.Request) {
+	run, err := s.getRunOrWriteError(w, r.PathValue("id"))
+	if err != nil {
+		return
+	}
+	planJSON, err := plan.DocumentJSON(run.Plan)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "RUN_CONFIG_UNAVAILABLE")
+		return
+	}
+	partialHosts := []string{}
+	if run.Report != nil {
+		for hostID := range anomalousHosts(*run.Report) {
+			partialHosts = append(partialHosts, hostID)
+		}
+		sort.Strings(partialHosts)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"plan": string(planJSON), "plan_digest": run.Config.PlanDigest,
+		"plan_record_key": run.Config.PlanRecordKey,
+		"inventory_input": map[string]string{"source": run.Config.InventorySource, "format": run.Config.InventoryFormat},
+		"inventory":       run.Config.Inventory, "role_map": run.Config.RoleMap,
+		"field_overrides": run.Config.Overrides, "run_mode": run.Config.Mode,
+		"run_scope": run.Config.Scope, "executor_backend": run.Config.Backend,
+		"simulator_profiles": run.Config.Simulator, "budgets": run.Config.Budgets,
+		"auth_identity":         run.Config.Auth,
+		"partial_hosts":         partialHosts,
+		"partial_source_run_id": run.Config.PartialSourceRunID,
+		"partial_host_ids":      run.Config.PartialHostIDs,
+	})
+}
+
+func anomalousHosts(value report.RunReport) map[string]bool {
+	result := make(map[string]bool)
+	for _, host := range value.Hosts {
+		if len(host.Failures) > 0 {
+			result[host.HostID] = true
+			continue
+		}
+		for _, item := range host.ItemResults {
+			if item.Status == "FAIL" || item.Status == "ERROR" || item.Status == "UNSUPPORTED" {
+				result[host.HostID] = true
+				break
+			}
+		}
+	}
+	return result
+}
+
+func validatePartialSelection(parent runstore.Run, planDigest string, hosts []inventory.Host, requested []string, selected map[string]bool) ([]inventory.Host, string) {
+	if parent.Report == nil || parent.Config.PlanDigest != planDigest {
+		return nil, "PARTIAL_SOURCE_RUN_UNAVAILABLE"
+	}
+	allowed := anomalousHosts(*parent.Report)
+	for _, hostID := range requested {
+		if !allowed[hostID] || selected[hostID] {
+			return nil, "PARTIAL_HOST_NOT_ELIGIBLE"
+		}
+		selected[hostID] = true
+	}
+	if len(selected) == 0 {
+		return nil, "PARTIAL_HOSTS_REQUIRED"
+	}
+	original := make(map[string]inventory.Host, len(parent.Config.Inventory))
+	for _, host := range parent.Config.Inventory {
+		original[host.ID] = host
+	}
+	filtered := make([]inventory.Host, 0, len(selected))
+	for _, host := range hosts {
+		if !selected[host.ID] {
+			continue
+		}
+		if old, ok := original[host.ID]; !ok || !reflect.DeepEqual(old, host) {
+			return nil, "PARTIAL_INVENTORY_CHANGED"
+		}
+		filtered = append(filtered, host)
+	}
+	if len(filtered) != len(selected) {
+		return nil, "PARTIAL_INVENTORY_CHANGED"
+	}
+	return filtered, ""
+}
+
+func filterPartialInputs(hosts []inventory.Host, roleMap map[string][]string, overrides []preview.Override, selected map[string]bool) ([]inventory.Host, map[string][]string, []preview.Override) {
+	filteredHosts := make([]inventory.Host, 0, len(selected))
+	groups := make(map[string]bool)
+	for _, host := range hosts {
+		if !selected[host.ID] {
+			continue
+		}
+		filteredHosts = append(filteredHosts, host)
+		for _, group := range host.Groups {
+			groups[group] = true
+		}
+	}
+	filteredRoles := make(map[string][]string)
+	for roleID, ids := range roleMap {
+		for _, id := range ids {
+			if selected[id] {
+				filteredRoles[roleID] = append(filteredRoles[roleID], id)
+			}
+		}
+	}
+	filteredOverrides := make([]preview.Override, 0, len(overrides))
+	for _, override := range overrides {
+		if override.Scope == "host" && selected[override.Target] || override.Scope == "group" && groups[override.Target] {
+			filteredOverrides = append(filteredOverrides, override)
+		}
+	}
+	return filteredHosts, filteredRoles, filteredOverrides
+}
+
+func (s *Server) resolveCleanupGlobal(w http.ResponseWriter, r *http.Request) {
+	if s.runs == nil {
+		writeError(w, http.StatusServiceUnavailable, "RUN_MANAGER_UNAVAILABLE")
+		return
+	}
+	cleanupID := r.PathValue("cleanupID")
+	var runID string
+	for _, run := range s.runs.List() {
+		for _, item := range s.runs.CleanupItems(run.Acceptance.RunID) {
+			if item.CleanupID == cleanupID {
+				if runID != "" {
+					writeError(w, http.StatusConflict, "CLEANUP_ID_AMBIGUOUS")
+					return
+				}
+				runID = run.Acceptance.RunID
+			}
+		}
+	}
+	if runID == "" {
+		writeError(w, http.StatusNotFound, "CLEANUP_NOT_FOUND")
+		return
+	}
+	r.SetPathValue("id", runID)
+	s.resolveCleanup(w, r)
+}
+
+func (s *Server) parseInventory(w http.ResponseWriter, r *http.Request) {
+	var body inventoryInput
+	if err := readJSON(w, r, &body); err != nil {
+		requestBodyError(w, err)
+		return
+	}
+	format := body.Format
+	if format == "" {
+		format = "quick"
+	}
+	hosts, err := inventory.Parse(body.Source, format)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "INVENTORY_INVALID")
+		return
+	}
+	groups := map[string][]string{}
+	for _, host := range hosts {
+		for _, group := range host.Groups {
+			groups[group] = append(groups[group], host.ID)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"hosts": hosts, "groups": groups})
+}
+
 func (s *Server) getRun(w http.ResponseWriter, r *http.Request) {
 	run, err := s.getRunOrWriteError(w, r.PathValue("id"))
 	if err == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"run": summarize(*run), "events": sanitizeEvents(run.Events)})
+		writeJSON(w, http.StatusOK, projectionWithEvents(*run, int64(len(run.Events))))
 	}
 }
 
@@ -240,7 +495,7 @@ func (s *Server) getRunReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	copy := *run.Report
-	copy.CleanupItems = append([]report.CleanupItem(nil), run.Report.CleanupItems...)
+	copy.CleanupItems = append([]report.CleanupItem{}, run.Report.CleanupItems...)
 	for i := range copy.CleanupItems {
 		copy.CleanupItems[i].OwnerToken = ""
 	}
@@ -369,7 +624,8 @@ func (s *Server) getRunOrWriteError(w http.ResponseWriter, id string) (*runstore
 
 func summarize(run runstore.Run) runSummary {
 	result := runSummary{
-		RunID: run.Acceptance.RunID, Status: run.Status, AcceptedAt: run.Acceptance.AcceptedAt,
+		RunID: run.Acceptance.RunID, PlanID: run.Plan.PlanID, PlanName: run.Plan.Name, PlanVersion: run.Plan.Version,
+		Status: run.Status, AcceptedAt: run.Acceptance.AcceptedAt,
 		PlanDigest: run.Config.PlanDigest, RunMode: run.Config.Mode, RunScope: run.Config.Scope,
 		Backend: run.Config.Backend,
 	}
@@ -418,20 +674,28 @@ func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 	var cursor int64
-	lastID := r.Header.Get("Last-Event-ID")
-	if lastID == "" {
+	lastID, afterSeq := r.Header.Get("Last-Event-ID"), r.URL.Query().Get("after_seq")
+	if lastID != "" && afterSeq != "" && lastID != afterSeq {
+		writeError(w, http.StatusBadRequest, "EVENT_CURSOR_CONFLICT")
+		return
+	}
+	if lastID == "" && afterSeq == "" {
 		run, _, sequence, _, err := s.runs.ReadEvents(r.PathValue("id"), 0)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "RUN_NOT_FOUND")
 			return
 		}
 		cursor = sequence
-		snapshot := map[string]any{"run": summarize(*run), "sequence": sequence}
+		snapshot := projectRun(*run, sequence)
 		if err := writeSSE(w, flusher, "snapshot", sequence, snapshot); err != nil {
 			return
 		}
 	} else {
-		value, err := strconv.ParseInt(lastID, 10, 64)
+		valueText := lastID
+		if valueText == "" {
+			valueText = afterSeq
+		}
+		value, err := strconv.ParseInt(valueText, 10, 64)
 		if err != nil || value < 0 {
 			writeError(w, http.StatusBadRequest, "INVALID_EVENT_CURSOR")
 			return
@@ -449,13 +713,17 @@ func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		if reset {
 			cursor = sequence
-			snapshot := map[string]any{"run": summarize(*run), "sequence": sequence}
+			snapshot := projectRun(*run, sequence)
 			if err := writeSSE(w, flusher, "reset", sequence, snapshot); err != nil {
 				return
 			}
 		} else {
 			for _, event := range events {
-				if err := writeSSE(w, flusher, event.Kind, event.Sequence, sanitizeEvent(event)); err != nil {
+				payload, _ := json.Marshal(sanitizeEvent(event))
+				var delta map[string]any
+				_ = json.Unmarshal(payload, &delta)
+				delta["projection"] = projectRun(*run, event.Sequence)
+				if err := writeSSE(w, flusher, event.Kind, event.Sequence, delta); err != nil {
 					return
 				}
 				cursor = event.Sequence
@@ -475,6 +743,151 @@ func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 		}
 	}
+}
+
+type hostPhaseProjection struct {
+	HostID string    `json:"host_id"`
+	Mode   string    `json:"execution_mode,omitempty"`
+	Phase  string    `json:"phase"`
+	At     time.Time `json:"at"`
+}
+
+type stageTransitionProjection struct {
+	Sequence  int64      `json:"sequence"`
+	HostID    string     `json:"host_id"`
+	Mode      string     `json:"execution_mode,omitempty"`
+	Phase     string     `json:"phase"`
+	Attempt   int        `json:"attempt"`
+	StartedAt *time.Time `json:"started_at,omitempty"`
+	EndedAt   *time.Time `json:"ended_at,omitempty"`
+	Omitted   bool       `json:"omitted,omitempty"`
+	Reason    string     `json:"reason,omitempty"`
+}
+
+func projectRun(run runstore.Run, sequence int64) map[string]any {
+	latest := map[string]hostPhaseProjection{}
+	transitions := make([]stageTransitionProjection, 0)
+	phaseEvents := make([]runstore.Event, 0)
+	for _, event := range run.Events {
+		if event.Sequence > sequence {
+			continue
+		}
+		if event.Kind != "PHASE" || event.HostID == "" || event.Status == "" {
+			continue
+		}
+		phaseEvents = append(phaseEvents, event)
+		// FINISHED is a boundary written when host processing ends. It closes
+		// the preceding stage; it is not a stage that began at that timestamp.
+		if event.Status == "FINISHED" {
+			continue
+		}
+		key := event.HostID + "\x00" + event.Mode
+		phase := event.Status
+		if event.Mode != "" {
+			phase = strings.TrimSuffix(phase, "_"+event.Mode)
+		}
+		latest[key] = hostPhaseProjection{HostID: event.HostID, Mode: event.Mode, Phase: phase, At: event.At}
+	}
+	for index, event := range phaseEvents {
+		if event.Status == "FINISHED" {
+			continue
+		}
+		phase := event.Status
+		if event.Mode != "" {
+			phase = strings.TrimSuffix(phase, "_"+event.Mode)
+		}
+		transition := stageTransitionProjection{
+			Sequence: event.Sequence, HostID: event.HostID, Mode: event.Mode, Phase: phase,
+			Attempt: event.Attempt, StartedAt: &event.At,
+		}
+		if transition.Attempt < 1 {
+			transition.Attempt = 1
+		}
+		for next := index + 1; next < len(phaseEvents); next++ {
+			if phaseEvents[next].HostID == event.HostID {
+				endedAt := phaseEvents[next].At
+				transition.EndedAt = &endedAt
+				break
+			}
+		}
+		transitions = append(transitions, transition)
+	}
+	for _, host := range run.Config.Inventory {
+		plannedModes := plannedExecutionModes(run.Plan, run.Config.RoleMap, host.ID)
+		for _, mode := range []string{"STANDARD", "PRIVILEGED"} {
+			if plannedModes[mode] {
+				continue
+			}
+			transitions = append(transitions, stageTransitionProjection{
+				HostID: host.ID, Mode: mode, Phase: "OMITTED", Attempt: 1,
+				Omitted: true, Reason: "NO_ENABLED_ITEMS",
+			})
+		}
+	}
+	sort.Slice(transitions, func(i, j int) bool {
+		if transitions[i].HostID != transitions[j].HostID {
+			return transitions[i].HostID < transitions[j].HostID
+		}
+		if transitions[i].Sequence != transitions[j].Sequence {
+			return transitions[i].Sequence < transitions[j].Sequence
+		}
+		if transitions[i].Mode != transitions[j].Mode {
+			return transitions[i].Mode < transitions[j].Mode
+		}
+		return transitions[i].Phase < transitions[j].Phase
+	})
+	phases := make([]hostPhaseProjection, 0, len(latest))
+	for _, phase := range latest {
+		phases = append(phases, phase)
+	}
+	sort.Slice(phases, func(i, j int) bool {
+		if phases[i].HostID == phases[j].HostID {
+			return phases[i].Mode < phases[j].Mode
+		}
+		return phases[i].HostID < phases[j].HostID
+	})
+	return map[string]any{"run": summarize(run), "sequence": sequence, "host_phases": phases, "stage_transitions": transitions}
+}
+
+func plannedExecutionModes(value *plan.Plan, roleMap map[string][]string, hostID string) map[string]bool {
+	modes := map[string]bool{}
+	if value == nil {
+		return modes
+	}
+	boundRoles := map[string]bool{}
+	for roleID, hostIDs := range roleMap {
+		for _, candidate := range hostIDs {
+			if candidate == hostID {
+				boundRoles[roleID] = true
+				break
+			}
+		}
+	}
+	templateModes := map[string]string{}
+	for _, snapshot := range value.EmbeddedTemplates {
+		templateModes[snapshot.TemplateID+"/"+snapshot.Version] = snapshot.ExecutionMode
+	}
+	for _, role := range value.Roles {
+		if !boundRoles[role.RoleID] {
+			continue
+		}
+		for _, item := range role.Items {
+			if !item.Enabled {
+				continue
+			}
+			mode := templateModes[item.TemplateID+"/"+item.TemplateVersion]
+			if mode != "" {
+				modes[mode] = true
+			}
+		}
+	}
+	return modes
+}
+
+func projectionWithEvents(run runstore.Run, sequence int64) map[string]any {
+	projection := projectRun(run, sequence)
+	projection["events"] = sanitizeEvents(run.Events)
+	return projection
 }
 
 func writeSSE(w http.ResponseWriter, flusher http.Flusher, name string, sequence int64, value any) error {
