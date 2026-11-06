@@ -58,6 +58,7 @@ func newHarness(t *testing.T) (string, *workspace.Store, *workspace.Lease, *runs
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = ws.Close() })
 	cfg := runstore.RunConfig{
 		PlanDigest: p.Digest, Mode: "TRIAL", Scope: "PARTIAL", Backend: "mock_simulator",
 		Inventory: []inventory.Host{{ID: "node-1", Address: "127.0.0.1", Port: 22, Username: "tester"}},

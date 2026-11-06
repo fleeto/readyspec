@@ -76,6 +76,9 @@ func TestPathChecksRoundTripThroughOfficialGoss(t *testing.T) {
 }
 
 func TestCustomShellCompilationKeepsParameterOutOfSource(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("generated execution scripts target Linux")
+	}
 	snapshot := plan.CheckTemplate{TemplateID: "custom", Version: "1", Source: "PLAN_LOCAL", ExecutionMode: "STANDARD", ParamsSchema: map[string]any{"type": "object", "properties": map[string]any{"VALUE": map[string]any{"type": "string"}}}, Implementation: map[string]any{"kind": "CUSTOM_SHELL", "command": "printf '%s' \"$RS_PARAM_VALUE\"", "expect_exit_code": float64(0)}}
 	marker := filepath.Join(t.TempDir(), "must-not-exist")
 	item := plan.CheckItem{ItemID: "shell", Enabled: true, TemplateID: "custom", TemplateVersion: "1", Params: map[string]any{"VALUE": "'; touch " + marker + "; '"}}

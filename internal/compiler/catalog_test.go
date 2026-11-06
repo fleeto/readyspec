@@ -3,6 +3,7 @@ package compiler_test
 import (
 	"encoding/json"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -25,6 +26,9 @@ func catalogSamples() map[string]map[string]any {
 }
 
 func TestAllCatalogTemplatesCompileAndGeneratedShellParses(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("generated execution scripts target Linux")
+	}
 	samples := catalogSamples()
 	ids := map[string]bool{}
 	for _, entry := range template.List() {
