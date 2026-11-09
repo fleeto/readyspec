@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"sync"
 )
 
 type Config struct {
@@ -17,27 +16,16 @@ type Config struct {
 }
 
 type fanoutWriter struct {
-	mu              sync.Mutex
-	fallback        io.Writer
-	file            io.Writer
-	failureReported bool
+	fallback *queuedWriter
+	file     *queuedWriter
 }
 
 func (w *fanoutWriter) Write(record []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	n, err := w.fallback.Write(record)
 	if err != nil {
 		return n, err
 	}
-	fileN, fileErr := w.file.Write(record)
-	if fileErr == nil && fileN != len(record) {
-		fileErr = io.ErrShortWrite
-	}
-	if fileErr != nil && !w.failureReported {
-		w.failureReported = true
-		_, _ = io.WriteString(w.fallback, "ReadySpec: operational log file write failed; continuing on stderr\n")
-	}
+	_, _ = w.file.Write(record)
 	return n, nil
 }
 
@@ -60,31 +48,39 @@ func Configure(config Config, fallback io.Writer) (*slog.Logger, io.Closer, erro
 	default:
 		return nil, nil, fmt.Errorf("LOG_CONFIG_INVALID: log level must be debug, info, warn, or error")
 	}
+	format = strings.ToLower(format)
+	if format != "text" && format != "json" {
+		return nil, nil, fmt.Errorf("LOG_CONFIG_INVALID: log format must be text or json")
+	}
 	options := &slog.HandlerOptions{Level: level}
-	var destination io.Writer = fallback
-	var closer io.Closer
+	fallbackQueue := newQueuedWriter(fallback, format, nil)
+	var destination io.Writer = fallbackQueue
+	var fileQueue *queuedWriter
+	var file io.Closer
 	filePath := choose(config.File, os.Getenv("READYSPEC_LOG_FILE"), "")
 	if filePath != "" {
-		file, err := OpenFile(filePath)
+		opened, err := OpenFile(filePath)
 		if err != nil {
+			_ = fallbackQueue.Close()
 			return nil, nil, err
 		}
-		closer = file
-		destination = &fanoutWriter{fallback: fallback, file: file}
+		file = opened
+		fallbackQueue.format = format
+		fileQueue = newQueuedFileWriter(opened, format, func() {
+			_, _ = fallbackQueue.Write([]byte("ReadySpec: operational log file write failed; continuing on stderr\n"))
+		}, func(count uint64) {
+			_, _ = fallbackQueue.Write(formatDropRecord(format, count))
+		})
+		destination = &fanoutWriter{fallback: fallbackQueue, file: fileQueue}
 	}
 	var handler slog.Handler
-	switch strings.ToLower(format) {
+	switch format {
 	case "text":
 		handler = slog.NewTextHandler(destination, options)
 	case "json":
 		handler = slog.NewJSONHandler(destination, options)
-	default:
-		if closer != nil {
-			_ = closer.Close()
-		}
-		return nil, nil, fmt.Errorf("LOG_CONFIG_INVALID: log format must be text or json")
 	}
-	return slog.New(handler), closer, nil
+	return slog.New(handler), &queuedCloser{fileQueue: fileQueue, fallback: fallbackQueue, file: file}, nil
 }
 
 func choose(explicit, environment, fallback string) string {

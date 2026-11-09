@@ -333,7 +333,7 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 				return fmt.Errorf("INFRA_ERROR: cannot report accepted Run ID")
 			}
 			if created {
-				if _, err := manager.ProcessNext(cmd.Context()); err != nil {
+				if err := processRunWithProgress(cmd.Context(), manager, store, run.Acceptance.RunID, cmd.ErrOrStderr()); err != nil {
 					setExitCode(13)
 					return fmt.Errorf("INFRA_ERROR: Run could not be archived")
 				}
@@ -342,15 +342,6 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 			if err != nil || finished.Report == nil {
 				setExitCode(13)
 				return fmt.Errorf("INFRA_ERROR: valid RunReport is unavailable")
-			}
-			for _, event := range finished.Events {
-				if event.Kind != "PHASE" || event.HostID == "" || event.Status == "" {
-					continue
-				}
-				if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "[%s] %s %s\n", strconv.QuoteToASCII(event.HostID), event.Status, strconv.QuoteToASCII(event.Mode)); err != nil {
-					setExitCode(13)
-					return fmt.Errorf("INFRA_ERROR: cannot write Run progress")
-				}
 			}
 			if err := emitReport(cmd.OutOrStdout(), reportOutput, finished.Report); err != nil {
 				setExitCode(13)
@@ -381,6 +372,54 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 	_ = command.MarkFlagRequired("plan")
 	_ = command.MarkFlagRequired("inventory")
 	return command
+}
+
+func processRunWithProgress(ctx context.Context, manager *runmanager.Manager, store *runstore.Store, runID string, stderr io.Writer) error {
+	type processResult struct{ err error }
+	processed := make(chan processResult, 1)
+	go func() {
+		_, err := manager.ProcessNext(ctx)
+		processed <- processResult{err: err}
+	}()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	var sequence int64
+	var progressErr error
+	printPending := func() {
+		if progressErr != nil {
+			return
+		}
+		run, err := store.Get(runID)
+		if err != nil {
+			progressErr = fmt.Errorf("RUN_STORAGE_ERROR")
+			return
+		}
+		for _, event := range run.Events {
+			if event.Sequence <= sequence {
+				continue
+			}
+			sequence = event.Sequence
+			if event.Kind != "PHASE" || event.HostID == "" || event.Status == "" {
+				continue
+			}
+			if _, err := fmt.Fprintf(stderr, "[%s] %s %s\n", strconv.QuoteToASCII(event.HostID), event.Status, strconv.QuoteToASCII(event.Mode)); err != nil {
+				progressErr = fmt.Errorf("INFRA_ERROR: cannot write Run progress")
+				return
+			}
+		}
+	}
+	for {
+		printPending()
+		select {
+		case result := <-processed:
+			if result.err != nil {
+				return result.err
+			}
+			printPending()
+			return progressErr
+		case <-ticker.C:
+		}
+	}
 }
 
 func loadPlan(file string) (*plan.Plan, error) {

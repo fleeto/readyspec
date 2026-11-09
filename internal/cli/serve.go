@@ -97,6 +97,7 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 	if err != nil {
 		return fmt.Errorf("recover Run store: %w", err)
 	}
+	logRunRecovery(logger, runs.List())
 	manager, err := runmanager.New(runs, executor.NewNativeSSH())
 	if err != nil {
 		return err
@@ -231,6 +232,17 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		return fmt.Errorf("Run worker did not stop after HTTP listener failure")
 	}
 	return err
+}
+
+func logRunRecovery(logger *slog.Logger, recoveredRuns []runstore.Run) {
+	for _, recoveredRun := range recoveredRuns {
+		if recoveredRun.RecoveryWarning != "" {
+			logger.Warn("Run journal tail recovered", "event", "journal.tail_recovered", "run_id", recoveredRun.Acceptance.RunID, "reason_code", recoveredRun.RecoveryWarning)
+		}
+		if recoveredRun.RecoveryError != "" {
+			logger.Error("Run recovery failed", "event", "run.recovery_failed", "run_id", recoveredRun.Acceptance.RunID, "reason_code", recoveredRun.RecoveryError)
+		}
+	}
 }
 
 func boundedDuration(remaining, maximum time.Duration) time.Duration {

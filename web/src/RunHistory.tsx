@@ -353,6 +353,9 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
               <p>
                 当前状态：{runState.run.status} · 已记录阶段 {runState.sequence}
               </p>
+              {!report && !runState.recovery_error && (
+                <Notice tone="info">报告尚未归档；以下显示已持久化的运行状态与阶段。</Notice>
+              )}
               {runState.recovery_error && (
                 <Notice tone="danger">恢复诊断：{runState.recovery_error}</Notice>
               )}

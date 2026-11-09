@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fleeto/readyspec/internal/runstore"
 )
 
 type blockedCloser struct{ release <-chan struct{} }
@@ -77,6 +80,24 @@ func TestBoundedDurationNeverExceedsRemainingBudget(t *testing.T) {
 	}
 	if got := boundedDuration(-time.Second, 3*time.Second); got != time.Nanosecond {
 		t.Fatalf("expired deadline duration=%s", got)
+	}
+}
+
+func TestLogRunRecoveryEmitsSafeWarningAndErrorEvents(t *testing.T) {
+	var output bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&output, nil))
+	logRunRecovery(logger, []runstore.Run{
+		{Acceptance: runstore.Acceptance{RunID: "run-tail"}, RecoveryWarning: "JOURNAL_TAIL_RECOVERED"},
+		{Acceptance: runstore.Acceptance{RunID: "run-corrupt"}, RecoveryError: "JOURNAL_RECORD_CORRUPT"},
+	})
+	value := output.String()
+	for _, expected := range []string{"journal.tail_recovered", "JOURNAL_TAIL_RECOVERED", "run-tail", "run.recovery_failed", "JOURNAL_RECORD_CORRUPT", "run-corrupt"} {
+		if !strings.Contains(value, expected) {
+			t.Fatalf("recovery log missing %q: %s", expected, value)
+		}
+	}
+	if strings.Contains(value, "path") || strings.Contains(value, "error text") {
+		t.Fatalf("recovery logs contain unapproved storage details: %s", value)
 	}
 }
 

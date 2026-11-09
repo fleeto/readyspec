@@ -143,3 +143,55 @@ test('report warns about verified UID zero independently of the login name', asy
   fireEvent.click(await screen.findByRole('button', { name: '查看报告' }))
   expect(await screen.findByText(/root（UID 0）身份执行检查/)).toHaveTextContent('admin-alias')
 })
+
+test('history shows persisted stages while an accepted run has no archived report', async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const path = String(input)
+    if (path.endsWith('/runs')) {
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              run_id: 'run-live',
+              plan_id: 'plan-live',
+              plan_name: 'Live run',
+              plan_version: '1.0.0',
+              status: 'RUNNING',
+              accepted_at: '2026-11-09T12:00:00Z',
+              run_mode: 'TRIAL',
+              run_scope: 'FULL',
+              executor_backend: 'native_ssh',
+            },
+          ],
+        }),
+        { status: 200 },
+      )
+    }
+    if (path.endsWith('/runs/run-live')) {
+      return new Response(
+        JSON.stringify({
+          run: { status: 'RUNNING' },
+          sequence: 3,
+          stage_transitions: [
+            {
+              sequence: 3,
+              host_id: 'node-a',
+              phase: 'SSH_CONNECT',
+              attempt: 1,
+              started_at: '2026-11-09T12:00:01Z',
+            },
+          ],
+        }),
+        { status: 200 },
+      )
+    }
+    return new Response(JSON.stringify({ error: 'REPORT_NOT_ARCHIVED' }), { status: 409 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  render(<RunHistory />)
+  fireEvent.click(await screen.findByRole('button', { name: '查看报告' }))
+  expect(await screen.findByText('当前状态：RUNNING · 已记录阶段 3')).toBeInTheDocument()
+  expect(screen.getByText('报告尚未归档；以下显示已持久化的运行状态与阶段。')).toBeInTheDocument()
+  expect(screen.getByText('SSH_CONNECT')).toBeInTheDocument()
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6), { timeout: 5000 })
+})

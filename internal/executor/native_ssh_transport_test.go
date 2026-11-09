@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -112,6 +113,192 @@ func TestConnectFailureClassificationUsesTypedCauses(t *testing.T) {
 				t.Fatal("raw cause leaked into failure")
 			}
 		})
+	}
+}
+
+func TestLoopbackPasswordAuthenticationDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		passwords  bool
+		password   string
+		wantCode   string
+		wantClass  FailureClass
+		wantResult bool
+	}{
+		{name: "accepted password", passwords: true, password: "fixture-correct-password", wantResult: true},
+		{name: "rejected password", passwords: true, password: "fixture-wrong-password", wantCode: "SSH_AUTH_REJECTED", wantClass: FailureAuth},
+		{name: "password forbidden by server policy", passwords: false, password: "fixture-correct-password", wantCode: "SSH_HANDSHAKE_UNVERIFIABLE", wantClass: FailureNetwork},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, private, err := ed25519.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hostSigner, err := ssh.NewSignerFromKey(private)
+			if err != nil {
+				t.Fatal(err)
+			}
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			serverConfig := &ssh.ServerConfig{}
+			if tc.passwords {
+				serverConfig.PasswordCallback = func(_ ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+					if string(password) != "fixture-correct-password" {
+						return nil, errors.New("rejected fixture credentials")
+					}
+					return nil, nil
+				}
+			}
+			serverConfig.AddHostKey(hostSigner)
+			serverDone := make(chan struct{})
+			go func() {
+				defer close(serverDone)
+				conn, acceptErr := listener.Accept()
+				if acceptErr != nil {
+					return
+				}
+				serverConn, _, _, handshakeErr := ssh.NewServerConn(conn, serverConfig)
+				if handshakeErr == nil {
+					_ = serverConn.Close()
+				} else {
+					_ = conn.Close()
+				}
+			}()
+			knownHosts := filepath.Join(t.TempDir(), "known_hosts")
+			line := knownhosts.Line([]string{listener.Addr().String()}, hostSigner.PublicKey()) + "\n"
+			if err := os.WriteFile(knownHosts, []byte(line), 0600); err != nil {
+				t.Fatal(err)
+			}
+			native := NewNativeSSH()
+			native.KnownHostsPath = knownHosts
+			native.Credentials = CredentialMap{"run": {"node": {Method: "password", Password: []byte(tc.password)}}}
+			address, portText, err := net.SplitHostPort(listener.Addr().String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			port, err := strconv.Atoi(portText)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			conn, connectErr := native.connect(ctx, "run", "node", address, port, "tester", "password", "")
+			if connectErr == nil {
+				defer conn.client.Close()
+			}
+			if tc.wantResult {
+				if connectErr != nil || conn == nil {
+					t.Fatalf("valid loopback password rejected: %v", connectErr)
+				}
+			} else {
+				if connectErr == nil || conn != nil {
+					t.Fatal("loopback SSH unexpectedly accepted rejected password")
+				}
+				failure := connectFailure(connectErr, "node")
+				if failure.Class != tc.wantClass || len(failure.Diagnostics) != 1 || failure.Diagnostics[0].Code != tc.wantCode {
+					t.Fatalf("loopback auth diagnostic=%+v", failure)
+				}
+				if strings.Contains(connectErr.Error(), tc.password) || strings.Contains(failure.Message, tc.password) || strings.Contains(failure.Message, "PASSWORD_WRONG") {
+					t.Fatal("authentication failure exposed a credential or claimed an incorrect password")
+				}
+			}
+			select {
+			case <-serverDone:
+			case <-time.After(2 * time.Second):
+				t.Fatal("loopback SSH server did not stop")
+			}
+		})
+	}
+}
+
+func TestLoopbackHostKeyTrustDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		knownHosts func(t *testing.T, path, endpoint string, presented ssh.PublicKey)
+		wantCode   string
+	}{
+		{name: "unknown key", knownHosts: func(t *testing.T, path, _ string, _ ssh.PublicKey) { writeKnownHosts(t, path, "") }, wantCode: "HOST_KEY_UNKNOWN"},
+		{name: "changed key", knownHosts: func(t *testing.T, path, endpoint string, _ ssh.PublicKey) {
+			_, wrong, _ := ed25519.GenerateKey(rand.Reader)
+			wrongSigner, _ := ssh.NewSignerFromKey(wrong)
+			writeKnownHosts(t, path, knownhosts.Line([]string{endpoint}, wrongSigner.PublicKey())+"\n")
+		}, wantCode: "HOST_KEY_CHANGED"},
+		{name: "revoked key", knownHosts: func(t *testing.T, path, endpoint string, presented ssh.PublicKey) {
+			writeKnownHosts(t, path, "@revoked "+knownhosts.Line([]string{endpoint}, presented)+"\n")
+		}, wantCode: "HOST_KEY_REVOKED"},
+		{name: "missing known_hosts", knownHosts: func(_ *testing.T, _ string, _ string, _ ssh.PublicKey) {}, wantCode: "KNOWN_HOSTS_UNREADABLE"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, hostPrivate, err := ed25519.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hostSigner, err := ssh.NewSignerFromKey(hostPrivate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			config := &ssh.ServerConfig{NoClientAuth: true}
+			config.AddHostKey(hostSigner)
+			serverDone := make(chan struct{})
+			go func() {
+				defer close(serverDone)
+				conn, acceptErr := listener.Accept()
+				if acceptErr != nil {
+					return
+				}
+				serverConn, _, requests, handshakeErr := ssh.NewServerConn(conn, config)
+				if handshakeErr == nil {
+					ssh.DiscardRequests(requests)
+					_ = serverConn.Close()
+				} else {
+					_ = conn.Close()
+				}
+			}()
+			endpoint := listener.Addr().String()
+			dir := t.TempDir()
+			knownHostsPath := filepath.Join(dir, "known_hosts")
+			if tc.name == "missing known_hosts" {
+				knownHostsPath = filepath.Join(dir, "absent", "known_hosts")
+			} else {
+				tc.knownHosts(t, knownHostsPath, endpoint, hostSigner.PublicKey())
+			}
+			native := NewNativeSSH()
+			native.KnownHostsPath = knownHostsPath
+			native.Credentials = CredentialMap{"run": {"node": {Method: "password", Password: []byte("fixture-password")}}}
+			host, portText, _ := net.SplitHostPort(endpoint)
+			port, _ := strconv.Atoi(portText)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_, connectErr := native.connect(ctx, "run", "node", host, port, "tester", "password", "")
+			if connectErr == nil {
+				t.Fatal("SSH connection unexpectedly passed host-key validation")
+			}
+			failure := connectFailure(connectErr, "node")
+			if failure.Class != FailureIdentity || len(failure.Diagnostics) != 1 || failure.Diagnostics[0].Code != tc.wantCode {
+				t.Fatalf("host-key diagnostic=%+v want=%s", failure, tc.wantCode)
+			}
+			_ = listener.Close()
+			select {
+			case <-serverDone:
+			case <-time.After(2 * time.Second):
+				t.Fatal("loopback SSH server did not stop")
+			}
+		})
+	}
+}
+
+func writeKnownHosts(t *testing.T, path, contents string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+		t.Fatal(err)
 	}
 }
 

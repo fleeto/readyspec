@@ -3,12 +3,14 @@ package runmanager_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/fleeto/readyspec/internal/compiler"
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/executor"
 	"github.com/fleeto/readyspec/internal/inventory"
 	"github.com/fleeto/readyspec/internal/plan"
@@ -107,7 +109,8 @@ func TestSubmitRequiresCredentialsOnlyForRoleBoundHosts(t *testing.T) {
 	}
 	hosts := []inventory.Host{
 		{ID: "bound", Address: "127.0.0.1", Port: 22, Username: "tester"},
-		{ID: "unbound", Address: "127.0.0.2", Port: 22, Username: "tester"},
+		{ID: "unbound-a", Address: "127.0.0.2", Port: 22, Username: "tester"},
+		{ID: "unbound-b", Address: "127.0.0.3", Port: 22, Username: "tester"},
 	}
 	request := runstore.Request{IdempotencyKey: "bound-host-only", Plan: p, Config: runstore.RunConfig{
 		PlanDigest: p.Digest, Mode: "TRIAL", Scope: "FULL", Backend: "native_ssh", Inventory: hosts,
@@ -120,6 +123,63 @@ func TestSubmitRequiresCredentialsOnlyForRoleBoundHosts(t *testing.T) {
 	}
 	if len(store.List()) != 1 {
 		t.Fatalf("expected one accepted Run, got %d", len(store.List()))
+	}
+}
+
+func TestSubmitRejectsDistinctCredentialFailuresWithoutAcceptingRun(t *testing.T) {
+	ws, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	store, err := runstore.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease, err := ws.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	p, err := plan.Load(strings.NewReader(planSource))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := runmanager.New(store, executor.NewNativeSSH())
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := runstore.Request{IdempotencyKey: "credential-diagnostic-matrix", Plan: p, Config: runstore.RunConfig{
+		PlanDigest: p.Digest, Mode: "TRIAL", Scope: "FULL", Backend: "native_ssh",
+		Inventory: []inventory.Host{{ID: "node", Address: "127.0.0.1", Port: 22, Username: "tester"}},
+		RoleMap:   map[string][]string{"app": {"node"}}, Auth: runstore.AuthIdentity{Method: "password"},
+		Budgets: runstore.Budgets{QueueSeconds: 1800, RunSeconds: 3600, HostSeconds: 600},
+	}}
+	cases := []struct {
+		name        string
+		credentials map[string]executor.Credential
+		wantCode    string
+	}{
+		{name: "missing target credential", wantCode: "CREDENTIAL_HOST_MISSING"},
+		{name: "empty password", credentials: map[string]executor.Credential{"node": {Method: "password"}}, wantCode: "CREDENTIAL_PASSWORD_EMPTY"},
+		{name: "method mismatch", credentials: map[string]executor.Credential{"node": {Method: "private_key"}}, wantCode: "CREDENTIAL_METHOD_MISMATCH"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			request := base
+			request.IdempotencyKey = "credential-diagnostic-" + strings.ReplaceAll(tc.name, " ", "-")
+			run, created, submitErr := manager.Submit(request, tc.credentials)
+			var diagnosticErr *diagnostic.Error
+			if !errors.As(submitErr, &diagnosticErr) || diagnosticErr.Code != tc.wantCode || diagnosticErr.HostID != "node" {
+				t.Fatalf("diagnostic = %#v, error = %v; want %s for node", diagnosticErr, submitErr, tc.wantCode)
+			}
+			if run != nil || created {
+				t.Fatalf("rejected submission returned Run=%v created=%v", run, created)
+			}
+			if runs := store.List(); len(runs) != 0 {
+				t.Fatalf("rejected submission persisted %d runs", len(runs))
+			}
+		})
 	}
 }
 

@@ -3,7 +3,10 @@ package webui_test
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +22,7 @@ import (
 	"github.com/fleeto/readyspec/internal/runstore"
 	"github.com/fleeto/readyspec/internal/webui"
 	"github.com/fleeto/readyspec/internal/workspace"
+	"golang.org/x/crypto/ssh"
 )
 
 const address = "127.0.0.1:18480"
@@ -186,6 +190,17 @@ template_lock: {}
 	if accepted.Acceptance != "accepted" || len(accepted.RequestID) != 32 || len(accepted.SubmissionID) != 32 || w.Header().Get("X-Request-ID") != accepted.RequestID {
 		t.Fatalf("submit response omitted correlation/acceptance metadata: %s", w.Body.String())
 	}
+	retryAccepted := request(serverWithRuns, "POST", "/api/v1/runs", string(body), cookie, csrf)
+	var retry struct {
+		RunID        string `json:"run_id"`
+		Created      bool   `json:"created"`
+		RequestID    string `json:"request_id"`
+		SubmissionID string `json:"submission_id"`
+		Acceptance   string `json:"acceptance"`
+	}
+	if retryAccepted.Code != http.StatusAccepted || json.Unmarshal(retryAccepted.Body.Bytes(), &retry) != nil || retry.RunID != accepted.RunID || retry.Created || retry.Acceptance != "accepted" || len(retry.RequestID) != 32 || len(retry.SubmissionID) != 32 || retry.RequestID == accepted.RequestID || retry.SubmissionID == accepted.SubmissionID {
+		t.Fatalf("idempotent retry did not report this attempt and original Run: status=%d body=%s", retryAccepted.Code, retryAccepted.Body.String())
+	}
 	statusBody, _ := json.Marshal(map[string]string{"idempotency_key": "web-api-test"})
 	statusResponse := request(serverWithRuns, "POST", "/api/v1/runs/submission-status", string(statusBody), cookie, csrf)
 	var statusResult struct {
@@ -223,6 +238,81 @@ template_lock: {}
 	}
 	if rejectedBody.Acceptance != "rejected" || len(rejectedBody.RequestID) != 32 || len(rejectedBody.SubmissionID) != 32 || len(rejectedBody.Diagnostics) != 1 || rejectedBody.Diagnostics[0].Code != "PRIVATE_KEY_PARSE_FAILED" || rejectedBody.Diagnostics[0].HostID != "node" {
 		t.Fatalf("credential rejection lacks safe structured diagnosis: %s", rejected.Body.String())
+	}
+	acceptedCount := len(store.List())
+	for _, tc := range []struct {
+		name        string
+		method      string
+		fingerprint string
+		privateKey  string
+		wantCode    string
+	}{
+		{name: "unknown authentication method", method: "unknown", wantCode: "CREDENTIAL_METHOD_MISMATCH"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var input map[string]any
+			encoded, _ := json.Marshal(failureBody)
+			if err := json.Unmarshal(encoded, &input); err != nil {
+				t.Fatal(err)
+			}
+			input["idempotency_key"] = "early-reject-" + strings.ReplaceAll(tc.name, " ", "-")
+			input["auth_identity"].(map[string]any)["method"] = tc.method
+			body, _ := json.Marshal(input)
+			response := request(serverWithRuns, "POST", "/api/v1/runs", string(body), cookie, csrf)
+			var responseBody struct {
+				Acceptance   string `json:"acceptance"`
+				RequestID    string `json:"request_id"`
+				SubmissionID string `json:"submission_id"`
+				Diagnostics  []struct {
+					Code string `json:"code"`
+				} `json:"diagnostics"`
+			}
+			if response.Code != http.StatusUnprocessableEntity || json.Unmarshal(response.Body.Bytes(), &responseBody) != nil || responseBody.Acceptance != "rejected" || len(responseBody.RequestID) != 32 || len(responseBody.SubmissionID) != 32 || len(responseBody.Diagnostics) != 1 || responseBody.Diagnostics[0].Code != tc.wantCode {
+				t.Fatalf("early credential rejection lacked safe correlation/diagnostic: status=%d body=%s", response.Code, response.Body.String())
+			}
+			if len(store.List()) != acceptedCount {
+				t.Fatal("early credential rejection persisted a Run")
+			}
+		})
+	}
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyBlock, err := ssh.MarshalPrivateKey(privateKey, "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, otherPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherSigner, err := ssh.NewSignerFromKey(otherPrivate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mismatch map[string]any
+	mismatchEncoded, _ := json.Marshal(failureBody)
+	if err := json.Unmarshal(mismatchEncoded, &mismatch); err != nil {
+		t.Fatal(err)
+	}
+	mismatch["idempotency_key"] = "private-key-identity-mismatch"
+	mismatch["auth_identity"].(map[string]any)["method"] = "private_key"
+	mismatch["auth_identity"].(map[string]any)["public_key_fingerprint"] = ssh.FingerprintSHA256(otherSigner.PublicKey())
+	mismatch["credentials"].(map[string]any)["node"].(map[string]any)["private_key"] = string(pem.EncodeToMemory(keyBlock))
+	mismatchBody, _ := json.Marshal(mismatch)
+	mismatchResponse := request(serverWithRuns, "POST", "/api/v1/runs", string(mismatchBody), cookie, csrf)
+	var mismatchResult struct {
+		Acceptance  string `json:"acceptance"`
+		Diagnostics []struct {
+			Code string `json:"code"`
+		} `json:"diagnostics"`
+	}
+	if mismatchResponse.Code != http.StatusUnprocessableEntity || json.Unmarshal(mismatchResponse.Body.Bytes(), &mismatchResult) != nil || mismatchResult.Acceptance != "rejected" || len(mismatchResult.Diagnostics) != 1 || mismatchResult.Diagnostics[0].Code != "PRIVATE_KEY_IDENTITY_MISMATCH" {
+		t.Fatalf("private key identity mismatch was not rejected safely: status=%d body=%s", mismatchResponse.Code, mismatchResponse.Body.String())
+	}
+	if len(store.List()) != acceptedCount {
+		t.Fatal("private key identity mismatch persisted a Run")
 	}
 	rerunResponse := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/rerun-config", "", cookie, csrf)
 	if rerunResponse.Code != http.StatusOK {

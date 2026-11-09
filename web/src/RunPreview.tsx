@@ -362,7 +362,7 @@ export function RunPreview({
                 : { agent_socket: agentSocket, sudo_password: sudoPassword },
         ]),
       )
-      const accepted = await api.request<{ run_id: string; status: string }>('/runs', {
+      const accepted = await api.request<{ run_id?: string; status?: string }>('/runs', {
         plan: stringify(result.validated_plan),
         ...(planRecordKey ? { plan_record_key: planRecordKey } : {}),
         inventory: { source, format },
@@ -383,8 +383,18 @@ export function RunPreview({
         credentials,
         ...(backend === 'mock_simulator' ? { simulator_profiles: JSON.parse(profiles) } : {}),
       })
+      if (typeof accepted.run_id !== 'string' || accepted.run_id.length === 0) {
+        throw new ApiError(
+          '服务未返回有效任务 ID，提交接受状态尚未确认。',
+          502,
+          [],
+          '',
+          '',
+          'unknown',
+        )
+      }
       setRunId(accepted.run_id)
-      setRunStatus(accepted.status)
+      setRunStatus(accepted.status ?? '已接受')
       setSubmissionUncertain(false)
       setSubmissionDiagnostic(null)
       onSubmissionUncertain?.(false)
@@ -409,10 +419,7 @@ export function RunPreview({
       setPassphrase('')
       setAgentSocket('')
       setKeyFingerprint('')
-      const uncertain =
-        cause instanceof ApiError
-          ? cause.acceptance === 'unknown' || (!cause.acceptance && cause.status >= 500)
-          : true
+      const uncertain = !(cause instanceof ApiError) || cause.acceptance !== 'rejected'
       setSubmissionUncertain(uncertain)
       setSubmissionDiagnostic(cause instanceof ApiError ? cause : null)
       onSubmissionUncertain?.(uncertain)

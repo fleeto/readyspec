@@ -233,3 +233,51 @@ test('SSE reconnect resumes from its cursor and reset replaces the old projectio
   expect(eventRequests[1].headers).toMatchObject({ 'Last-Event-ID': '5' })
   vi.unstubAllGlobals()
 })
+
+test('submit response without a trusted acceptance contract stays unknown and is never retried', async () => {
+  const document = newPlan()
+  const submissionRequests: RequestInit[] = []
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(input)
+    if (path.endsWith('/runs/preview')) {
+      return new Response(
+        JSON.stringify({
+          host_count: 1,
+          candidate_check_count: 1,
+          privileged_check_count: 0,
+          custom_shell_check_count: 0,
+          active_probe_check_count: 0,
+          configured_root_hosts: [],
+          identity_unverified_hosts: [],
+          validated_plan: document,
+          hosts: [{ host: { id: 'node', address: '192.0.2.1', port: 22 }, roles: ['app'] }],
+        }),
+        { status: 200 },
+      )
+    }
+    if (path.endsWith('/runs') && init?.method === 'POST') {
+      submissionRequests.push(init)
+      return new Response('gateway response unavailable', { status: 502 })
+    }
+    if (path.endsWith('/runs/submission-status')) {
+      return new Response(JSON.stringify({ acceptance: 'unknown' }), { status: 200 })
+    }
+    throw new Error(`unexpected request: ${path}`)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  render(<RunPreview document={document} />)
+  fireEvent.click(screen.getByRole('button', { name: '下一步：主机清单' }))
+  fireEvent.change(screen.getByLabelText('主机清单'), { target: { value: 'node=192.0.2.1' } })
+  fireEvent.click(screen.getByRole('button', { name: '下一步：角色与认证' }))
+  fireEvent.change(screen.getByLabelText(/绑定主机.*app/), { target: { value: 'node' } })
+  fireEvent.change(screen.getByLabelText('执行器'), { target: { value: 'mock_simulator' } })
+  fireEvent.click(screen.getByRole('button', { name: '生成静态预览' }))
+  fireEvent.click(await screen.findByRole('button', { name: '接受并执行任务' }))
+
+  expect(await screen.findByText(/任务接受状态尚未确认/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '查询提交状态' }))
+  expect(await screen.findByText(/服务端暂时无法确认提交状态/)).toBeInTheDocument()
+  expect(submissionRequests).toHaveLength(1)
+  expect(screen.getByRole('button', { name: '查询提交状态' })).toBeInTheDocument()
+  vi.unstubAllGlobals()
+})

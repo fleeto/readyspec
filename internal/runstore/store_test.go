@@ -2,6 +2,7 @@ package runstore_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -118,7 +119,12 @@ func TestRecoveryUsesValidReportEvenWhenJournalIsCorrupt(t *testing.T) {
 		t.Fatal(err)
 	}
 	journalPath := filepath.Join(dir, "runs", run.Acceptance.RunID, "events.ndjson")
-	if err := os.WriteFile(journalPath, []byte("{broken}\n"), 0600); err != nil {
+	validJournal, err := os.ReadFile(journalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupted := append(append(append([]byte{}, validJournal...), []byte("{broken}\n")...), validJournal...)
+	if err := os.WriteFile(journalPath, corrupted, 0600); err != nil {
 		t.Fatal(err)
 	}
 	recoveredWorkspace, err := workspace.Open(dir)
@@ -142,8 +148,63 @@ func TestRecoveryUsesValidReportEvenWhenJournalIsCorrupt(t *testing.T) {
 	if got.Report == nil || got.Report.RunID != value.RunID || got.RecoveryError != "JOURNAL_RECORD_CORRUPT" {
 		t.Fatalf("valid report was not retained with journal diagnosis: report=%+v recovery=%q", got.Report, got.RecoveryError)
 	}
+	corruptJournal, err := os.ReadFile(journalPath)
+	if err != nil || string(corruptJournal) != string(corrupted) {
+		t.Fatalf("corrupt journal was modified during recovery: contents=%q err=%v", corruptJournal, err)
+	}
 	if _, _, err := recovered.LookupIdempotency("valid-report-corrupt-journal"); err != nil {
 		t.Fatalf("idempotency lookup should retain accepted Run: %v", err)
+	}
+	if _, ok, err := recovered.EnqueueNext(); err != nil || ok {
+		t.Fatalf("valid archived Run with corrupt journal was requeued: dispatched=%v err=%v", ok, err)
+	}
+}
+
+func TestRecoveryRejectsCorruptJournalWithoutValidReportAndPreservesIt(t *testing.T) {
+	dir, ws, lease, store, p, cfg := newHarness(t)
+	run, _, err := store.Accept(runstore.Request{IdempotencyKey: "corrupt-without-report", Plan: p, Config: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ExecutionStarted(context.Background(), run.Acceptance.RunID, "node-a", "STANDARD"); err != nil {
+		t.Fatal(err)
+	}
+	if err := lease.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.Close(); err != nil {
+		t.Fatal(err)
+	}
+	journalPath := filepath.Join(dir, "runs", run.Acceptance.RunID, "events.ndjson")
+	validJournal, err := os.ReadFile(journalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupted := append(append(append([]byte{}, validJournal...), []byte("{broken}\n")...), validJournal...)
+	if err := os.WriteFile(journalPath, corrupted, 0600); err != nil {
+		t.Fatal(err)
+	}
+	ws, err = workspace.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	lease, err = ws.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	recovered, err := runstore.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := recovered.Get(run.Acceptance.RunID)
+	if err != nil || got.Report != nil || got.RecoveryError != "RUN_STORAGE_ERROR" {
+		t.Fatalf("corrupt journal without a valid report did not remain unavailable: run=%+v err=%v", got, err)
+	}
+	contents, err := os.ReadFile(journalPath)
+	if err != nil || string(contents) != string(corrupted) {
+		t.Fatalf("corrupt journal was changed during failed recovery: contents=%q err=%v", contents, err)
 	}
 }
 
@@ -249,6 +310,65 @@ func TestCrashRecoveryArchivesAcceptedRunWithoutRerun(t *testing.T) {
 		}
 	}
 	t.Fatal("recovery lost the durable execution marker")
+}
+
+func TestCrashRecoveryMarksAndTruncatesIncompleteJournalTail(t *testing.T) {
+	dir, ws, lease, store, p, cfg := newHarness(t)
+	run, _, err := store.Accept(runstore.Request{IdempotencyKey: "incomplete-tail", Plan: p, Config: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ExecutionStarted(context.Background(), run.Acceptance.RunID, "node-a", "STANDARD"); err != nil {
+		t.Fatal(err)
+	}
+	if err := lease.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.Close(); err != nil {
+		t.Fatal(err)
+	}
+	journalPath := filepath.Join(dir, "runs", run.Acceptance.RunID, "events.ndjson")
+	journal, err := os.OpenFile(journalPath, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := journal.WriteString(`{"sequence":`); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ws, err = workspace.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	lease, err = ws.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	recovered, err := runstore.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := recovered.Get(run.Acceptance.RunID)
+	if err != nil || got.Report == nil || got.RecoveryWarning != "JOURNAL_TAIL_RECOVERED" {
+		t.Fatalf("incomplete journal tail recovery missing warning/report: run=%+v err=%v", got, err)
+	}
+	if _, ok, err := recovered.EnqueueNext(); err != nil || ok {
+		t.Fatalf("accepted run with a recovered journal tail was requeued: dispatched=%v err=%v", ok, err)
+	}
+	contents, err := os.ReadFile(journalPath)
+	lines := strings.Split(strings.TrimSpace(string(contents)), "\n")
+	if err != nil || len(lines) < 2 {
+		t.Fatalf("recovered journal lost its valid records: contents=%q err=%v", contents, err)
+	}
+	for _, line := range lines {
+		if !json.Valid([]byte(line)) {
+			t.Fatalf("incomplete journal tail remains after recovery: %q", line)
+		}
+	}
 }
 
 func TestCrashRecoveryRetainsCleanupHostIdentityWithoutOwnerToken(t *testing.T) {

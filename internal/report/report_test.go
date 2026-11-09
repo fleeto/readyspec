@@ -1,6 +1,7 @@
 package report_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -43,6 +44,20 @@ func TestValidateRunReportRequiresValidSchemaAndCleanupAudit(t *testing.T) {
 	value.CleanupItems[0].AuditReason = "operator confirmed no cleanup needed"
 	if err := report.Validate(value); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLegacyReportWithoutDiagnosticsRemainsReadable(t *testing.T) {
+	legacyJSON, err := json.Marshal(validReport())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded report.RunReport
+	if err := json.Unmarshal(legacyJSON, &decoded); err != nil {
+		t.Fatalf("legacy report decoding failed: %v", err)
+	}
+	if err := report.Validate(decoded); err != nil {
+		t.Fatalf("legacy report without optional diagnostics failed validation: %v", err)
 	}
 }
 
