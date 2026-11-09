@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import { RunPreview } from './RunPreview'
 import { newPlan } from './model'
@@ -226,6 +226,7 @@ test('SSE reconnect resumes from its cursor and reset replaces the old projectio
   fireEvent.click(await screen.findByRole('button', { name: '接受并执行任务' }))
 
   expect(await screen.findByText(/PREPARING · 尝试 1/)).toBeInTheDocument()
+  await waitFor(() => expect(eventRequests).toHaveLength(2))
   expect(await screen.findByText(/COMPLETED \/ UNKNOWN/)).toBeInTheDocument()
   expect(screen.queryByText(/PREPARING · 尝试 1/)).not.toBeInTheDocument()
   expect(eventRequests).toHaveLength(2)
