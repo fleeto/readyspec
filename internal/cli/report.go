@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/fleeto/readyspec/internal/publicview"
 	"github.com/fleeto/readyspec/internal/runstore"
 	"github.com/fleeto/readyspec/internal/workspace"
 	"github.com/spf13/cobra"
@@ -48,7 +49,11 @@ func newReportCommand(workspacePath func() string, setExitCode func(int)) *cobra
 			defer closeStore()
 			runs := store.List()
 			if jsonOutput {
-				return json.NewEncoder(cmd.OutOrStdout()).Encode(runs)
+				publicRuns := make([]publicview.Run, 0, len(runs))
+				for _, run := range runs {
+					publicRuns = append(publicRuns, publicview.RunValue(run))
+				}
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(publicRuns)
 			}
 			for _, run := range runs {
 				verdict := "-"
@@ -87,7 +92,7 @@ func newReportCommand(workspacePath func() string, setExitCode func(int)) *cobra
 				setExitCode(13)
 				return fmt.Errorf("RUN_REPORT_NOT_READY")
 			}
-			return json.NewEncoder(cmd.OutOrStdout()).Encode(run.Report)
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(publicview.RunValue(*run).Report)
 		},
 	}
 	command.AddCommand(list, show)
@@ -124,13 +129,13 @@ func newReportCommand(workspacePath func() string, setExitCode func(int)) *cobra
 		}
 		if run.Report == nil {
 			setExitCode(13)
+			if run.RecoveryError != "" {
+				return fmt.Errorf("RUN_STORAGE_ERROR")
+			}
 			return fmt.Errorf("RUN_REPORT_NOT_READY")
 		}
-		copy := *run.Report
-		for i := range copy.CleanupItems {
-			copy.CleanupItems[i].OwnerToken = ""
-		}
-		raw, err := json.MarshalIndent(copy, "", "  ")
+		publicReport := publicview.RunValue(*run).Report
+		raw, err := json.MarshalIndent(publicReport, "", "  ")
 		if err != nil {
 			return err
 		}

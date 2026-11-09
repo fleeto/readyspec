@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fleeto/readyspec/internal/diagnostic"
+
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -73,10 +75,51 @@ func TestAgentMissingSelectedKeyIsAuthenticationFailure(t *testing.T) {
 			if err == nil || classifySSHConnectFailure(err) != FailureAuth {
 				t.Fatalf("missing selected key must be AUTH_ERROR, got %v", err)
 			}
+			failure := connectFailure(err, "host")
+			if failure.Diagnostics[0].Code != "AGENT_SELECTED_KEY_MISSING" {
+				t.Fatalf("missing selected identity diagnostic=%+v", failure.Diagnostics)
+			}
 			<-done
 		})
 	}
 }
+
+func TestRuntimeDiagnosticRegistryNeverEchoesUnknownCause(t *testing.T) {
+	item := diagnostic.ForCode("SOME_PRIVATE_REMOTE_ERROR", "node-a")
+	if item.Code != "DIAGNOSTIC_UNCLASSIFIED" || item.Category != "EXECUTION_ERROR" || strings.Contains(item.Message, "SOME_PRIVATE") {
+		t.Fatalf("unknown cause was not conservative: %+v", item)
+	}
+}
+
+func TestConnectFailureClassificationUsesTypedCauses(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		cause error
+		code  string
+		class FailureClass
+	}{
+		{name: "DNS", cause: &net.DNSError{Err: "no such host", Name: "target.invalid"}, code: "DNS_LOOKUP_FAILED", class: FailureNetwork},
+		{name: "timeout", cause: &net.OpError{Op: "dial", Net: "tcp", Err: timeoutError{}}, code: "TCP_CONNECT_TIMEOUT", class: FailureNetwork},
+		{name: "unknown is conservative", cause: errors.New("private transport detail"), code: "SSH_HANDSHAKE_UNVERIFIABLE", class: FailureNetwork},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := classifiedConnectError(test.cause, test.code, test.class)
+			failure := connectFailure(err, "node-a")
+			if failure.Class != test.class || len(failure.Diagnostics) != 1 || failure.Diagnostics[0].Code != test.code || failure.Diagnostics[0].HostID != "node-a" {
+				t.Fatalf("typed diagnostic mismatch: %+v", failure)
+			}
+			if strings.Contains(failure.Message, "private transport detail") {
+				t.Fatal("raw cause leaked into failure")
+			}
+		})
+	}
+}
+
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return true }
 
 func loopbackSSHClient(t *testing.T, handle func(ssh.Channel, <-chan *ssh.Request, string)) *ssh.Client {
 	t.Helper()
@@ -159,6 +202,23 @@ func TestRunSSHRejectsRemoteOutputBeyondLimit(t *testing.T) {
 	_, err := runSSH(context.Background(), client, "large-output", nil)
 	if err == nil || !errors.Is(err, errOutputLimit) {
 		t.Fatalf("runSSH error=%v, want output limit error", err)
+	}
+}
+
+func TestRunSSHDoesNotExposeRemoteStderrInError(t *testing.T) {
+	const secret = "stderr-secret-fixture"
+	client := loopbackSSHClient(t, func(channel ssh.Channel, _ <-chan *ssh.Request, _ string) {
+		_, _ = channel.Stderr().Write([]byte(secret))
+		_, _ = channel.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{42}))
+		_ = channel.Close()
+	})
+	_, err := runSSH(context.Background(), client, "safe-command-label", nil)
+	if err == nil || strings.Contains(err.Error(), secret) {
+		t.Fatalf("remote stderr leaked through error: %v", err)
+	}
+	var exitError *ssh.ExitError
+	if !errors.As(err, &exitError) || exitError.ExitStatus() != 42 {
+		t.Fatalf("typed error must preserve exit status for classification: %v", err)
 	}
 }
 

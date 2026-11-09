@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -15,10 +16,12 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/fleeto/readyspec/internal/executor"
+	"github.com/fleeto/readyspec/internal/oplog"
 	"github.com/fleeto/readyspec/internal/runmanager"
 	"github.com/fleeto/readyspec/internal/runstore"
 	"github.com/fleeto/readyspec/internal/webui"
@@ -29,11 +32,30 @@ var errAuth = errors.New("AUTH_ERROR")
 
 type serveOptions struct {
 	listen, workspace, token, cert, key string
+	logLevel, logFormat                 string
+	logFile                             string
 	allowedHosts                        []string
 	noBrowser                           bool
 }
 
 func serve(ctx context.Context, options serveOptions, explicitAddress bool, out io.Writer) error {
+	logger, logFile, err := oplog.Configure(oplog.Config{Level: options.logLevel, Format: options.logFormat, File: options.logFile}, os.Stderr)
+	if err != nil {
+		return err
+	}
+	var shutdownDeadline time.Time
+	var deadlineMu sync.Mutex
+	if logFile != nil {
+		defer func() {
+			deadlineMu.Lock()
+			deadline := shutdownDeadline
+			deadlineMu.Unlock()
+			if err := closeLogFileBounded(logFile, deadline); err != nil {
+				_, _ = io.WriteString(os.Stderr, "ReadySpec: operational log flush failed\n")
+			}
+		}()
+	}
+	slog.SetDefault(logger)
 	if (options.cert == "") != (options.key == "") {
 		return fmt.Errorf("both --tls-cert and --tls-key are required for HTTPS")
 	}
@@ -56,12 +78,21 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 	if err != nil {
 		return fmt.Errorf("open workspace: %w", err)
 	}
-	defer store.Close()
+	closeWorkspace := true
+	defer func() {
+		if closeWorkspace {
+			_ = store.Close()
+		}
+	}()
 	lease, err := store.TryLock()
 	if err != nil {
 		return err
 	}
-	defer lease.Close()
+	defer func() {
+		if closeWorkspace {
+			_ = lease.Close()
+		}
+	}()
 	runs, err := runstore.Open(store)
 	if err != nil {
 		return fmt.Errorf("recover Run store: %w", err)
@@ -107,23 +138,41 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		}
 	}()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 32 * 1024}
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	signalCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	ctx, cancel := context.WithCancel(signalCtx)
+	defer cancel()
 	done := make(chan struct{})
 	shutdownComplete := make(chan struct{})
+	shutdownStarted := make(chan time.Time, 1)
 	workerDone := make(chan struct{})
+	workerFailure := make(chan error, 1)
 	defer close(done)
 	go func() {
 		defer close(workerDone)
-		if err := manager.Run(ctx); err != nil {
-			fmt.Fprintln(os.Stderr, "Run manager stopped after a storage or execution error")
+		runErr := manager.Run(ctx)
+		if runErr != nil && ctx.Err() == nil {
+			handler.StopAcceptingRuns()
+			logger.Error("worker stopped", "event", "worker.stopped", "reason_code", "RUN_WORKER_STOPPED")
+			workerFailure <- fmt.Errorf("Run manager stopped after a storage or execution error")
+			cancel()
+		} else if runErr == nil && ctx.Err() == nil {
+			handler.StopAcceptingRuns()
+			logger.Error("worker stopped", "event", "worker.stopped", "reason_code", "RUN_WORKER_STOPPED")
+			workerFailure <- fmt.Errorf("Run manager stopped unexpectedly")
+			cancel()
 		}
 	}()
 	go func() {
 		defer close(shutdownComplete)
 		select {
 		case <-ctx.Done():
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			deadline := time.Now().Add(5 * time.Second)
+			deadlineMu.Lock()
+			shutdownDeadline = deadline
+			deadlineMu.Unlock()
+			shutdownStarted <- deadline
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), boundedDuration(time.Until(deadline), 3*time.Second))
 			defer cancel()
 			if err := server.Shutdown(shutdownCtx); err != nil {
 				_ = server.Close()
@@ -140,6 +189,7 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		scheme = "https"
 	}
 	url := scheme + "://" + net.JoinHostPort(host, port) + "/"
+	logger.Info("service started", "event", "service.started", "version", Version, "listen_port", port, "backend", "native_ssh", "worker_state", "running")
 	if generatedToken {
 		url += "#token=" + token
 	}
@@ -156,11 +206,82 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		err = server.Serve(listener)
 	}
 	if errors.Is(err, http.ErrServerClosed) {
+		deadline := <-shutdownStarted
 		<-shutdownComplete
-		<-workerDone
-		return nil
+		if !waitUntil(workerDone, deadline, 4*time.Second) {
+			closeWorkspace = false
+			return fmt.Errorf("Run worker did not stop within shutdown budget")
+		}
+		select {
+		case failure := <-workerFailure:
+			logger.Info("service stopped", "event", "service.stopped")
+			return failure
+		default:
+			logger.Info("service stopped", "event", "service.stopped")
+			return nil
+		}
+	}
+	handler.StopAcceptingRuns()
+	cancel()
+	_ = server.Close()
+	deadline := <-shutdownStarted
+	<-shutdownComplete
+	if !waitUntil(workerDone, deadline, 4*time.Second) {
+		closeWorkspace = false
+		return fmt.Errorf("Run worker did not stop after HTTP listener failure")
 	}
 	return err
+}
+
+func boundedDuration(remaining, maximum time.Duration) time.Duration {
+	if remaining <= 0 {
+		return time.Nanosecond
+	}
+	if remaining < maximum {
+		return remaining
+	}
+	return maximum
+}
+
+func waitUntil(done <-chan struct{}, deadline time.Time, maximum time.Duration) bool {
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return false
+	}
+	if maximum > 0 && remaining > maximum {
+		remaining = maximum
+	}
+	timer := time.NewTimer(remaining)
+	defer timer.Stop()
+	select {
+	case <-done:
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
+func closeLogFileBounded(closer io.Closer, deadline time.Time) error {
+	budget := time.Second
+	if !deadline.IsZero() {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return fmt.Errorf("LOG_FLUSH_TIMEOUT")
+		}
+		if remaining < budget {
+			budget = remaining
+		}
+	}
+	done := make(chan error, 1)
+	go func() { done <- closer.Close() }()
+	timer := time.NewTimer(budget)
+	defer timer.Stop()
+	select {
+	case err := <-done:
+		return err
+	case <-timer.C:
+		return fmt.Errorf("LOG_FLUSH_TIMEOUT")
+	}
 }
 
 type serverInstance struct {

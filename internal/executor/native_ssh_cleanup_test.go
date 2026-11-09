@@ -86,7 +86,7 @@ func startCleanupSSHFixture(t *testing.T, activeProcesses bool) (*cleanupSSHFixt
 					_ = request.Reply(true, nil)
 					switch {
 					case strings.Contains(payload.Command, "printf 'UID='"):
-						_, _ = channel.Write([]byte("UID=0\nARCH=x86_64\nMACHINE=machine-cleanup\nBOOT=boot-cleanup\nCHECKSUM=/usr/bin/sha256sum\n"))
+						_, _ = channel.Write([]byte("UID=0\nARCH=x86_64\nMACHINE=machine-cleanup\nBOOT=dddddddd-dddd-4ddd-8ddd-dddddddddddd\nCHECKSUM=/usr/bin/sha256sum\n"))
 					case strings.Contains(payload.Command, "for p in /proc/[0-9]*") && activeProcesses:
 						_, _ = channel.Write([]byte("4242\n"))
 					case strings.Contains(payload.Command, "if test -e "):
@@ -118,7 +118,7 @@ func startCleanupSSHFixture(t *testing.T, activeProcesses bool) (*cleanupSSHFixt
 	native.KnownHostsPath = knownHosts
 	credential := Credential{Method: "private_key", Signer: clientSigner}
 	host := HostInput{Inventory: inventory.Host{ID: "cleanup-host", Address: "127.0.0.1", Port: address.Port, Username: "cleanup"}, AuthMethod: "private_key", PublicKeyFingerprint: ssh.FingerprintSHA256(clientSigner.PublicKey())}
-	item := report.CleanupItem{CleanupID: "run-cleanup", HostID: host.Inventory.ID, MachineID: "machine-cleanup", BootID: "boot-cleanup", Status: "PENDING", RemotePath: "/tmp/readyspec-cleanup-owner", OwnerToken: "0123456789abcdef0123456789abcdef"}
+	item := report.CleanupItem{CleanupID: "run-cleanup", HostID: host.Inventory.ID, MachineID: "machine-cleanup", BootID: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", Status: "PENDING", RemotePath: "/tmp/readyspec-cleanup-owner", OwnerToken: "0123456789abcdef0123456789abcdef"}
 	return fixture, native, credential, host, item, ssh.FingerprintSHA256(hostSigner.PublicKey())
 }
 

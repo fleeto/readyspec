@@ -1,6 +1,7 @@
 package topology_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/fleeto/readyspec/internal/plan"
@@ -60,6 +61,21 @@ func TestVerdictFailurePrecedenceAndReadinessRequirements(t *testing.T) {
 				t.Fatalf("Verdict()=%q want=%q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestVerdictWithReasonsKeepsVerdictOrderingAndReportsMultipleCauses(t *testing.T) {
+	input := topology.VerdictInput{
+		PlanState: "DRAFT", Mode: "TRIAL", Scope: "PARTIAL", Executor: "mock_simulator", Status: "FAILED",
+		Required: []string{"FAIL", "ERROR"}, Topology: []string{"FAIL", "ERROR"},
+	}
+	verdict, reasons := topology.VerdictWithReasons(input)
+	if verdict != "NOT_READY" {
+		t.Fatalf("verdict changed: %q", verdict)
+	}
+	want := []string{"REQUIRED_CHECK_FAILED", "TOPOLOGY_FAILED", "REQUIRED_EVIDENCE_ERROR", "TOPOLOGY_EVIDENCE_ERROR", "TRIAL_NOT_GATE", "PARTIAL_SCOPE", "SIMULATOR_BACKEND", "RUN_NOT_COMPLETED", "PLAN_NOT_RELEASED"}
+	if !reflect.DeepEqual(reasons, want) {
+		t.Fatalf("reasons=%v want=%v", reasons, want)
 	}
 }
 

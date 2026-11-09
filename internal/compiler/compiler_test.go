@@ -59,7 +59,7 @@ func TestPathChecksRoundTripThroughOfficialGoss(t *testing.T) {
 		t.Fatalf("results=%+v err=%v", results, err)
 	}
 	results, err = compiler.Normalize(artifact, []byte(`{"results":[]}`))
-	if err != nil || results[0].Status != "ERROR" {
+	if err != nil || results[0].Status != "ERROR" || len(results[0].Evidence) == 0 || len(results[0].Evidence[0].Diagnostics) == 0 || results[0].Evidence[0].Diagnostics[0].Code != "RESULT_RESOURCE_MISSING" {
 		t.Fatalf("missing evidence passed: %+v %v", results, err)
 	}
 	artifact.Config = json.RawMessage(`{}`)

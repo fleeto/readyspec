@@ -25,6 +25,9 @@ test('report details show parameter source categories without parameter values',
         { status: 200 },
       )
     }
+    if (path.endsWith('/runs/run-1')) {
+      return new Response(JSON.stringify({ run: { status: 'COMPLETED' }, sequence: 1, stage_transitions: [] }), { status: 200 })
+    }
     return new Response(
       JSON.stringify({
         run_id: 'run-1',
@@ -82,7 +85,7 @@ test('report details show parameter source categories without parameter values',
       'node-a · IGNORED · /tmp/readyspec-run · operator verified no cleanup was needed',
     ),
   ).toBeInTheDocument()
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
 })
 
 test('report warns about verified UID zero independently of the login name', async () => {
@@ -105,6 +108,8 @@ test('report warns about verified UID zero independently of the login name', asy
           JSON.stringify(
             String(input).endsWith('/runs')
               ? { items: [run] }
+              : String(input).endsWith('/runs/root-run')
+                ? { run: { status: 'COMPLETED' }, sequence: 1, stage_transitions: [] }
               : {
                   ...run,
                   run_status: 'COMPLETED',

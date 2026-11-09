@@ -106,19 +106,70 @@ type VerdictInput struct {
 }
 
 func Verdict(input VerdictInput) string {
+	verdict, _ := VerdictWithReasons(input)
+	return verdict
+}
+
+// VerdictWithReasons applies the same verdict ordering while returning every
+// stable domain reason that contributed to a non-READY result.
+func VerdictWithReasons(input VerdictInput) (string, []string) {
 	states := append(append([]string{}, input.Required...), input.Topology...)
+	reasons := []string{}
+	requiredFail, requiredError := false, false
+	topologyFail, topologyError := false, false
+	for _, state := range input.Required {
+		requiredFail = requiredFail || state == "FAIL"
+		requiredError = requiredError || state != "PASS" && state != "FAIL"
+	}
+	for _, state := range input.Topology {
+		topologyFail = topologyFail || state == "FAIL"
+		topologyError = topologyError || state != "PASS" && state != "FAIL"
+	}
+	if requiredFail {
+		reasons = append(reasons, "REQUIRED_CHECK_FAILED")
+	}
+	if topologyFail {
+		reasons = append(reasons, "TOPOLOGY_FAILED")
+	}
+	if requiredError {
+		reasons = append(reasons, "REQUIRED_EVIDENCE_ERROR")
+	}
+	if topologyError {
+		reasons = append(reasons, "TOPOLOGY_EVIDENCE_ERROR")
+	}
+	if input.Mode != "GATE" {
+		reasons = append(reasons, "TRIAL_NOT_GATE")
+	}
+	if input.Scope != "FULL" {
+		reasons = append(reasons, "PARTIAL_SCOPE")
+	}
+	if input.Executor != "native_ssh" {
+		reasons = append(reasons, "SIMULATOR_BACKEND")
+	}
+	if input.Status != "COMPLETED" {
+		reasons = append(reasons, "RUN_NOT_COMPLETED")
+	}
+	if input.PlanState != "RELEASED" {
+		reasons = append(reasons, "PLAN_NOT_RELEASED")
+	}
+	if len(input.Required) == 0 {
+		reasons = append(reasons, "NO_REQUIRED_CHECKS")
+	}
+	if len(input.Topology) == 0 {
+		reasons = append(reasons, "NO_TOPOLOGY_RESULTS")
+	}
 	for _, state := range states {
 		if state == "FAIL" {
-			return "NOT_READY"
+			return "NOT_READY", reasons
 		}
 	}
 	if input.PlanState != "RELEASED" || input.Mode != "GATE" || input.Scope != "FULL" || input.Executor != "native_ssh" || input.Status != "COMPLETED" || len(input.Required) == 0 || len(input.Topology) == 0 {
-		return "UNKNOWN"
+		return "UNKNOWN", reasons
 	}
 	for _, state := range states {
 		if state != "PASS" {
-			return "UNKNOWN"
+			return "UNKNOWN", reasons
 		}
 	}
-	return "READY"
+	return "READY", []string{}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/fleeto/readyspec/internal/compiler"
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/inventory"
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/preview"
@@ -58,9 +59,10 @@ type PreflightResult struct {
 }
 
 type Failure struct {
-	Class   FailureClass
-	Phase   string
-	Message string
+	Class       FailureClass
+	Phase       string
+	Message     string
+	Diagnostics []diagnostic.Item
 }
 
 type ExecuteRequest struct {

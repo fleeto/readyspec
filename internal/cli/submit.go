@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -13,9 +14,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/executor"
 	"github.com/fleeto/readyspec/internal/inventory"
 	"github.com/fleeto/readyspec/internal/plan"
@@ -31,6 +34,7 @@ import (
 func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra.Command {
 	var planFile, inventoryInput, inventoryFormat, overridesFile string
 	var expectedDigest, reportOutput string
+	var idempotencyKey string
 	var noWait bool
 	var lockWait time.Duration
 	var mode, scope, backend, authMethod, keyFile, keyFingerprint, profileFile string
@@ -209,6 +213,11 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 				setExitCode(13)
 				return err
 			}
+			requestKey, keyErr := requestKey(idempotencyKey)
+			if keyErr != nil {
+				setExitCode(12)
+				return keyErr
+			}
 			ws, err := workspace.Open(workspaceDir)
 			if err != nil {
 				setExitCode(13)
@@ -225,12 +234,12 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 						sudoPasswordHandoff = credential.SudoPassword
 						break
 					}
-					payload, payloadErr := delegatedSubmission(p, config, source, format, requestKey(), credentials, passwordHandoff, sudoPasswordHandoff, privateKeyHandoff, privateKeyPassphrase, simulator)
+					payload, payloadErr := delegatedSubmission(p, config, source, format, requestKey, credentials, passwordHandoff, sudoPasswordHandoff, privateKeyHandoff, privateKeyPassphrase, simulator)
 					if payloadErr != nil {
 						setExitCode(15)
 						return payloadErr
 					}
-					finished, delegateErr := delegateRun(cmd.Context(), ws, payload)
+					finished, delegateErr := delegateRun(cmd.Context(), ws, payload, cmd.ErrOrStderr())
 					for i := range payload {
 						payload[i] = 0
 					}
@@ -291,9 +300,21 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 				PlanDigest: p.Digest, Mode: mode, Scope: scope, Backend: backend,
 				Inventory: hosts, RoleMap: roleMap, Overrides: overrides, Auth: auth, Simulator: simulator,
 			}
-			request := runstore.Request{IdempotencyKey: requestKey(), Plan: p, Config: config}
+			submissionID, idErr := diagnostic.NewID()
+			if idErr != nil {
+				setExitCode(13)
+				return fmt.Errorf("INFRA_ERROR: cannot create submission diagnostic ID")
+			}
+			request := runstore.Request{IdempotencyKey: requestKey, SubmissionID: submissionID, Plan: p, Config: config}
 			run, created, err := manager.Submit(request, credentials)
 			if err != nil {
+				var diagnosticErr *diagnostic.Error
+				if errors.As(err, &diagnosticErr) {
+					item := diagnostic.ForCode(diagnosticErr.Code, diagnosticErr.HostID)
+					_ = json.NewEncoder(cmd.ErrOrStderr()).Encode(map[string]any{"submission_id": submissionID, "acceptance": "rejected", "error": item.Category, "diagnostics": []diagnostic.Item{item}})
+				} else {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Submission ID %s; acceptance=rejected\n", submissionID)
+				}
 				if strings.Contains(err.Error(), "PLAN_DIGEST_MISMATCH") || strings.Contains(err.Error(), "RUN_IDEMPOTENCY_CONFLICT") {
 					setExitCode(15)
 				} else if strings.Contains(err.Error(), "AUTH_ERROR") {
@@ -307,6 +328,10 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 				}
 				return err
 			}
+			if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "Accepted Run %s\n", run.Acceptance.RunID); err != nil {
+				setExitCode(13)
+				return fmt.Errorf("INFRA_ERROR: cannot report accepted Run ID")
+			}
 			if created {
 				if _, err := manager.ProcessNext(cmd.Context()); err != nil {
 					setExitCode(13)
@@ -317,6 +342,15 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 			if err != nil || finished.Report == nil {
 				setExitCode(13)
 				return fmt.Errorf("INFRA_ERROR: valid RunReport is unavailable")
+			}
+			for _, event := range finished.Events {
+				if event.Kind != "PHASE" || event.HostID == "" || event.Status == "" {
+					continue
+				}
+				if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "[%s] %s %s\n", strconv.QuoteToASCII(event.HostID), event.Status, strconv.QuoteToASCII(event.Mode)); err != nil {
+					setExitCode(13)
+					return fmt.Errorf("INFRA_ERROR: cannot write Run progress")
+				}
 			}
 			if err := emitReport(cmd.OutOrStdout(), reportOutput, finished.Report); err != nil {
 				setExitCode(13)
@@ -341,6 +375,7 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 	command.Flags().StringVar(&profileFile, "profiles", "", "Explicit simulator profile JSON")
 	command.Flags().StringVar(&expectedDigest, "expected-plan-digest", "", "Require this exact validated Plan digest")
 	command.Flags().StringVar(&reportOutput, "report-out", "", "Write the authoritative JSON report to a new file")
+	command.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "Stable key for safely recovering an uncertain submission (not logged)")
 	command.Flags().BoolVar(&noWait, "no-wait", false, "Do not wait for a short-lived workspace lock owner")
 	command.Flags().DurationVar(&lockWait, "lock-wait", 5*time.Second, "Maximum wait for a short-lived workspace lock owner")
 	_ = command.MarkFlagRequired("plan")
@@ -400,11 +435,23 @@ func parseRoleFlags(flags []string) (map[string][]string, error) {
 
 func randomRunKey() string { return rand.Text() }
 
-func requestKey() string {
-	if value := strings.TrimSpace(os.Getenv("READYSPEC_IDEMPOTENCY_KEY")); value != "" {
-		return "cli-" + value
+func requestKey(flagValue string) (string, error) {
+	value := strings.TrimSpace(flagValue)
+	if value == "" {
+		value = strings.TrimSpace(os.Getenv("READYSPEC_IDEMPOTENCY_KEY"))
 	}
-	return "cli-" + randomRunKey()
+	if value == "" {
+		return "cli-" + randomRunKey(), nil
+	}
+	if len(value) > 124 {
+		return "", fmt.Errorf("PLAN_ERROR: idempotency key must be at most 124 bytes")
+	}
+	for _, char := range value {
+		if char < 0x21 || char > 0x7e {
+			return "", fmt.Errorf("PLAN_ERROR: idempotency key must contain printable ASCII without spaces")
+		}
+	}
+	return "cli-" + value, nil
 }
 
 func delegatedExitCode(err error) int {
@@ -490,7 +537,7 @@ func delegatedSubmission(p *plan.Plan, config runstore.RunConfig, inventorySourc
 	return encoded, nil
 }
 
-func delegateRun(ctx context.Context, ws *workspace.Store, body []byte) (*report.RunReport, error) {
+func delegateRun(ctx context.Context, ws *workspace.Store, body []byte, stderr io.Writer) (*report.RunReport, error) {
 	var instance serverInstance
 	if err := ws.ReadJSON("runtime/server.json", &instance); err != nil || instance.ServerID == "" || instance.LocalToken == "" {
 		return nil, fmt.Errorf("WORKSPACE_BUSY: no verifiable ReadySpec service owns the workspace")
@@ -572,8 +619,61 @@ func delegateRun(ctx context.Context, ws *workspace.Store, body []byte) (*report
 			return nil, fmt.Errorf("INFRA_ERROR: delegated Run was not accepted")
 		}
 	}
+	if _, err := fmt.Fprintf(stderr, "Accepted Run %s\n", accepted.RunID); err != nil {
+		return nil, fmt.Errorf("INFRA_ERROR: cannot report accepted Run ID")
+	}
 	deadline := time.Now().Add(2 * time.Hour)
+	var cursor int64
+	seenTerminal := false
 	for time.Now().Before(deadline) {
+		if !seenTerminal {
+			response, streamErr := request(http.MethodGet, "/api/v1/runs/"+url.PathEscape(accepted.RunID)+"/events?after_seq="+strconv.FormatInt(cursor, 10), nil)
+			if streamErr == nil && response.StatusCode == http.StatusOK {
+				lastID := ""
+				var eventName, data string
+				scanner := bufio.NewScanner(io.LimitReader(response.Body, 32*1024*1024))
+				scanner.Buffer(make([]byte, 4096), 1024*1024)
+				for scanner.Scan() {
+					line := scanner.Text()
+					if line == "" {
+						if data != "" {
+							var payload map[string]any
+							_ = json.Unmarshal([]byte(data), &payload)
+							if eventName == "reset" {
+								if projection, ok := payload["sequence"].(float64); ok {
+									cursor = int64(projection)
+								}
+							} else if seq, err := strconv.ParseInt(lastID, 10, 64); err == nil && seq > cursor {
+								cursor = seq
+								fmt.Fprintf(stderr, "[%s] %s\n", eventName, safeProgressLabel(payload))
+							}
+							if eventName == "TERMINAL_ARCHIVED" {
+								seenTerminal = true
+							}
+							if eventName == "recovery_error" {
+								_ = response.Body.Close()
+								return nil, fmt.Errorf("INFRA_ERROR: accepted Run storage recovery failed")
+							}
+						}
+						lastID, eventName, data = "", "", ""
+						continue
+					}
+					if strings.HasPrefix(line, "id: ") {
+						lastID = strings.TrimPrefix(line, "id: ")
+					}
+					if strings.HasPrefix(line, "event: ") {
+						eventName = strings.TrimPrefix(line, "event: ")
+					}
+					if strings.HasPrefix(line, "data: ") {
+						data = strings.TrimPrefix(line, "data: ")
+					}
+				}
+				_ = scanner.Err()
+				_ = response.Body.Close()
+			} else if response != nil {
+				_ = response.Body.Close()
+			}
+		}
 		response, err := request(http.MethodGet, "/api/v1/runs/"+url.PathEscape(accepted.RunID)+"/report", nil)
 		if err != nil {
 			return nil, fmt.Errorf("INFRA_ERROR: accepted Run report could not be retrieved")
@@ -598,4 +698,14 @@ func delegateRun(ctx context.Context, ws *workspace.Store, body []byte) (*report
 		}
 	}
 	return nil, fmt.Errorf("INFRA_ERROR: delegated Run report deadline expired")
+}
+
+func safeProgressLabel(payload map[string]any) string {
+	parts := []string{}
+	for _, field := range []string{"host_id", "status", "phase", "mode"} {
+		if value, ok := payload[field].(string); ok && len(value) <= 128 {
+			parts = append(parts, field+"="+strconv.QuoteToASCII(value))
+		}
+	}
+	return strings.Join(parts, " ")
 }

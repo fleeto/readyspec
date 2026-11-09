@@ -80,6 +80,25 @@ func TestRejectsCrossOriginHostAndCSRFBypasses(t *testing.T) {
 	}
 }
 
+func TestEveryHTTPRejectionHasRequestID(t *testing.T) {
+	s := newServer(t)
+	r := httptest.NewRequest(http.MethodGet, "http://"+address+"/api/v1/plans", nil)
+	r.Host = "attacker.invalid:18480"
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	id := w.Header().Get("X-Request-ID")
+	if len(id) != 32 || w.Code != http.StatusForbidden {
+		t.Fatalf("missing request correlation header: id=%q status=%d", id, w.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["request_id"] != id {
+		t.Fatalf("response request_id=%v, header=%q", body["request_id"], id)
+	}
+}
+
 func TestLoopbackDelegationTokenIsBoundToLocalPeerAndServerIdentity(t *testing.T) {
 	_, ws := newServerWithStore(t)
 	server, err := webui.New(webui.Options{Address: address, Token: token, LocalToken: "local-delegation-secret-value-012345", ServerID: "instance-1", Store: ws, Version: "test"})
@@ -156,10 +175,54 @@ template_lock: {}
 		t.Fatalf("submit returned %d: %s", w.Code, w.Body.String())
 	}
 	var accepted struct {
-		RunID string `json:"run_id"`
+		RunID        string `json:"run_id"`
+		RequestID    string `json:"request_id"`
+		SubmissionID string `json:"submission_id"`
+		Acceptance   string `json:"acceptance"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &accepted); err != nil || accepted.RunID == "" {
 		t.Fatalf("invalid submit response: %v %s", err, w.Body.String())
+	}
+	if accepted.Acceptance != "accepted" || len(accepted.RequestID) != 32 || len(accepted.SubmissionID) != 32 || w.Header().Get("X-Request-ID") != accepted.RequestID {
+		t.Fatalf("submit response omitted correlation/acceptance metadata: %s", w.Body.String())
+	}
+	statusBody, _ := json.Marshal(map[string]string{"idempotency_key": "web-api-test"})
+	statusResponse := request(serverWithRuns, "POST", "/api/v1/runs/submission-status", string(statusBody), cookie, csrf)
+	var statusResult struct {
+		Acceptance string `json:"acceptance"`
+		RunID      string `json:"run_id"`
+	}
+	if statusResponse.Code != http.StatusOK || json.Unmarshal(statusResponse.Body.Bytes(), &statusResult) != nil || statusResult.Acceptance != "accepted" || statusResult.RunID != accepted.RunID {
+		t.Fatalf("submission recovery lookup failed: status=%d body=%s", statusResponse.Code, statusResponse.Body.String())
+	}
+	failureBody := map[string]any{
+		"plan": source, "inventory": map[string]string{"source": "node=127.0.0.1", "format": "quick"},
+		"role_map": map[string][]string{"app": {"node"}}, "field_overrides": []any{}, "run_mode": "TRIAL", "run_scope": "FULL",
+		"executor_backend": "native_ssh", "idempotency_key": "invalid-private-key", "auth_identity": map[string]string{"method": "private_key"},
+		"credentials": map[string]any{"node": map[string]string{"private_key": "not a private key"}},
+	}
+	failureJSON, err := json.Marshal(failureBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejected := request(serverWithRuns, "POST", "/api/v1/runs", string(failureJSON), cookie, csrf)
+	if rejected.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid credential returned %d: %s", rejected.Code, rejected.Body.String())
+	}
+	var rejectedBody struct {
+		Acceptance   string `json:"acceptance"`
+		RequestID    string `json:"request_id"`
+		SubmissionID string `json:"submission_id"`
+		Diagnostics  []struct {
+			Code   string `json:"code"`
+			HostID string `json:"host_id"`
+		} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal(rejected.Body.Bytes(), &rejectedBody); err != nil {
+		t.Fatal(err)
+	}
+	if rejectedBody.Acceptance != "rejected" || len(rejectedBody.RequestID) != 32 || len(rejectedBody.SubmissionID) != 32 || len(rejectedBody.Diagnostics) != 1 || rejectedBody.Diagnostics[0].Code != "PRIVATE_KEY_PARSE_FAILED" || rejectedBody.Diagnostics[0].HostID != "node" {
+		t.Fatalf("credential rejection lacks safe structured diagnosis: %s", rejected.Body.String())
 	}
 	rerunResponse := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/rerun-config", "", cookie, csrf)
 	if rerunResponse.Code != http.StatusOK {

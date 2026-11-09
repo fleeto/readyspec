@@ -17,6 +17,15 @@ interface RunSummary {
   verdict?: string
 }
 
+interface RunState {
+  run: RunSummary
+  sequence: number
+  host_phases: { sequence: number; host_id: string; phase: string; status?: string; attempt?: number; at?: string }[]
+  stage_transitions: { sequence: number; host_id: string; phase: string; status?: string; attempt?: number; started_at?: string; ended_at?: string }[]
+  recovery_error?: string
+  recovery_warning?: string
+}
+
 interface Evidence {
   resource: string
   property: string
@@ -80,6 +89,7 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
   const [runs, setRuns] = useState<RunSummary[]>([])
   const [selected, setSelected] = useState<RunSummary | null>(null)
   const [report, setReport] = useState<RunReport | null>(null)
+  const [runState, setRunState] = useState<RunState | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
@@ -118,10 +128,24 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
   async function openRun(run: RunSummary) {
     setSelected(run)
     setReport(null)
+    setRunState(null)
     setBusy(true)
     setError('')
     try {
-      setReport(await loadReport(run.run_id))
+      const state = await api.request<RunState>(`/runs/${encodeURIComponent(run.run_id)}`)
+      setRunState(state)
+      if (state.recovery_error) {
+        setError(`任务存储恢复异常：${state.recovery_error}`)
+        if (!state.run.verdict) return
+      }
+      if (state.recovery_warning) setError(`任务记录已恢复：${state.recovery_warning}`)
+      try {
+        setReport(await loadReport(run.run_id))
+      } catch (cause) {
+        if (!(cause instanceof ApiError) || cause.status !== 409) throw cause
+        // Accepted Runs may still be executing; their durable state and phases
+        // remain useful while the authoritative report is not ready.
+      }
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409)
         setError('归档报告暂不可读，请稍后刷新。')
@@ -309,6 +333,37 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
             )}
           </div>
           {busy && <Spinner />}
+          {runState && (
+            <>
+              <p>
+                当前状态：{runState.run.status} · 已记录阶段 {runState.sequence}
+              </p>
+              {runState.recovery_error && (
+                <Notice tone="danger">恢复诊断：{runState.recovery_error}</Notice>
+              )}
+              {runState.recovery_warning && (
+                <Notice tone="warning">恢复提示：{runState.recovery_warning}</Notice>
+              )}
+              {runState.stage_transitions.length > 0 && (
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr><th>主机</th><th>阶段</th><th>状态</th><th>开始</th><th>结束</th></tr>
+                    </thead>
+                    <tbody>
+                      {runState.stage_transitions.map((stage) => (
+                        <tr key={`${stage.sequence}/${stage.host_id}/${stage.phase}`}>
+                          <td>{stage.host_id}</td><td>{stage.phase}</td><td>{stage.status ?? '进行中/未知'}</td>
+                          <td>{stage.started_at ? formatTime(stage.started_at) : '未记录'}</td>
+                          <td>{stage.ended_at ? formatTime(stage.ended_at) : '进行中/未知'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
           {report && (
             <>
               <Notice

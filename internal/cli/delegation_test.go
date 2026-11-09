@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http/httptest"
 	"strings"
@@ -122,7 +123,7 @@ template_lock: {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := delegateRun(context.Background(), ws, body)
+	result, err := delegateRun(context.Background(), ws, body, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}

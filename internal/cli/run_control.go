@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fleeto/readyspec/internal/executor"
+	"github.com/fleeto/readyspec/internal/publicview"
 	"github.com/fleeto/readyspec/internal/runmanager"
 	"github.com/fleeto/readyspec/internal/workspace"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ func newRunControlCommands(workspacePath func() string, setExitCode func(int)) [
 			setExitCode(13)
 			return fmt.Errorf("RUN_NOT_FOUND")
 		}
-		return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{"run_id": run.Acceptance.RunID, "status": run.Status, "events": run.Events, "report": run.Report})
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(publicview.RunValue(*run))
 	}}
 	cancel := &cobra.Command{Use: "cancel <run-id>", Short: "Request Run cancellation", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		body := []byte(`{}`)

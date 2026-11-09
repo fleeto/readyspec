@@ -61,7 +61,7 @@
         "execution_mode": {"enum": ["STANDARD", "PRIVILEGED"]},
         "evidence_mode": {"type": "string"},
         "parameter_sources": {"type": "object", "additionalProperties": {"type": "string"}},
-        "evidence": {"type": "array", "items": {"type": "object"}}
+        "evidence": {"type": "array", "items": {"type": "object", "properties": {"diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}}}}}
       }
     },
     "host_result": {
@@ -105,7 +105,26 @@
         "code": {"type": "string", "minLength": 1},
         "phase": {"type": "string", "minLength": 1},
         "host_id": {"type": "string"},
-        "message": {"type": "string"}
+        "message": {"type": "string"},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}}
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["category", "code", "phase", "message", "retryable", "action"],
+      "properties": {
+        "category": {"type": "string", "minLength": 1},
+        "code": {"type": "string", "minLength": 1},
+        "phase": {"type": "string", "minLength": 1},
+        "host_id": {"type": "string"},
+        "role_id": {"type": "string"},
+        "item_id": {"type": "string"},
+        "resource": {"type": "string"},
+        "property": {"type": "string"},
+        "field": {"type": "string"},
+        "message": {"type": "string", "maxLength": 1024},
+        "retryable": {"type": "boolean"},
+        "action": {"type": "string", "minLength": 1}
       }
     }
   }

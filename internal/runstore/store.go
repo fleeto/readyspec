@@ -83,6 +83,8 @@ type RunConfig struct {
 
 type Request struct {
 	IdempotencyKey string
+	RequestID      string
+	SubmissionID   string
 	Plan           *plan.Plan
 	Config         RunConfig
 }
@@ -94,6 +96,8 @@ type Acceptance struct {
 	SemanticDigest string    `json:"semantic_digest"`
 	PlanDigest     string    `json:"plan_digest"`
 	AcceptedAt     time.Time `json:"accepted_at"`
+	RequestID      string    `json:"request_id,omitempty"`
+	SubmissionID   string    `json:"submission_id,omitempty"`
 	InitialStatus  string    `json:"initial_status"`
 	PlanPath       string    `json:"plan_path"`
 	ConfigPath     string    `json:"config_path"`
@@ -111,23 +115,25 @@ type Event struct {
 }
 
 type Run struct {
-	Acceptance    Acceptance        `json:"acceptance"`
-	Plan          *plan.Plan        `json:"plan"`
-	Config        RunConfig         `json:"config"`
-	Status        string            `json:"status"`
-	Events        []Event           `json:"events"`
-	Report        *report.RunReport `json:"report,omitempty"`
-	RecoveryError string            `json:"recovery_error,omitempty"`
-	finalizing    bool
+	Acceptance      Acceptance        `json:"acceptance"`
+	Plan            *plan.Plan        `json:"plan"`
+	Config          RunConfig         `json:"config"`
+	Status          string            `json:"status"`
+	Events          []Event           `json:"events"`
+	Report          *report.RunReport `json:"report,omitempty"`
+	RecoveryError   string            `json:"recovery_error,omitempty"`
+	RecoveryWarning string            `json:"recovery_warning,omitempty"`
+	finalizing      bool
 }
 
 type Store struct {
-	mu          sync.Mutex
-	workspace   *workspace.Store
-	runs        map[string]*Run
-	idempotency map[string]string
-	queue       []string
-	active      string
+	mu               sync.Mutex
+	workspace        *workspace.Store
+	runs             map[string]*Run
+	idempotency      map[string]string
+	queue            []string
+	active           string
+	recoveryRequired bool
 }
 
 func Open(ws *workspace.Store) (*Store, error) {
@@ -222,6 +228,9 @@ func (s *Store) Accept(req Request) (*Run, bool, error) {
 func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(), error)) (*Run, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.recoveryRequired {
+		return nil, false, fmt.Errorf("INFRA_ERROR: acceptance state requires recovery")
+	}
 	if req.Plan == nil || !validIdempotencyKey(req.IdempotencyKey) {
 		return nil, false, fmt.Errorf("PLAN_ERROR: invalid Run submission")
 	}
@@ -291,9 +300,11 @@ func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(),
 		IdempotencyKey: req.IdempotencyKey, SemanticDigest: digest,
 		PlanDigest: req.Config.PlanDigest,
 		AcceptedAt: time.Now().UTC(), InitialStatus: "PENDING",
+		RequestID: req.RequestID, SubmissionID: req.SubmissionID,
 		PlanPath: planPath, ConfigPath: configPath,
 	}
 	if err := s.workspace.WriteJSON(path.Join(base, acceptedName), accepted); err != nil {
+		s.recoveryRequired = true
 		return nil, false, fmt.Errorf("INFRA_ERROR: commit Run acceptance: %w", err)
 	}
 	committed = true
@@ -303,6 +314,47 @@ func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(),
 	s.queue = append(s.queue, id)
 	copy := cloneRun(run)
 	return &copy, true, nil
+}
+
+// LookupIdempotency returns the durable acceptance record for a key. A clean
+// scan with no record confirms rejection; any read failure leaves the result
+// unknown to the caller.
+func (s *Store) LookupIdempotency(key string) (Acceptance, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id, ok := s.idempotency[key]; ok {
+		if run := s.runs[id]; run != nil {
+			return run.Acceptance, true, nil
+		}
+	}
+	entries, err := s.workspace.ReadDir("runs")
+	if errors.Is(err, fs.ErrNotExist) {
+		s.recoveryRequired = false
+		return Acceptance{}, false, nil
+	}
+	if err != nil {
+		return Acceptance{}, false, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		var accepted Acceptance
+		if err := s.workspace.ReadJSON(path.Join("runs", entry.Name(), acceptedName), &accepted); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return Acceptance{}, false, err
+		}
+		if err := validateAcceptance(entry.Name(), accepted); err != nil {
+			return Acceptance{}, false, err
+		}
+		if accepted.IdempotencyKey == key {
+			return accepted, true, nil
+		}
+	}
+	s.recoveryRequired = false
+	return Acceptance{}, false, nil
 }
 
 func validateSubmission(p *plan.Plan, config RunConfig) error {
@@ -687,6 +739,9 @@ func (s *Store) ResolveCleanup(runID, cleanupID string, status, reason string) (
 }
 
 func (s *Store) appendLocked(run *Run, event Event) (Event, error) {
+	if run.RecoveryError != "" {
+		return Event{}, fmt.Errorf("INFRA_ERROR: Run journal is not writable after recovery failure")
+	}
 	event.Sequence = int64(len(run.Events) + 1)
 	event.At = time.Now().UTC()
 	if err := s.workspace.AppendJSONLine(path.Join("runs", run.Acceptance.RunID, journalName), event); err != nil {
@@ -701,23 +756,8 @@ func (s *Store) appendLocked(run *Run, event Event) (Event, error) {
 }
 
 func (s *Store) replay(run *Run) error {
-	raw, _, err := s.workspace.RecoverJSONLines(path.Join("runs", run.Acceptance.RunID, journalName))
-	if err != nil {
-		return fmt.Errorf("recover Run journal %s: %w", run.Acceptance.RunID, err)
-	}
-	for index, line := range raw {
-		var event Event
-		if err := json.Unmarshal(line, &event); err != nil || event.Sequence != int64(index+1) || event.Kind == "" || event.At.IsZero() || !validEvent(event) {
-			return fmt.Errorf("invalid Run journal record %s/%d", run.Acceptance.RunID, index+1)
-		}
-		run.Events = append(run.Events, event)
-		switch event.Kind {
-		case "STATE", "CANCEL_ACCEPTED", "TERMINAL_ARCHIVED", "ARCHIVE_RECOVERED":
-			run.Status = event.Status
-		}
-	}
 	var archived report.RunReport
-	err = s.workspace.ReadJSON(path.Join("runs", run.Acceptance.RunID, reportName), &archived)
+	err := s.workspace.ReadJSON(path.Join("runs", run.Acceptance.RunID, reportName), &archived)
 	if err == nil {
 		if archived.RunID != run.Acceptance.RunID || report.Validate(archived) != nil {
 			return fmt.Errorf("invalid committed RunReport for %s", run.Acceptance.RunID)
@@ -726,6 +766,33 @@ func (s *Store) replay(run *Run) error {
 		run.Status = archived.RunStatus
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("read committed RunReport %s: %w", run.Acceptance.RunID, err)
+	}
+
+	raw, truncated, err := s.workspace.RecoverJSONLines(path.Join("runs", run.Acceptance.RunID, journalName))
+	if err != nil {
+		if run.Report != nil {
+			run.RecoveryError = "JOURNAL_RECORD_CORRUPT"
+			return nil
+		}
+		return fmt.Errorf("recover Run journal %s: %w", run.Acceptance.RunID, err)
+	}
+	for index, line := range raw {
+		var event Event
+		if err := json.Unmarshal(line, &event); err != nil || event.Sequence != int64(index+1) || event.Kind == "" || event.At.IsZero() || !validEvent(event) {
+			if run.Report != nil {
+				run.RecoveryError = "JOURNAL_RECORD_CORRUPT"
+				return nil
+			}
+			return fmt.Errorf("invalid Run journal record %s/%d", run.Acceptance.RunID, index+1)
+		}
+		run.Events = append(run.Events, event)
+		switch event.Kind {
+		case "STATE", "CANCEL_ACCEPTED", "TERMINAL_ARCHIVED", "ARCHIVE_RECOVERED":
+			run.Status = event.Status
+		}
+	}
+	if truncated {
+		run.RecoveryWarning = "JOURNAL_TAIL_RECOVERED"
 	}
 	return nil
 }

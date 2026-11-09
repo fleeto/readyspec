@@ -127,8 +127,8 @@ func TestNativeSSHGlobalPreflightPreventsUploadsToEligibleHost(t *testing.T) {
 	_, hostPrivateB, _ := ed25519.GenerateKey(rand.Reader)
 	hostSignerA, _ := ssh.NewSignerFromKey(hostPrivateA)
 	hostSignerB, _ := ssh.NewSignerFromKey(hostPrivateB)
-	factsA := "UID=1000\nARCH=x86_64\nMACHINE=machine-a\nBOOT=boot-a\nCHECKSUM=/usr/bin/sha256sum\n"
-	factsB := "UID=1000\nARCH=x86_64\nMACHINE=machine-b\nBOOT=boot-b\nCHECKSUM=/usr/bin/sha256sum\n"
+	factsA := "UID=1000\nARCH=x86_64\nMACHINE=machine-a\nBOOT=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\nCHECKSUM=/usr/bin/sha256sum\n"
+	factsB := "UID=1000\nARCH=x86_64\nMACHINE=machine-b\nBOOT=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\nCHECKSUM=/usr/bin/sha256sum\n"
 	serverA := startBarrierSSHServer(t, hostSignerA, clientSigner.PublicKey(), factsA)
 	serverB := startBarrierSSHServer(t, hostSignerB, rejectedSigner.PublicKey(), factsB)
 	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
@@ -212,7 +212,7 @@ func TestNativeSSHRejectsHostKeyRotationBetweenPreflightAndExecution(t *testing.
 	_, hostPrivateB, _ := ed25519.GenerateKey(rand.Reader)
 	hostSignerA, _ := ssh.NewSignerFromKey(hostPrivateA)
 	hostSignerB, _ := ssh.NewSignerFromKey(hostPrivateB)
-	facts := "UID=1000\nARCH=x86_64\nMACHINE=machine-stable\nBOOT=boot-stable\nCHECKSUM=/usr/bin/sha256sum\n"
+	facts := "UID=1000\nARCH=x86_64\nMACHINE=machine-stable\nBOOT=cccccccc-cccc-4ccc-8ccc-cccccccccccc\nCHECKSUM=/usr/bin/sha256sum\n"
 	server := startBarrierSSHServer(t, hostSignerA, clientSigner.PublicKey(), facts, hostSignerB)
 	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
 	entry := fmt.Sprintf("[127.0.0.1]:%d %s\n", server.listener.Addr().(*net.TCPAddr).Port, strings.TrimSpace(string(ssh.MarshalAuthorizedKey(hostSignerA.PublicKey()))))
@@ -265,6 +265,9 @@ func TestNativeSSHRejectsHostKeyRotationBetweenPreflightAndExecution(t *testing.
 	}
 	if run.Report == nil || len(run.Report.Failures) == 0 || run.Report.Failures[0].Code != "IDENTITY_ERROR" || run.Report.Failures[0].Phase != "REVALIDATE" {
 		t.Fatalf("host-key rotation was not classified as an identity failure: %+v", run.Report)
+	}
+	if len(run.Report.Failures[0].Diagnostics) != 1 || run.Report.Failures[0].Diagnostics[0].Code != "HOST_KEY_CHANGED" {
+		t.Fatalf("host-key change diagnostic missing: %+v", run.Report.Failures[0].Diagnostics)
 	}
 	for {
 		select {

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/semantic"
 	"github.com/fleeto/readyspec/internal/shellassert"
@@ -46,17 +47,18 @@ type ItemResult struct {
 }
 
 type Evidence struct {
-	Resource          string `json:"resource"`
-	Property          string `json:"property"`
-	Expected          any    `json:"expected"`
-	Actual            any    `json:"actual"`
-	Error             bool   `json:"error"`
-	Source            string `json:"source"`
-	StartTime         string `json:"start_time,omitempty"`
-	EndTime           string `json:"end_time,omitempty"`
-	DurationNS        int64  `json:"duration_ns,omitempty"`
-	ObservationOnly   bool   `json:"observation_only,omitempty"`
-	HighRiskRootAudit bool   `json:"high_risk_root_audit,omitempty"`
+	Resource          string            `json:"resource"`
+	Property          string            `json:"property"`
+	Expected          any               `json:"expected"`
+	Actual            any               `json:"actual"`
+	Error             bool              `json:"error"`
+	Source            string            `json:"source"`
+	StartTime         string            `json:"start_time,omitempty"`
+	EndTime           string            `json:"end_time,omitempty"`
+	DurationNS        int64             `json:"duration_ns,omitempty"`
+	ObservationOnly   bool              `json:"observation_only,omitempty"`
+	HighRiskRootAudit bool              `json:"high_risk_root_audit,omitempty"`
+	Diagnostics       []diagnostic.Item `json:"diagnostics,omitempty"`
 }
 
 type Artifact struct {
@@ -563,6 +565,7 @@ func Normalize(a Artifact, raw []byte) ([]ItemResult, error) {
 		}
 		if customShell {
 			results[i] = normalizeCustomShell(results[i], a.Origins, report.Results)
+			results[i] = addEvidenceDiagnostics(results[i])
 			continue
 		}
 		status := "PASS"
@@ -778,6 +781,16 @@ func Normalize(a Artifact, raw []byte) ([]ItemResult, error) {
 			}
 			if matches != 1 && status != "FAIL" {
 				status = "ERROR"
+				if matches == 0 {
+					item := diagnostic.ForCode("RESULT_RESOURCE_MISSING", "")
+					item.Phase, item.RoleID, item.ItemID = "COLLECTING", results[i].RoleID, results[i].ItemID
+					item.Resource, item.Property = origin.Resource, origin.Property
+					results[i].Evidence = append(results[i].Evidence, Evidence{
+						Resource: origin.Resource, Property: origin.Property,
+						Actual: "未收到对应的远端观测", Error: true, Source: origin.Source,
+						Diagnostics: []diagnostic.Item{item}, ObservationOnly: origin.ObservationOnly,
+					})
+				}
 			}
 			if matches != 1 && origin.Collection {
 				collectionError = true
@@ -787,8 +800,23 @@ func Normalize(a Artifact, raw []byte) ([]ItemResult, error) {
 			status = "ERROR"
 		}
 		results[i].Status = status
+		results[i] = addEvidenceDiagnostics(results[i])
 	}
 	return results, nil
+}
+
+func addEvidenceDiagnostics(result ItemResult) ItemResult {
+	for i := range result.Evidence {
+		evidence := &result.Evidence[i]
+		if !evidence.Error || len(evidence.Diagnostics) != 0 {
+			continue
+		}
+		item := diagnostic.ForCode("OBSERVATION_UNVERIFIABLE", "")
+		item.Phase, item.RoleID, item.ItemID = "COLLECTING", result.RoleID, result.ItemID
+		item.Resource, item.Property = evidence.Resource, evidence.Property
+		evidence.Diagnostics = []diagnostic.Item{item}
+	}
+	return result
 }
 
 type gossObservation struct {

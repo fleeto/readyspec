@@ -3,7 +3,6 @@ package runmanager_test
 import (
 	"context"
 	"encoding/json"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -45,10 +44,16 @@ func TestSubmitUnavailableAgentIsAuthenticationError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ws.Close()
 	store, err := runstore.Open(ws)
 	if err != nil {
 		t.Fatal(err)
 	}
+	lease, err := ws.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
 	p, err := plan.Load(strings.NewReader(planSource))
 	if err != nil {
 		t.Fatal(err)
@@ -65,13 +70,56 @@ func TestSubmitUnavailableAgentIsAuthenticationError(t *testing.T) {
 		Budgets:   runstore.Budgets{QueueSeconds: 1800, RunSeconds: 3600, HostSeconds: 600},
 	}}
 	run, _, err := manager.Submit(request, map[string]executor.Credential{"node": {
-		Method: "agent", AgentSocket: filepath.Join(t.TempDir(), "missing.sock"),
+		// Deliberately invalid on Unix and Windows; avoid creating a nested
+		// temporary directory whose lifetime can mask Windows handle leaks.
+		Method: "agent", AgentSocket: "missing-agent-endpoint",
 	}})
 	if err == nil || !strings.HasPrefix(err.Error(), "AUTH_ERROR:") || run != nil {
 		t.Fatalf("unavailable Agent must reject submission as AUTH_ERROR, got run=%v err=%v", run, err)
 	}
 	if runs := store.List(); len(runs) != 0 {
 		t.Fatalf("unavailable Agent left %d accepted runs", len(runs))
+	}
+}
+
+func TestSubmitRequiresCredentialsOnlyForRoleBoundHosts(t *testing.T) {
+	ws, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	store, err := runstore.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease, err := ws.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Close()
+	p, err := plan.Load(strings.NewReader(planSource))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := runmanager.New(store, executor.NewNativeSSH())
+	if err != nil {
+		t.Fatal(err)
+	}
+	hosts := []inventory.Host{
+		{ID: "bound", Address: "127.0.0.1", Port: 22, Username: "tester"},
+		{ID: "unbound", Address: "127.0.0.2", Port: 22, Username: "tester"},
+	}
+	request := runstore.Request{IdempotencyKey: "bound-host-only", Plan: p, Config: runstore.RunConfig{
+		PlanDigest: p.Digest, Mode: "TRIAL", Scope: "FULL", Backend: "native_ssh", Inventory: hosts,
+		RoleMap: map[string][]string{"app": {"bound"}}, Auth: runstore.AuthIdentity{Method: "password"},
+		Budgets: runstore.Budgets{QueueSeconds: 10, RunSeconds: 10, HostSeconds: 10},
+	}}
+	run, created, err := manager.Submit(request, map[string]executor.Credential{"bound": {Method: "password", Password: []byte("fixture-secret")}})
+	if err != nil || !created || run == nil {
+		t.Fatalf("bound host credential should be sufficient: run=%v created=%v err=%v", run, created, err)
+	}
+	if len(store.List()) != 1 {
+		t.Fatalf("expected one accepted Run, got %d", len(store.List()))
 	}
 }
 

@@ -40,6 +40,9 @@ func Execute(args []string, out, stderr io.Writer) int {
 	root.PersistentFlags().StringVar(&options.key, "tls-key", "", "HTTPS private key file")
 	root.PersistentFlags().StringSliceVar(&options.allowedHosts, "allowed-host", nil, "Additional accepted Host values, including port")
 	root.PersistentFlags().BoolVar(&options.noBrowser, "no-browser", false, "Do not launch the desktop browser")
+	root.PersistentFlags().StringVar(&options.logLevel, "log-level", "", "Operational log level: debug, info, warn, or error (READYSPEC_LOG_LEVEL)")
+	root.PersistentFlags().StringVar(&options.logFormat, "log-format", "", "Operational log format: text or json (READYSPEC_LOG_FORMAT)")
+	root.PersistentFlags().StringVar(&options.logFile, "log-file", "", "Private rotating operational log file (READYSPEC_LOG_FILE)")
 	exitCode := 0
 	startServer := func(cmd *cobra.Command, args []string) error {
 		err := serve(cmd.Context(), options, cmd.Flags().Changed("listen"), cmd.OutOrStdout())

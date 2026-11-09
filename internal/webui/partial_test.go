@@ -119,20 +119,31 @@ func TestRunProjectionReplaysOnlyPhasePrefix(t *testing.T) {
 	}
 }
 
-func TestRunProjectionMarksUnconfiguredExecutionModesOmitted(t *testing.T) {
+func TestRunProjectionMarksUnconfiguredExecutionModesOmittedForBoundHost(t *testing.T) {
 	run := runstore.Run{
 		Plan:   &plan.Plan{PlanID: "omitted", EmbeddedTemplates: []plan.CheckTemplate{}, Roles: []plan.Role{}},
-		Config: runstore.RunConfig{Inventory: []inventory.Host{{ID: "node-a"}}},
+		Config: runstore.RunConfig{Inventory: []inventory.Host{{ID: "node-a"}}, RoleMap: map[string][]string{"role": {"node-a"}}},
 	}
 	projection := projectRun(run, 0)
 	transitions := projection["stage_transitions"].([]stageTransitionProjection)
 	if len(transitions) != 2 {
-		t.Fatalf("expected both unused execution modes to be explicit, got %+v", transitions)
+		t.Fatalf("bound host with no enabled items should show omitted modes: %+v", transitions)
 	}
 	for _, transition := range transitions {
 		if !transition.Omitted || transition.Phase != "OMITTED" || transition.Reason != "NO_ENABLED_ITEMS" || transition.StartedAt != nil || transition.EndedAt != nil {
 			t.Fatalf("omitted mode fabricated execution timestamps: %+v", transition)
 		}
+	}
+}
+
+func TestRunProjectionDoesNotFabricateStagesForUnboundHosts(t *testing.T) {
+	run := runstore.Run{
+		Plan:   &plan.Plan{PlanID: "unbound", EmbeddedTemplates: []plan.CheckTemplate{}, Roles: []plan.Role{}},
+		Config: runstore.RunConfig{Inventory: []inventory.Host{{ID: "node-a"}}},
+	}
+	projection := projectRun(run, 0)
+	if transitions := projection["stage_transitions"].([]stageTransitionProjection); len(transitions) != 0 {
+		t.Fatalf("unbound hosts must not receive synthetic phase rows: %+v", transitions)
 	}
 }
 

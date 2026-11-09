@@ -1,6 +1,12 @@
 export interface Diagnostic {
   code: string
+  category?: string
+  phase?: string
+  host_id?: string
+  field?: string
   message: string
+  retryable?: boolean
+  action?: string
   role_id?: string
   item_id?: string
   resource?: string
@@ -13,6 +19,9 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public diagnostics: Diagnostic[] = [],
+    public requestId = '',
+    public submissionId = '',
+    public acceptance: 'accepted' | 'rejected' | 'unknown' | '' = '',
   ) {
     super(message)
   }
@@ -48,13 +57,16 @@ class Client {
     if (response.status === 401 && path !== '/auth/session') {
       this.csrf = ''
       for (const listener of this.sessionExpiryListeners) listener()
-      throw new ApiError('会话已过期，请重新认证后继续。', 401)
+      throw new ApiError('会话已过期，请重新认证后继续。', 401, [], response.headers.get('X-Request-ID') ?? '')
     }
     if (!response.ok)
       throw new ApiError(
         data.error ?? '请求失败，请重试。',
         response.status,
         Array.isArray(data.diagnostics) ? data.diagnostics : [],
+        data.request_id ?? response.headers.get('X-Request-ID') ?? '',
+        data.submission_id ?? '',
+        data.acceptance ?? '',
       )
     return data as T
   }

@@ -401,8 +401,8 @@ Web UI 的视觉气质、深浅色语义令牌、字体与等宽数字规则、�
 | 系统与鉴权 | `GET /system/info`、`POST /auth/session` | 交换会话 Cookie 与 CSRF 令牌；校验 `Origin`/`Host` |
 | 检查模板 | `GET /templates`、`POST /templates/promote`、`POST /templates/shell-selftest` | 查询内置与公共模板；纯本地运行 Shell 断言模拟自测 |
 | 检查方案 | `GET\|POST /plans`、`GET\|PUT\|DELETE /plans/{id}`、`POST /plans/{id}/validate`、`POST /plans/{id}/release`、`POST /plans/{id}/archive`、`POST /plans/import`、`GET /plans/{id}/export` | 静态校验、不可变发布、停用归档与自包含 YAML 导入导出（零 SSH）。`POST /plans` 保存可编辑的未完成 `DRAFT`，`draft_key` 稳定标识同一记录；保存不声明校验通过或返回有效摘要。当前校验入口为 `POST /plans/validate`，导出前严格校验，发布与执行仍须使用完整校验通过的文档 |
-| 主机清单与任务 | `POST /inventory/parse`、`POST /runs/preview`、`POST /runs`、`GET /runs`、`GET /runs/{id}`、`POST /runs/{id}/cancel` | 密码字段当场转入内存保险箱；幂等提交；零 SSH 预览 |
-| 实时事件流 | `GET /runs/{id}/events?after_seq=N` | 标准 SSE 流：首帧推送当前状态快照与最新单调序号，后续增量推送阶段事件，支持 `Last-Event-ID` 断线续传 |
+| 主机清单与任务 | `POST /inventory/parse`、`POST /runs/preview`、`POST /runs`、`POST /runs/submission-status`、`GET /runs`、`GET /runs/{id}`、`POST /runs/{id}/cancel` | 密码字段当场转入内存保险箱；幂等提交；零 SSH 预览；提交响应含 `request_id`、`submission_id` 与 `acceptance`；状态查询只读接受记录，不创建任务 |
+| 实时事件流 | `GET /runs/{id}/events?after_seq=N` | 标准 SSE 流：首帧推送当前状态快照与最新单调序号，后续增量推送阶段事件，支持 `Last-Event-ID` 断线续传；公共事件视图不输出幂等键或 owner token |
 | 远端残留清理 | `GET /cleanups`、`POST /cleanups/{id}/resolve` | 验证机器码/开机标识/归属令牌后清理或记原因置为 `IGNORED` |
 
 ### 10.3 CLI 命令树与确定性门禁退出码推导规则

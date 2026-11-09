@@ -73,7 +73,7 @@ func TestAcceptIdempotencyAndConflict(t *testing.T) {
 	_, ws, lease, store, p, cfg := newHarness(t)
 	defer ws.Close()
 	defer lease.Close()
-	first, created, err := store.Accept(runstore.Request{IdempotencyKey: "same", Plan: p, Config: cfg})
+	first, created, err := store.Accept(runstore.Request{IdempotencyKey: "same", RequestID: "request-one", SubmissionID: "submission-one", Plan: p, Config: cfg})
 	if err != nil || !created {
 		t.Fatalf("first Accept: created=%v err=%v", created, err)
 	}
@@ -81,10 +81,69 @@ func TestAcceptIdempotencyAndConflict(t *testing.T) {
 	if err != nil || created || second.Acceptance.RunID != first.Acceptance.RunID {
 		t.Fatalf("duplicate Accept: created=%v run=%v err=%v", created, second, err)
 	}
+	if second.Acceptance.RequestID != "request-one" || second.Acceptance.SubmissionID != "submission-one" {
+		t.Fatalf("initial correlation metadata was not retained: %+v", second.Acceptance)
+	}
+	lookup, found, err := store.LookupIdempotency("same")
+	if err != nil || !found || lookup.RunID != first.Acceptance.RunID {
+		t.Fatalf("lookup idempotency: found=%v acceptance=%+v err=%v", found, lookup, err)
+	}
 	changed := cfg
 	changed.Scope = "FULL"
 	if _, _, err := store.Accept(runstore.Request{IdempotencyKey: "same", Plan: p, Config: changed}); !errors.Is(err, runstore.ErrIdempotencyConflict) {
 		t.Fatalf("changed duplicate error = %v", err)
+	}
+}
+
+func TestRecoveryUsesValidReportEvenWhenJournalIsCorrupt(t *testing.T) {
+	dir, ws, lease, store, p, cfg := newHarness(t)
+	run, _, err := store.Accept(runstore.Request{IdempotencyKey: "valid-report-corrupt-journal", Plan: p, Config: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	value := report.RunReport{
+		SchemaVersion: "readyspec.report/v1", RunID: run.Acceptance.RunID, PlanDigest: cfg.PlanDigest,
+		RunMode: cfg.Mode, RunScope: cfg.Scope, ExecutorBackend: cfg.Backend, AuthMethod: cfg.Auth.Method,
+		RunStatus: "COMPLETED", Verdict: "UNKNOWN", TerminationReason: "NORMAL_COMPLETION", VerdictReasons: []string{}, StartedAt: run.Acceptance.AcceptedAt, FinishedAt: now,
+		TopologyResults: []topology.Result{}, Hosts: []report.HostResult{}, CleanupItems: []report.CleanupItem{}, Failures: []report.Failure{},
+	}
+	if err := store.Finalize(run.Acceptance.RunID, value); err != nil {
+		t.Fatal(err)
+	}
+	if err := lease.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.Close(); err != nil {
+		t.Fatal(err)
+	}
+	journalPath := filepath.Join(dir, "runs", run.Acceptance.RunID, "events.ndjson")
+	if err := os.WriteFile(journalPath, []byte("{broken}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	recoveredWorkspace, err := workspace.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recoveredWorkspace.Close()
+	recoveredLease, err := recoveredWorkspace.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recoveredLease.Close()
+	recovered, err := runstore.Open(recoveredWorkspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := recovered.Get(run.Acceptance.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Report == nil || got.Report.RunID != value.RunID || got.RecoveryError != "JOURNAL_RECORD_CORRUPT" {
+		t.Fatalf("valid report was not retained with journal diagnosis: report=%+v recovery=%q", got.Report, got.RecoveryError)
+	}
+	if _, _, err := recovered.LookupIdempotency("valid-report-corrupt-journal"); err != nil {
+		t.Fatalf("idempotency lookup should retain accepted Run: %v", err)
 	}
 }
 

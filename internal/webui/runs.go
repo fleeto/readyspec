@@ -13,11 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/executor"
 	"github.com/fleeto/readyspec/internal/inventory"
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/planstore"
 	"github.com/fleeto/readyspec/internal/preview"
+	"github.com/fleeto/readyspec/internal/publicview"
 	"github.com/fleeto/readyspec/internal/report"
 	"github.com/fleeto/readyspec/internal/runstore"
 	"golang.org/x/crypto/ssh"
@@ -76,29 +78,38 @@ type runSummary struct {
 }
 
 func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
+	submissionID, idErr := diagnostic.NewID()
+	if idErr != nil {
+		writeError(w, http.StatusInternalServerError, "DIAGNOSTIC_ID_UNAVAILABLE")
+		return
+	}
 	if s.runs == nil {
-		writeError(w, http.StatusServiceUnavailable, "RUN_MANAGER_UNAVAILABLE")
+		writeSubmissionError(w, http.StatusServiceUnavailable, submissionID, "RUN_MANAGER_UNAVAILABLE", diagnostic.ForCode("RUN_WORKER_STOPPED", ""))
+		return
+	}
+	if !s.AcceptingRuns() {
+		writeSubmissionError(w, http.StatusServiceUnavailable, submissionID, "RUN_WORKER_STOPPED", diagnostic.ForCode("RUN_WORKER_STOPPED", ""))
 		return
 	}
 	var body runSubmission
 	if err := readJSON(w, r, &body); err != nil {
-		requestBodyError(w, err)
+		writeSubmissionError(w, requestBodyStatus(err), submissionID, requestBodyCode(err), diagnostic.Item{})
 		return
 	}
 	p, err := plan.Load(strings.NewReader(body.Plan))
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "PLAN_ERROR: invalid plan")
+		writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "PLAN_ERROR", diagnostic.Item{})
 		return
 	}
 	if p.State == "ARCHIVED" || body.Mode == "GATE" && p.State != "RELEASED" {
-		writeError(w, http.StatusUnprocessableEntity, "PLAN_STATE_NOT_EXECUTABLE")
+		writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "PLAN_STATE_NOT_EXECUTABLE", diagnostic.Item{})
 		return
 	}
 	if body.Mode == "GATE" {
 		document, marshalErr := plan.DocumentJSON(p)
 		var value map[string]any
 		if marshalErr != nil || json.Unmarshal(document, &value) != nil || planstore.VerifyManifest(value) != nil {
-			writeError(w, http.StatusUnprocessableEntity, "RELEASE_MANIFEST_UNVERIFIABLE")
+			writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "RELEASE_MANIFEST_UNVERIFIABLE", diagnostic.Item{})
 			return
 		}
 	}
@@ -107,7 +118,7 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 		defer s.plansMu.Unlock()
 		record, recordErr := s.plans.Get(body.PlanRecordKey)
 		if recordErr != nil || record.ArchiveSnapshot != nil || record.ReleaseSnapshot == nil || record.ReleaseFingerprint != p.Digest {
-			writeError(w, http.StatusConflict, "PLAN_RECORD_NOT_ACTIVE")
+			writeSubmissionError(w, http.StatusConflict, submissionID, "PLAN_RECORD_NOT_ACTIVE", diagnostic.Item{})
 			return
 		}
 	}
@@ -117,13 +128,13 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 	}
 	hosts, err := inventory.Parse(body.Inventory.Source, format)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "PLAN_ERROR: invalid inventory")
+		writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "PLAN_ERROR", diagnostic.Item{})
 		return
 	}
 	if body.Scope == "PARTIAL" {
 		parent, parentErr := s.runs.Get(body.PartialSourceRunID)
 		if parentErr != nil || parent.Report == nil || parent.Config.PlanDigest != p.Digest {
-			writeError(w, http.StatusConflict, "PARTIAL_SOURCE_RUN_UNAVAILABLE")
+			writeSubmissionError(w, http.StatusConflict, submissionID, "PARTIAL_SOURCE_RUN_UNAVAILABLE", diagnostic.Item{})
 			return
 		}
 		selected := make(map[string]bool, len(body.PartialHostIDs))
@@ -133,7 +144,7 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 			if validationError == "PARTIAL_SOURCE_RUN_UNAVAILABLE" || validationError == "PARTIAL_INVENTORY_CHANGED" {
 				status = http.StatusConflict
 			}
-			writeError(w, status, validationError)
+			writeSubmissionError(w, status, submissionID, validationError, diagnostic.Item{})
 			return
 		}
 		hosts = filtered
@@ -181,6 +192,17 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 	if body.IdempotencyKey == "" {
 		body.IdempotencyKey = "web-" + rand.Text()
 	}
+	boundHostIDs := map[string]bool{}
+	for _, targets := range body.RoleMap {
+		for _, hostID := range targets {
+			boundHostIDs[hostID] = true
+		}
+	}
+	for hostID := range body.Credentials {
+		if !boundHostIDs[hostID] {
+			delete(body.Credentials, hostID)
+		}
+	}
 	credentials := make(map[string]executor.Credential, len(body.Credentials))
 	for hostID, input := range body.Credentials {
 		if body.Backend == "mock_simulator" {
@@ -206,13 +228,13 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 			body.Credentials[hostID] = input
 			if parseErr != nil {
 				wipeCredentials(credentials)
-				writeError(w, http.StatusUnprocessableEntity, "AUTH_ERROR: invalid private key")
+				writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "AUTH_ERROR", diagnostic.ForCode("PRIVATE_KEY_PARSE_FAILED", hostID))
 				return
 			}
 			fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
 			if body.Auth.PublicKeyFingerprint != "" && body.Auth.PublicKeyFingerprint != fingerprint {
 				wipeCredentials(credentials)
-				writeError(w, http.StatusUnprocessableEntity, "AUTH_ERROR: selected public key identity does not match")
+				writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "AUTH_ERROR", diagnostic.ForCode("PRIVATE_KEY_IDENTITY_MISMATCH", hostID))
 				return
 			}
 			body.Auth.PublicKeyFingerprint = fingerprint
@@ -221,7 +243,7 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 			credentials[hostID] = executor.Credential{Method: "agent", AgentSocket: input.AgentSocket, SudoPassword: []byte(input.SudoPassword)}
 		default:
 			wipeCredentials(credentials)
-			writeError(w, http.StatusUnprocessableEntity, "AUTH_ERROR: unsupported authentication method")
+			writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "AUTH_ERROR", diagnostic.ForCode("CREDENTIAL_METHOD_MISMATCH", hostID))
 			return
 		}
 		input.Password = ""
@@ -243,7 +265,15 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 		Auth: body.Auth, Simulator: body.Simulator, Budgets: body.Budgets,
 		PartialSourceRunID: body.PartialSourceRunID, PartialHostIDs: append([]string(nil), body.PartialHostIDs...),
 	}
-	accepted, created, err := s.runs.Submit(runstore.Request{IdempotencyKey: body.IdempotencyKey, Plan: p, Config: config}, credentials)
+	s.acceptMu.RLock()
+	if !s.accepting {
+		s.acceptMu.RUnlock()
+		wipeCredentials(credentials)
+		writeSubmissionError(w, http.StatusServiceUnavailable, submissionID, "RUN_WORKER_STOPPED", diagnostic.ForCode("RUN_WORKER_STOPPED", ""))
+		return
+	}
+	accepted, created, err := s.runs.Submit(runstore.Request{IdempotencyKey: body.IdempotencyKey, RequestID: w.Header().Get("X-Request-ID"), SubmissionID: submissionID, Plan: p, Config: config}, credentials)
+	s.acceptMu.RUnlock()
 	if err != nil {
 		status := http.StatusUnprocessableEntity
 		if strings.Contains(err.Error(), "WORKSPACE_BUSY") {
@@ -251,10 +281,70 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 		} else if strings.Contains(err.Error(), "INFRA_ERROR") {
 			status = http.StatusInternalServerError
 		}
-		writeError(w, status, safeRunError(err))
+		var diagnosticErr *diagnostic.Error
+		if errors.As(err, &diagnosticErr) {
+			writeSubmissionError(w, status, submissionID, "AUTH_ERROR", diagnostic.ForCode(diagnosticErr.Code, diagnosticErr.HostID))
+		} else {
+			writeSubmissionError(w, status, submissionID, safeRunError(err), diagnostic.Item{})
+		}
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"run_id": accepted.Acceptance.RunID, "created": created, "status": accepted.Status})
+	writeJSON(w, http.StatusAccepted, map[string]any{"run_id": accepted.Acceptance.RunID, "created": created, "status": accepted.Status, "request_id": w.Header().Get("X-Request-ID"), "submission_id": submissionID, "acceptance": "accepted"})
+}
+
+func writeSubmissionError(w http.ResponseWriter, status int, submissionID, code string, item diagnostic.Item) {
+	requestID := w.Header().Get("X-Request-ID")
+	body := map[string]any{"error": code, "request_id": requestID, "submission_id": submissionID, "acceptance": "rejected"}
+	if item.Code == "" {
+		item = diagnostic.ForCode(code, "")
+	}
+	body["diagnostics"] = []diagnostic.Item{item}
+	writeJSON(w, status, body)
+}
+
+func (s *Server) submissionStatus(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	if err := readJSON(w, r, &body); err != nil || !validSubmissionKey(body.IdempotencyKey) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"acceptance": "unknown", "request_id": w.Header().Get("X-Request-ID"), "error": "SUBMISSION_KEY_INVALID"})
+		return
+	}
+	if s.runs == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"acceptance": "unknown", "request_id": w.Header().Get("X-Request-ID"), "error": "RUN_MANAGER_UNAVAILABLE"})
+		return
+	}
+	accepted, found, err := s.runs.LookupSubmission(body.IdempotencyKey)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"acceptance": "unknown", "request_id": w.Header().Get("X-Request-ID"), "error": "RUN_STORAGE_ERROR"})
+		return
+	}
+	if !found {
+		writeJSON(w, http.StatusOK, map[string]any{"acceptance": "rejected", "request_id": w.Header().Get("X-Request-ID")})
+		return
+	}
+	response := map[string]any{"acceptance": "accepted", "run_id": accepted.RunID, "request_id": w.Header().Get("X-Request-ID"), "submission_id": accepted.SubmissionID}
+	if run, getErr := s.runs.Get(accepted.RunID); getErr != nil {
+		response["recovery_error"] = "RUN_STORAGE_ERROR"
+	} else {
+		response["status"] = run.Status
+		if run.RecoveryError != "" {
+			response["recovery_error"] = run.RecoveryError
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func validSubmissionKey(key string) bool {
+	if len(key) < 1 || len(key) > 128 {
+		return false
+	}
+	for _, value := range key {
+		if value < 0x21 || value > 0x7e {
+			return false
+		}
+	}
+	return true
 }
 
 func wipeCredentials(credentials map[string]executor.Credential) {
@@ -271,6 +361,15 @@ func wipeCredentials(credentials map[string]executor.Credential) {
 
 func safeRunError(err error) string {
 	message := err.Error()
+	for _, detail := range []string{
+		"AUTH_ERROR: required host credential is missing",
+		"AUTH_ERROR: required host credential is invalid",
+		"AUTH_ERROR: selected local credential is unavailable",
+	} {
+		if strings.Contains(message, detail) {
+			return detail
+		}
+	}
 	for _, marker := range []string{"AUTH_ERROR", "PLAN_ERROR", "PLAN_DIGEST_MISMATCH", "RUN_IDEMPOTENCY_CONFLICT", "WORKSPACE_BUSY", "INFRA_ERROR", "CLEANUP_AUDIT_REASON_REQUIRED", "CLEANUP_ALREADY_RESOLVED", "CLEANUP_NOT_FOUND", "CLEANUP_PROCESSES_REMAIN_ACTIVE"} {
 		if strings.Contains(message, marker) {
 			return marker
@@ -481,7 +580,14 @@ func (s *Server) parseInventory(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getRun(w http.ResponseWriter, r *http.Request) {
 	run, err := s.getRunOrWriteError(w, r.PathValue("id"))
 	if err == nil {
-		writeJSON(w, http.StatusOK, projectionWithEvents(*run, int64(len(run.Events))))
+		projection := projectionWithEvents(*run, int64(len(run.Events)))
+		if run.RecoveryError != "" {
+			projection["recovery_error"] = run.RecoveryError
+		}
+		if run.RecoveryWarning != "" {
+			projection["recovery_warning"] = run.RecoveryWarning
+		}
+		writeJSON(w, http.StatusOK, projection)
 	}
 }
 
@@ -491,6 +597,10 @@ func (s *Server) getRunReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run.Report == nil {
+		if run.RecoveryError != "" {
+			writeError(w, http.StatusInternalServerError, "RUN_STORAGE_ERROR")
+			return
+		}
 		writeError(w, http.StatusConflict, "RUN_REPORT_NOT_READY")
 		return
 	}
@@ -600,7 +710,7 @@ func (s *Server) resolveCleanup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status := http.StatusConflict
 		if strings.Contains(err.Error(), "AUTH_ERROR") {
-			status = http.StatusUnauthorized
+			status = http.StatusUnprocessableEntity
 		}
 		writeError(w, status, safeRunError(err))
 		return
@@ -644,14 +754,7 @@ func sanitizeEvents(events []runstore.Event) []runstore.Event {
 }
 
 func sanitizeEvent(event runstore.Event) runstore.Event {
-	if event.Kind == "CLEANUP_REGISTERED" || event.Kind == "CLEANUP_UPDATED" {
-		var item report.CleanupItem
-		if json.Unmarshal(event.Data, &item) == nil {
-			item.OwnerToken = ""
-			event.Data, _ = json.Marshal(item)
-		}
-	}
-	return event
+	return publicview.EventValue(event)
 }
 
 func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
@@ -730,6 +833,10 @@ func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if run.Report != nil {
+			return
+		}
+		if run.RecoveryError != "" {
+			_ = writeSSE(w, flusher, "recovery_error", sequence, map[string]any{"code": run.RecoveryError, "run_id": run.Acceptance.RunID})
 			return
 		}
 		select {
@@ -812,7 +919,16 @@ func projectRun(run runstore.Run, sequence int64) map[string]any {
 		}
 		transitions = append(transitions, transition)
 	}
+	boundHosts := map[string]bool{}
+	for _, hostIDs := range run.Config.RoleMap {
+		for _, hostID := range hostIDs {
+			boundHosts[hostID] = true
+		}
+	}
 	for _, host := range run.Config.Inventory {
+		if !boundHosts[host.ID] {
+			continue
+		}
 		plannedModes := plannedExecutionModes(run.Plan, run.Config.RoleMap, host.ID)
 		for _, mode := range []string{"STANDARD", "PRIVILEGED"} {
 			if plannedModes[mode] {
@@ -846,7 +962,14 @@ func projectRun(run runstore.Run, sequence int64) map[string]any {
 		}
 		return phases[i].HostID < phases[j].HostID
 	})
-	return map[string]any{"run": summarize(run), "sequence": sequence, "host_phases": phases, "stage_transitions": transitions}
+	projection := map[string]any{"run": summarize(run), "sequence": sequence, "host_phases": phases, "stage_transitions": transitions}
+	if run.RecoveryError != "" {
+		projection["recovery_error"] = run.RecoveryError
+	}
+	if run.RecoveryWarning != "" {
+		projection["recovery_warning"] = run.RecoveryWarning
+	}
+	return projection
 }
 
 func plannedExecutionModes(value *plan.Plan, roleMap map[string][]string, hostID string) map[string]bool {

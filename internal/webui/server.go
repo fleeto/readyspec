@@ -12,10 +12,12 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/planstore"
 	"github.com/fleeto/readyspec/internal/runmanager"
 	"github.com/fleeto/readyspec/internal/template"
@@ -55,6 +57,8 @@ type Server struct {
 	plansMu       sync.Mutex
 	runs          *runmanager.Manager
 	plans         *planstore.Store
+	acceptMu      sync.RWMutex
+	accepting     bool
 }
 
 func New(options Options) (*Server, error) {
@@ -71,10 +75,11 @@ func New(options Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{options: options, mux: http.NewServeMux(), sessions: make(map[string]session), runs: options.Runs, plans: plans}
+	s := &Server{options: options, mux: http.NewServeMux(), sessions: make(map[string]session), runs: options.Runs, plans: plans, accepting: options.Runs != nil}
 	s.mux.HandleFunc("POST /api/v1/auth/session", s.authenticate)
 	s.mux.HandleFunc("GET /api/v1/system/info", s.authorize(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"version": options.Version, "workspace_label": options.WorkspaceLabel, "executor_available": s.runs != nil, "server_id": options.ServerID})
+		commit, dirty, goVersion := processBuildInfo()
+		writeJSON(w, http.StatusOK, map[string]any{"version": options.Version, "build_commit": commit, "build_dirty": dirty, "go_version": goVersion, "workspace_label": options.WorkspaceLabel, "executor_available": s.runs != nil, "accepting_runs": s.AcceptingRuns(), "worker_state": workerState(s.runs != nil, s.AcceptingRuns()), "server_id": options.ServerID})
 	}))
 	s.mux.HandleFunc("GET /api/v1/plans", s.authorize(s.listPlans))
 	s.mux.HandleFunc("GET /api/v1/plans/{key}", s.authorize(s.getPlan))
@@ -124,6 +129,7 @@ func New(options Options) (*Server, error) {
 	s.mux.HandleFunc("POST /api/v1/runs/preview", s.authorize(s.previewRun))
 	s.mux.HandleFunc("POST /api/v1/inventory/parse", s.authorize(s.parseInventory))
 	s.mux.HandleFunc("POST /api/v1/runs", s.authorize(s.submitRun))
+	s.mux.HandleFunc("POST /api/v1/runs/submission-status", s.authorize(s.submissionStatus))
 	s.mux.HandleFunc("GET /api/v1/runs", s.authorize(s.listRuns))
 	s.mux.HandleFunc("GET /api/v1/cleanup", s.authorize(s.listCleanup))
 	s.mux.HandleFunc("GET /api/v1/cleanups", s.authorize(s.listCleanup))
@@ -158,7 +164,52 @@ func New(options Options) (*Server, error) {
 	return s, nil
 }
 
+func processBuildInfo() (commit string, dirty bool, goVersion string) {
+	commit, goVersion = "unknown", "unknown"
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	goVersion = info.GoVersion
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			commit = setting.Value
+		case "vcs.modified":
+			dirty = setting.Value == "true"
+		}
+	}
+	return
+}
+
+func workerState(available, accepting bool) string {
+	if !available {
+		return "unavailable"
+	}
+	if !accepting {
+		return "stopped"
+	}
+	return "running"
+}
+
+func (s *Server) StopAcceptingRuns() {
+	s.acceptMu.Lock()
+	s.accepting = false
+	s.acceptMu.Unlock()
+}
+
+func (s *Server) AcceptingRuns() bool {
+	s.acceptMu.RLock()
+	defer s.acceptMu.RUnlock()
+	return s.accepting
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	requestID, err := diagnostic.NewID()
+	if err != nil {
+		requestID = "unavailable"
+	}
+	w.Header().Set("X-Request-ID", requestID)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Frame-Options", "DENY")
@@ -297,7 +348,8 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
+	requestID := w.Header().Get("X-Request-ID")
+	writeJSON(w, status, map[string]any{"error": message, "request_id": requestID})
 }
 func readJSON(w http.ResponseWriter, r *http.Request, value any) error {
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" && contentType != "application/json; charset=utf-8" {
@@ -326,4 +378,20 @@ func requestBodyError(w http.ResponseWriter, err error) {
 		return
 	}
 	writeError(w, http.StatusBadRequest, "请求格式无效，请提交单个 JSON 对象。")
+}
+
+func requestBodyCode(err error) string {
+	var sizeError *http.MaxBytesError
+	if errors.As(err, &sizeError) {
+		return "REQUEST_TOO_LARGE"
+	}
+	return "REQUEST_INVALID"
+}
+
+func requestBodyStatus(err error) int {
+	var sizeError *http.MaxBytesError
+	if errors.As(err, &sizeError) {
+		return http.StatusRequestEntityTooLarge
+	}
+	return http.StatusBadRequest
 }

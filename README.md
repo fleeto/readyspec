@@ -34,11 +34,13 @@ make build
 make build-all
 ```
 
+服务的结构化日志可用 `--log-level debug|info|warn|error`、`--log-format text|json` 和 `--log-file PATH` 配置，也可分别通过 `READYSPEC_LOG_LEVEL`、`READYSPEC_LOG_FORMAT`、`READYSPEC_LOG_FILE` 设置；命令行值优先。默认级别为 `info`，默认格式为 `text`，默认输出 stderr。Linux 日志文件要求位于当前用户拥有且权限为 0700 的目录；Windows 要求日志目录的受保护 DACL 仅授予当前用户、SYSTEM 和 Administrators。两平台文件均按 10 MiB 上限轮转并保留 3 份备份；Windows 目前只有交叉编译覆盖，原生权限与轮转验收仍待执行。
+
 当前 Web UI 提供总览、方案工作台、检查与报告、模板与清理四个视图，支持深浅主题、响应式导航、草稿编辑与保存、YAML/JSON 导入、静态校验和 YAML 导出。方案工作台可配置环境拓扑、节点角色、自定义 Shell 检查项、检查参数及现场可调范围，支持检查项独立复制、删除确认与仅恢复被删对象的撤销。方案级 `TopologyPolicy` 只声明 CPU 架构与节点拓扑，不再包含 `allowed_os`；发行版与版本要求通过具体检查项表达。含 `allowed_os` 的旧方案须先移除该字段，再按当前 Schema 重新校验和导出。未完成草稿也可保存在持锁工作区的 `plans/drafts/web-index.json`，刷新或重启后可重新打开；保存不代表校验通过，严格校验/导出还会核对参数类型、范围、枚举与语义摘要。
 
 后端已实现安全 YAML、RFC 8785 语义摘要、新方案/模板 Schema、模板引用与快照摘要校验、工作区互斥与原子 JSON 写入、会话 Cookie、CSRF、Origin 防护，以及双架构官方 Goss 内嵌完整性校验。Host 头校验分档：回环监听保持严格校验，非回环监听（内网部署）只校验端口一致，允许通过主机名、网卡 IP、域名等任意入口访问。浏览器启动令牌通过 URL Fragment 传递，交换为会话后立即从地址栏移除；自动生成的启动令牌仅可使用一次，同一浏览器可凭 Cookie 恢复会话。Windows 权限与锁实现已交叉编译，仍需原生环境验收。
 
-CLI 提供 `serve`、`plan validate/compile/list/release/archive/import/export`、`template list`、`run preview/submit/status/cancel`、`report list/show/export`、`cleanup list/resolve`。生命周期与报告命令在同工作区服务运行时委托到本机服务，服务未运行时使用工作区锁直接访问记录。发布与导入使用工作区生命周期记录；GATE 任务必须带可验证发布清单。内置模板必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。Native SSH 分别发现 STANDARD 与 PRIVILEGED 远端执行目录，检查 noexec/只读挂载并回退；可用 `READYSPEC_REMOTE_TEMP_DIR` 指定首选目录。SHA-256 验真支持 `sha256sum`，以及 `openssl` 回退。sudo 密码可通过 `READYSPEC_SUDO_PASSWORD` 提供；策略拒绝或缺少凭据会在全目标屏障处拒绝整次任务。自动及人工清理会重新核对目标身份和 owner token，人工清理发现活动进程时必须显式确认。离线单二进制 smoke 已覆盖嵌入页面、方案发布/导出/停用，以及模板、报告和清理 CLI 委托；完整 M3 行为验收仍未完成，浏览器 E2E 尚未通过，因此不能据此宣称 M3 已验收或环境 `READY`。旧 Python 原型须在替代用例和 M3 验收后再清理。
+CLI 提供 `serve`、`plan validate/compile/list/release/archive/import/export`、`template list`、`run preview/submit/status/cancel`、`report list/show/export`、`cleanup list/resolve`。生命周期与报告命令在同工作区服务运行时委托到本机服务，服务未运行时使用工作区锁直接访问记录。`run submit --idempotency-key KEY` 可在操作者确认状态后跨进程复用提交键；该键不会打印到终端或日志。接受后 Run ID 写入 stderr，JSON 报告保持在 stdout。委托提交通过 SSE 恢复阶段进度，断线按事件游标续传且不重新提交；直接模式执行后输出阶段摘要。`run status`、报告 JSON 与 Web/SSE 使用安全公共视图，省略内部接受键及清理 owner token。发布与导入使用工作区生命周期记录；GATE 任务必须带可验证发布清单。内置模板必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。Native SSH 分别发现 STANDARD 与 PRIVILEGED 远端执行目录，检查 noexec/只读挂载并回退；可用 `READYSPEC_REMOTE_TEMP_DIR` 指定首选目录。SHA-256 验真支持 `sha256sum`，以及 `openssl` 回退。sudo 密码可通过 `READYSPEC_SUDO_PASSWORD` 提供；策略拒绝或缺少凭据会在全目标屏障处拒绝整次任务。自动及人工清理会重新核对目标身份和 owner token，人工清理发现活动进程时必须显式确认。离线单二进制 smoke 已覆盖嵌入页面、方案发布/导出/停用，以及模板、报告和清理 CLI 委托；完整 M3 行为验收仍未完成，浏览器 E2E 尚未通过，因此不能据此宣称 M3 已验收或环境 `READY`。旧 Python 原型须在替代用例和 M3 验收后再清理。
 
 ```bash
 # 查询当前已实现模板的自包含快照

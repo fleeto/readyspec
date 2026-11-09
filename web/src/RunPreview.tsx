@@ -89,13 +89,25 @@ export function RunPreview({
   >([])
   const [stageTransitions, setStageTransitions] = useState<StageTransition[]>([])
   const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const [submissionDiagnostic, setSubmissionDiagnostic] = useState<ApiError | null>(null)
   const [report, setReport] = useState<RunReport | null>(null)
   const [step, setStep] = useState(1)
   const eventsController = useRef<AbortController | null>(null)
   const eventCursor = useRef('')
   const reconnectEvents = useRef<() => void>(() => undefined)
   const pendingIdempotencyKey = useRef('')
-  useEffect(() => () => eventsController.current?.abort(), [])
+  useEffect(() => {
+    try {
+      pendingIdempotencyKey.current = sessionStorage.getItem('readyspec.pending-run-key') ?? ''
+      if (pendingIdempotencyKey.current) {
+        setSubmissionUncertain(true)
+        onSubmissionUncertain?.(true)
+      }
+    } catch {
+      // Private browsing/storage policy may disable session storage.
+    }
+    return () => eventsController.current?.abort()
+  }, [onSubmissionUncertain])
   function connectEvents(id: string, resetCursor = false) {
     eventsController.current?.abort()
     if (resetCursor) eventCursor.current = ''
@@ -268,6 +280,11 @@ export function RunPreview({
     setResult(null)
     setError('')
     pendingIdempotencyKey.current = ''
+    try {
+      sessionStorage.removeItem('readyspec.pending-run-key')
+    } catch {
+      // Ignore unavailable session storage.
+    }
   }
   async function preview() {
     setResult(null)
@@ -358,9 +375,7 @@ export function RunPreview({
         ...(scope === 'PARTIAL'
           ? { partial_source_run_id: partialSourceRunID, partial_host_ids: partialHostIDs }
           : {}),
-        idempotency_key:
-          pendingIdempotencyKey.current ||
-          (pendingIdempotencyKey.current = `web-${randomSuffix(32)}`),
+        idempotency_key: currentSubmissionKey(),
         auth_identity: {
           method: backend === 'mock_simulator' ? 'offline' : auth,
           ...(auth === 'agent' ? { public_key_fingerprint: keyFingerprint } : {}),
@@ -371,6 +386,7 @@ export function RunPreview({
       setRunId(accepted.run_id)
       setRunStatus(accepted.status)
       setSubmissionUncertain(false)
+      setSubmissionDiagnostic(null)
       onSubmissionUncertain?.(false)
       setHostPhases([])
       setPassword('')
@@ -380,6 +396,11 @@ export function RunPreview({
       setAgentSocket('')
       setKeyFingerprint('')
       pendingIdempotencyKey.current = ''
+      try {
+        sessionStorage.removeItem('readyspec.pending-run-key')
+      } catch {
+        // Ignore unavailable session storage.
+      }
       connectEvents(accepted.run_id, true)
     } catch (cause) {
       setPassword('')
@@ -388,13 +409,62 @@ export function RunPreview({
       setPassphrase('')
       setAgentSocket('')
       setKeyFingerprint('')
-      const uncertain = !(cause instanceof ApiError)
+      const uncertain =
+        cause instanceof ApiError
+          ? cause.acceptance === 'unknown' || (!cause.acceptance && cause.status >= 500)
+          : true
       setSubmissionUncertain(uncertain)
+      setSubmissionDiagnostic(cause instanceof ApiError ? cause : null)
       onSubmissionUncertain?.(uncertain)
       setError(cause instanceof Error ? cause.message : '任务提交失败')
     } finally {
       setBusy(false)
     }
+  }
+  async function checkSubmissionStatus() {
+    if (!pendingIdempotencyKey.current) return
+    setBusy(true)
+    try {
+      const result = await api.request<{
+        acceptance: 'accepted' | 'rejected' | 'unknown'
+        run_id?: string
+        status?: string
+        recovery_error?: string
+      }>('/runs/submission-status', { idempotency_key: pendingIdempotencyKey.current })
+      if (result.acceptance === 'accepted' && result.run_id) {
+        setRunId(result.run_id)
+        setRunStatus(result.status ?? '已接受')
+        setSubmissionUncertain(false)
+        onSubmissionUncertain?.(false)
+        pendingIdempotencyKey.current = ''
+        try {
+          sessionStorage.removeItem('readyspec.pending-run-key')
+        } catch {
+          // Ignore unavailable session storage.
+        }
+        connectEvents(result.run_id, true)
+      } else if (result.acceptance === 'rejected') {
+        setSubmissionUncertain(false)
+        onSubmissionUncertain?.(false)
+        setError('服务端确认该提交未被接受。可检查凭据后使用原提交键再次提交。')
+      } else {
+        setError('服务端暂时无法确认提交状态，请稍后再次查询。')
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '提交状态查询失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+  function currentSubmissionKey() {
+    if (pendingIdempotencyKey.current) return pendingIdempotencyKey.current
+    pendingIdempotencyKey.current = `web-${randomSuffix(32)}`
+    try {
+      sessionStorage.setItem('readyspec.pending-run-key', pendingIdempotencyKey.current)
+    } catch {
+      // The request still remains idempotent for this mounted component.
+    }
+    return pendingIdempotencyKey.current
   }
   return (
     <section className="panel">
@@ -742,9 +812,53 @@ export function RunPreview({
           </div>
         </fieldset>
         {error && <Notice tone="danger">{error}</Notice>}
+        {submissionDiagnostic && (
+          <section className="panel" aria-label="提交诊断">
+            <strong>
+              {submissionDiagnostic.acceptance === 'rejected'
+                ? '任务未接受'
+                : submissionDiagnostic.acceptance === 'accepted'
+                  ? '任务已接受'
+                  : '任务接受状态未知'}
+            </strong>
+            {submissionDiagnostic.diagnostics.map((item, index) => (
+              <p key={`${item.code}-${index}`}>
+                {item.host_id ? `${item.host_id}：` : ''}
+                {item.message}
+                {item.action ? `（建议：${item.action}）` : ''}
+              </p>
+            ))}
+            {(submissionDiagnostic.requestId || submissionDiagnostic.submissionId) && (
+              <p>
+                诊断 ID：{submissionDiagnostic.requestId || '无'} · 提交 ID：
+                {submissionDiagnostic.submissionId || '无'}
+              </p>
+            )}
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                const lines = [
+                  `request_id=${submissionDiagnostic.requestId || 'unavailable'}`,
+                  `submission_id=${submissionDiagnostic.submissionId || 'unavailable'}`,
+                  `acceptance=${submissionDiagnostic.acceptance || 'unknown'}`,
+                  ...submissionDiagnostic.diagnostics.map(
+                    (item) => `${item.code}${item.host_id ? ` host_id=${item.host_id}` : ''}: ${item.message}`,
+                  ),
+                ]
+                void navigator.clipboard?.writeText(lines.join('\n'))
+              }}
+            >
+              复制诊断摘要
+            </button>
+          </section>
+        )}
         {submissionUncertain && (
           <Notice tone="warning">
-            任务接受状态尚未确认。配置已冻结；重新输入凭据后会以原幂等键重试。离开向导将要求显式放弃该提交意图。
+            任务接受状态尚未确认。先查询原提交状态；不会自动重新提交。离开向导将要求显式放弃该提交意图。
+            <button type="button" className="button" disabled={busy} onClick={() => void checkSubmissionStatus()}>
+              查询提交状态
+            </button>
           </Notice>
         )}
         {runId && (

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fleeto/readyspec/internal/compiler"
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/topology"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -20,10 +21,11 @@ import (
 var schemaFiles embed.FS
 
 type Failure struct {
-	Code    string `json:"code"`
-	Phase   string `json:"phase"`
-	HostID  string `json:"host_id,omitempty"`
-	Message string `json:"message"`
+	Code        string            `json:"code"`
+	Phase       string            `json:"phase"`
+	HostID      string            `json:"host_id,omitempty"`
+	Message     string            `json:"message"`
+	Diagnostics []diagnostic.Item `json:"diagnostics,omitempty"`
 }
 
 type HostResult struct {
@@ -180,8 +182,13 @@ func ExitCode(input ExitConditions) int {
 // EvaluateVerdict applies the domain ordering to report observations. Missing
 // required observations create evidence uncertainty; they never imply PASS.
 func EvaluateVerdict(p *plan.Plan, mode, scope, executor, status string, hosts []HostResult, topologyResults []topology.Result) string {
+	verdict, _ := EvaluateVerdictWithReasons(p, mode, scope, executor, status, hosts, topologyResults)
+	return verdict
+}
+
+func EvaluateVerdictWithReasons(p *plan.Plan, mode, scope, executor, status string, hosts []HostResult, topologyResults []topology.Result) (string, []string) {
 	if p == nil {
-		return "UNKNOWN"
+		return "UNKNOWN", []string{"PLAN_UNAVAILABLE"}
 	}
 	requiredItems := map[[2]string]bool{}
 	for _, role := range p.Roles {
@@ -220,7 +227,7 @@ func EvaluateVerdict(p *plan.Plan, mode, scope, executor, status string, hosts [
 	for _, result := range topologyResults {
 		topologyStates = append(topologyStates, result.Status)
 	}
-	return topology.Verdict(topology.VerdictInput{
+	return topology.VerdictWithReasons(topology.VerdictInput{
 		PlanState: p.State, Mode: mode, Scope: scope, Executor: executor, Status: status,
 		Required: requiredStates, Topology: topologyStates,
 	})

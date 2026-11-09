@@ -16,9 +16,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/fleeto/readyspec/internal/compiler"
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/goss"
 	"github.com/fleeto/readyspec/internal/report"
 	"golang.org/x/crypto/ssh"
@@ -192,40 +195,64 @@ type connection struct {
 	keyFP  string
 }
 
+type connectError struct {
+	code  string
+	class FailureClass
+}
+
+func (e *connectError) Error() string { return e.code }
+
+func classifiedConnectError(err error, code string, class FailureClass) error {
+	return &connectError{code: code, class: class}
+}
+
+func connectFailure(err error, hostID string) *Failure {
+	var typed *connectError
+	code := "SSH_HANDSHAKE_UNVERIFIABLE"
+	class := FailureNetwork
+	if errors.As(err, &typed) {
+		code, class = typed.code, typed.class
+	}
+	item := diagnostic.ForCode(code, hostID)
+	item.Phase = "SSH_CONNECT"
+	return &Failure{Class: class, Phase: "SSH_CONNECT", Message: "SSH connection or host identity verification failed", Diagnostics: []diagnostic.Item{item}}
+}
+
 func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address string, port int, username, expectedMethod, expectedFingerprint string) (*connection, error) {
 	if e.Credentials == nil {
-		return nil, errors.New("task credential provider is unavailable")
+		return nil, classifiedConnectError(errors.New("credential provider unavailable"), "SSH_AUTH_REJECTED", FailureAuth)
 	}
 	credential, err := e.Credentials.Credential(ctx, runID, hostID)
 	if err != nil {
-		return nil, err
+		return nil, classifiedConnectError(err, "SSH_AUTH_REJECTED", FailureAuth)
 	}
 	if expectedMethod != "" && credential.Method != expectedMethod {
-		return nil, errors.New("credential method does not match accepted identity")
+		return nil, classifiedConnectError(errors.New("credential method mismatch"), "SSH_AUTH_REJECTED", FailureAuth)
 	}
 	auth := []ssh.AuthMethod{}
 	var agentConn io.ReadWriteCloser
+	var selectedAgentKeyMissing atomic.Bool
 	switch credential.Method {
 	case "password":
 		if len(credential.Password) == 0 {
-			return nil, errors.New("password credential is empty")
+			return nil, classifiedConnectError(errors.New("password credential unavailable"), "SSH_AUTH_REJECTED", FailureAuth)
 		}
 		auth = append(auth, ssh.Password(string(credential.Password)))
 	case "private_key":
 		if credential.Signer == nil {
-			return nil, errors.New("private key credential is unavailable")
+			return nil, classifiedConnectError(errors.New("private key credential unavailable"), "SSH_AUTH_REJECTED", FailureAuth)
 		}
 		if expectedFingerprint != "" && ssh.FingerprintSHA256(credential.Signer.PublicKey()) != expectedFingerprint {
-			return nil, errors.New("selected public key identity mismatch")
+			return nil, classifiedConnectError(errors.New("selected public key identity mismatch"), "SSH_AUTH_REJECTED", FailureAuth)
 		}
 		auth = append(auth, ssh.PublicKeys(credential.Signer))
 	case "agent":
 		if credential.AgentSocket == "" {
-			return nil, errors.New("explicit local SSH Agent endpoint is missing")
+			return nil, classifiedConnectError(errors.New("agent endpoint unavailable"), "AGENT_SELECTED_KEY_MISSING", FailureAuth)
 		}
 		agentConn = credential.AgentConn
 		if agentConn == nil {
-			return nil, errors.New("task-owned Agent connection is unavailable")
+			return nil, classifiedConnectError(errors.New("agent connection unavailable"), "AGENT_SELECTED_KEY_MISSING", FailureAuth)
 		}
 		agentClient := agent.NewClient(agentConn)
 		auth = append(auth, ssh.PublicKeysCallback(func() ([]ssh.Signer, error) {
@@ -240,12 +267,13 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 				}
 			}
 			if len(selected) == 0 {
+				selectedAgentKeyMissing.Store(true)
 				return nil, errAgentKeyUnavailable
 			}
 			return selected, nil
 		}))
 	default:
-		return nil, errors.New("unsupported SSH authentication method")
+		return nil, classifiedConnectError(errors.New("unsupported SSH authentication method"), "SSH_AUTH_REJECTED", FailureAuth)
 	}
 	knownHostsFile := e.KnownHostsPath
 	if knownHostsFile == "" {
@@ -253,12 +281,28 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 	}
 	knownHostCallback, err := knownhosts.New(knownHostsFile)
 	if err != nil {
-		return nil, fmt.Errorf("load SSH known_hosts: %w", err)
+		return nil, classifiedConnectError(err, "KNOWN_HOSTS_UNREADABLE", FailureIdentity)
 	}
 	var hostKeyFingerprint string
+	var hostKeyFailureCode string
 	callback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		if err := knownHostCallback(hostname, remote, key); err != nil {
-			return err
+			var revoked *knownhosts.RevokedError
+			var keyErr *knownhosts.KeyError
+			switch {
+			case errors.As(err, &revoked):
+				hostKeyFailureCode = "HOST_KEY_REVOKED"
+				return classifiedConnectError(err, "HOST_KEY_REVOKED", FailureIdentity)
+			case errors.As(err, &keyErr) && len(keyErr.Want) == 0:
+				hostKeyFailureCode = "HOST_KEY_UNKNOWN"
+				return classifiedConnectError(err, "HOST_KEY_UNKNOWN", FailureIdentity)
+			case errors.As(err, &keyErr):
+				hostKeyFailureCode = "HOST_KEY_CHANGED"
+				return classifiedConnectError(err, "HOST_KEY_CHANGED", FailureIdentity)
+			default:
+				hostKeyFailureCode = "SSH_HANDSHAKE_UNVERIFIABLE"
+				return classifiedConnectError(err, "SSH_HANDSHAKE_UNVERIFIABLE", FailureIdentity)
+			}
 		}
 		hostKeyFingerprint = ssh.FingerprintSHA256(key)
 		return nil
@@ -269,7 +313,18 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 	defer cancel()
 	transport, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", remote)
 	if err != nil {
-		return nil, err
+		var dnsErr *net.DNSError
+		var opErr *net.OpError
+		switch {
+		case errors.As(err, &dnsErr):
+			return nil, classifiedConnectError(err, "DNS_LOOKUP_FAILED", FailureNetwork)
+		case errors.Is(err, context.DeadlineExceeded) || errors.As(err, &opErr) && opErr.Timeout():
+			return nil, classifiedConnectError(err, "TCP_CONNECT_TIMEOUT", FailureNetwork)
+		case errors.Is(err, syscall.ECONNREFUSED):
+			return nil, classifiedConnectError(err, "TCP_CONNECT_REFUSED", FailureNetwork)
+		default:
+			return nil, classifiedConnectError(err, "SSH_HANDSHAKE_UNVERIFIABLE", FailureNetwork)
+		}
 	}
 	if deadline, ok := dialCtx.Deadline(); ok {
 		_ = transport.SetDeadline(deadline)
@@ -280,7 +335,30 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 	clientConn, channels, requests, err := ssh.NewClientConn(transport, remote, config)
 	if err != nil {
 		_ = transport.Close()
-		return nil, err
+		if hostKeyFailureCode != "" {
+			return nil, classifiedConnectError(err, hostKeyFailureCode, FailureIdentity)
+		}
+		if selectedAgentKeyMissing.Load() || errors.Is(err, errAgentKeyUnavailable) {
+			return nil, classifiedConnectError(errAgentKeyUnavailable, "AGENT_SELECTED_KEY_MISSING", FailureAuth)
+		}
+		var algorithmErr *ssh.AlgorithmNegotiationError
+		if errors.As(err, &algorithmErr) {
+			return nil, classifiedConnectError(err, "SSH_NEGOTIATION_FAILED", FailureNetwork)
+		}
+		var keyErr *knownhosts.KeyError
+		var revoked *knownhosts.RevokedError
+		switch {
+		case errors.As(err, &revoked):
+			return nil, classifiedConnectError(err, "HOST_KEY_REVOKED", FailureIdentity)
+		case errors.As(err, &keyErr) && len(keyErr.Want) == 0:
+			return nil, classifiedConnectError(err, "HOST_KEY_UNKNOWN", FailureIdentity)
+		case errors.As(err, &keyErr):
+			return nil, classifiedConnectError(err, "HOST_KEY_CHANGED", FailureIdentity)
+		case strings.Contains(err.Error(), "unable to authenticate"):
+			return nil, classifiedConnectError(err, "SSH_AUTH_REJECTED", FailureAuth)
+		default:
+			return nil, classifiedConnectError(err, "SSH_HANDSHAKE_UNVERIFIABLE", FailureNetwork)
+		}
 	}
 	_ = transport.SetDeadline(time.Time{})
 	client := ssh.NewClient(clientConn, channels, requests)
@@ -340,8 +418,7 @@ func (e *NativeSSH) Preflight(ctx context.Context, req PreflightRequest) Preflig
 	}
 	conn, err := e.connect(ctx, req.RunID, req.Host.Inventory.ID, req.Host.Inventory.Address, req.Host.Inventory.Port, req.Host.Inventory.Username, req.Host.AuthMethod, req.Host.PublicKeyFingerprint)
 	if err != nil {
-		class := classifySSHConnectFailure(err)
-		return PreflightResult{Failure: &Failure{Class: class, Phase: "SSH_AUTHENTICATION", Message: "SSH connection or host key verification failed"}}
+		return PreflightResult{Failure: connectFailure(err, req.Host.Inventory.ID)}
 	}
 	defer conn.Close()
 	if req.Journal != nil {
@@ -351,14 +428,19 @@ func (e *NativeSSH) Preflight(ctx context.Context, req PreflightRequest) Preflig
 	}
 	facts, err := discover(ctx, conn.client)
 	if err != nil {
-		return PreflightResult{Failure: &Failure{Class: FailureIdentity, Phase: "DISCOVERY", Message: "target identity facts could not be verified"}}
+		code := "REMOTE_FACTS_UNVERIFIABLE"
+		var missing *remoteFactError
+		if errors.As(err, &missing) {
+			code = missing.code
+		}
+		return PreflightResult{Failure: failureWithDiagnostic(FailureIdentity, "DISCOVERY", "target identity facts could not be verified", code, req.Host.Inventory.ID)}
 	}
 	facts.HostKey = conn.keyFP
 	facts.Root = facts.UID == 0
 	if len(req.Artifacts.Standard.Items)+len(req.Artifacts.Privileged.Items) > 0 {
 		paths, pathErr := discoverWorkspacePaths(ctx, conn.client, e.RemoteTempDir, len(req.Artifacts.Privileged.Items) > 0)
 		if pathErr != nil {
-			return PreflightResult{Facts: facts, Failure: &Failure{Class: FailureExecution, Phase: "REMOTE_WORKSPACE", Message: "a safe remote execution directory is unavailable"}}
+			return PreflightResult{Facts: facts, Failure: failureWithDiagnostic(FailureExecution, "REMOTE_WORKSPACE", "a safe remote execution directory is unavailable", "REMOTE_TEMP_CANDIDATES_EXHAUSTED", req.Host.Inventory.ID)}
 		}
 		facts.WorkspaceBase = paths.Standard
 		facts.PrivilegedWorkspaceBase = paths.Privileged
@@ -371,16 +453,24 @@ func (e *NativeSSH) Preflight(ctx context.Context, req PreflightRequest) Preflig
 	if len(req.Artifacts.Privileged.Items) > 0 && !facts.Root {
 		credential, credentialErr := e.Credentials.Credential(ctx, req.RunID, req.Host.Inventory.ID)
 		if credentialErr != nil {
-			return PreflightResult{Facts: facts, Failure: &Failure{Class: FailureAuth, Phase: "SUDO_CREDENTIAL", Message: "required sudo credential is unavailable"}}
+			return PreflightResult{Facts: facts, Failure: failureWithDiagnostic(FailureAuth, "SUDO_CREDENTIAL", "required sudo credential is unavailable", "SUDO_CREDENTIAL_MISSING", req.Host.Inventory.ID)}
 		}
 		workspace := executionWorkspace(facts.WorkspaceBase, req.RunID, req.Host.Inventory.ID)
 		rootDir := privilegedExecutionWorkspace(facts.PrivilegedWorkspaceBase, req.RunID, req.Host.Inventory.ID)
 		if class := checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, workspace, rootDir, credential); class != "" {
-			return PreflightResult{Facts: facts, Failure: &Failure{Class: class, Phase: "SUDO_POLICY", Message: "controlled sudo command was denied or could not be verified"}}
+			code := "SUDO_RESULT_UNVERIFIABLE"
+			if class == FailureAuth {
+				code = "SUDO_POLICY_DENIED"
+			}
+			return PreflightResult{Facts: facts, Failure: failureWithDiagnostic(class, "SUDO_POLICY", "controlled sudo command was denied or could not be verified", code, req.Host.Inventory.ID)}
 		}
 	}
 	return PreflightResult{Facts: facts}
 }
+
+type remoteFactError struct{ code string }
+
+func (e *remoteFactError) Error() string { return e.code }
 
 func discover(ctx context.Context, client *ssh.Client) (HostFacts, error) {
 	command := "printf 'UID='; id -u; printf 'ARCH='; uname -m; printf 'MACHINE='; cat /etc/machine-id 2>/dev/null; printf 'BOOT='; cat /proc/sys/kernel/random/boot_id 2>/dev/null; printf 'CHECKSUM='; command -v sha256sum || command -v openssl || true"
@@ -396,10 +486,47 @@ func discover(ctx context.Context, client *ssh.Client) (HostFacts, error) {
 		}
 	}
 	uid, err := strconv.Atoi(fields["UID"])
-	if err != nil || fields["ARCH"] == "" || fields["MACHINE"] == "" || fields["BOOT"] == "" || fields["CHECKSUM"] == "" {
-		return HostFacts{}, errors.New("required remote facts unavailable")
+	if err != nil {
+		return HostFacts{}, err
 	}
+	if _, err := strconv.Atoi(fields["UID"]); err != nil || fields["ARCH"] == "" {
+		return HostFacts{}, &remoteFactError{code: "REMOTE_FACTS_UNVERIFIABLE"}
+	}
+	if fields["MACHINE"] == "" {
+		return HostFacts{}, &remoteFactError{code: "FACT_MACHINE_ID_MISSING"}
+	}
+	if !validBootID(fields["BOOT"]) {
+		return HostFacts{}, &remoteFactError{code: "FACT_BOOT_ID_INVALID"}
+	}
+	if fields["CHECKSUM"] == "" {
+		return HostFacts{}, &remoteFactError{code: "CHECKSUM_TOOL_UNAVAILABLE"}
+	}
+	uid, _ = strconv.Atoi(fields["UID"])
 	return HostFacts{UID: uid, Arch: fields["ARCH"], MachineID: fields["MACHINE"], BootID: fields["BOOT"]}, nil
+}
+
+func validBootID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for i, r := range value {
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if r != '-' {
+				return false
+			}
+			continue
+		}
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func failureWithDiagnostic(class FailureClass, phase, message, code, hostID string) *Failure {
+	item := diagnostic.ForCode(code, hostID)
+	item.Phase = phase
+	return &Failure{Class: class, Phase: phase, Message: message, Diagnostics: []diagnostic.Item{item}}
 }
 
 func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Journal) (outcome HostOutcome) {
@@ -408,12 +535,14 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 	}
 	conn, err := e.connect(ctx, req.RunID, req.Host.Inventory.ID, req.Host.Inventory.Address, req.Host.Inventory.Port, req.Host.Inventory.Username, req.Host.AuthMethod, req.Host.PublicKeyFingerprint)
 	if err != nil {
-		class := classifySSHConnectFailure(err)
+		failure := connectFailure(err, req.Host.Inventory.ID)
 		phase := "RECONNECT"
-		if class == FailureIdentity {
+		if failure.Class == FailureIdentity {
 			phase = "REVALIDATE"
 		}
-		return HostOutcome{Failure: &Failure{Class: class, Phase: phase, Message: "target reconnect or host identity verification failed"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+		failure.Phase = phase
+		failure.Message = "target reconnect or host identity verification failed"
+		return HostOutcome{Failure: failure, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 	}
 	defer conn.Close()
 	if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "DISCOVERING"); err != nil {
@@ -421,7 +550,12 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 	}
 	facts, err := discover(ctx, conn.client)
 	if err != nil || facts.MachineID != req.Facts.MachineID || facts.BootID != req.Facts.BootID || facts.UID != req.Facts.UID {
-		return HostOutcome{Failure: &Failure{Class: FailureIdentity, Phase: "REVALIDATE", Message: "target identity or privilege facts changed after preflight"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+		code := "REMOTE_FACTS_UNVERIFIABLE"
+		var missing *remoteFactError
+		if errors.As(err, &missing) {
+			code = missing.code
+		}
+		return HostOutcome{Failure: failureWithDiagnostic(FailureIdentity, "REVALIDATE", "target identity or privilege facts changed after preflight", code, req.Host.Inventory.ID), Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 	}
 	facts.OwnerToken = req.Facts.OwnerToken
 	facts.Root = facts.UID == 0
@@ -431,7 +565,7 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 	if len(req.Artifacts.Standard.Items)+len(req.Artifacts.Privileged.Items) > 0 {
 		paths, pathErr := discoverWorkspacePaths(ctx, conn.client, e.RemoteTempDir, len(req.Artifacts.Privileged.Items) > 0)
 		if pathErr != nil || paths.Standard != req.Facts.WorkspaceBase || paths.Privileged != req.Facts.PrivilegedWorkspaceBase {
-			return HostOutcome{Failure: &Failure{Class: FailureIdentity, Phase: "REVALIDATE", Message: "remote execution directory facts changed after preflight"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+			return HostOutcome{Failure: failureWithDiagnostic(FailureIdentity, "REVALIDATE", "remote execution directory facts changed after preflight", "REMOTE_TEMP_CANDIDATES_EXHAUSTED", req.Host.Inventory.ID), Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 		}
 		facts.WorkspaceBase = paths.Standard
 		facts.PrivilegedWorkspaceBase = paths.Privileged
@@ -439,12 +573,16 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 	if len(req.Artifacts.Privileged.Items) > 0 && !facts.Root {
 		credential, credentialErr := e.Credentials.Credential(ctx, req.RunID, req.Host.Inventory.ID)
 		if credentialErr != nil {
-			return HostOutcome{Failure: &Failure{Class: FailureAuth, Phase: "SUDO_CREDENTIAL", Message: "required sudo credential is unavailable"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+			return HostOutcome{Failure: failureWithDiagnostic(FailureAuth, "SUDO_CREDENTIAL", "required sudo credential is unavailable", "SUDO_CREDENTIAL_MISSING", req.Host.Inventory.ID), Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 		}
 		workspace := executionWorkspace(facts.WorkspaceBase, req.RunID, req.Host.Inventory.ID)
 		rootDir := privilegedExecutionWorkspace(facts.PrivilegedWorkspaceBase, req.RunID, req.Host.Inventory.ID)
 		if class := checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, workspace, rootDir, credential); class != "" {
-			return HostOutcome{Failure: &Failure{Class: class, Phase: "SUDO_POLICY", Message: "controlled sudo command was denied or could not be verified"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+			code := "SUDO_RESULT_UNVERIFIABLE"
+			if class == FailureAuth {
+				code = "SUDO_POLICY_DENIED"
+			}
+			return HostOutcome{Failure: failureWithDiagnostic(class, "SUDO_POLICY", "controlled sudo command was denied or could not be verified", code, req.Host.Inventory.ID), Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 		}
 	}
 	result := HostOutcome{Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
@@ -469,7 +607,7 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		cleanup.Status, cleanup.Reason = "UNKNOWN", "remote workspace creation could not be confirmed"
 		_ = journal.CleanupUpdated(ctx, req.RunID, cleanup)
 		result.Cleanup = append(result.Cleanup, cleanup)
-		return failedOutcome(result, "PREPARE", "remote execution workspace could not be created")
+		return failedOutcomeFor(result, "PREPARE", "remote execution workspace could not be created", err, req.Host.Inventory.ID)
 	}
 	privilegedUncertain := false
 	defer func() {
@@ -515,8 +653,16 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		if artifact.ExecutionMode == "PRIVILEGED" && !facts.Root {
 			credential, credentialErr := e.Credentials.Credential(ctx, req.RunID, req.Host.Inventory.ID)
 			rootDir := privilegedExecutionWorkspace(facts.PrivilegedWorkspaceBase, req.RunID, req.Host.Inventory.ID)
-			if credentialErr != nil || checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, remotePath, rootDir, credential) != "" {
-				return failedOutcome(result, "SUDO_POLICY", "controlled sudo command could not be revalidated")
+			if credentialErr != nil {
+				outcome := failedOutcomeWithCode(result, "SUDO_CREDENTIAL", "required sudo credential is unavailable", "SUDO_CREDENTIAL_MISSING", req.Host.Inventory.ID)
+				return outcome
+			}
+			if class := checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, remotePath, rootDir, credential); class != "" {
+				code := "SUDO_RESULT_UNVERIFIABLE"
+				if class == FailureAuth {
+					code = "SUDO_POLICY_DENIED"
+				}
+				return failedOutcomeWithCode(result, "SUDO_POLICY", "controlled sudo command could not be revalidated", code, req.Host.Inventory.ID)
 			}
 		}
 		gossBinary, err := goss.Binary(facts.Arch)
@@ -529,16 +675,16 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 			return failedOutcome(result, "JOURNAL", "cannot persist upload phase")
 		}
 		if _, err := runSSH(ctx, conn.client, "cat > '"+gossPath+"' && chmod 700 -- '"+gossPath+"'", gossBinary); err != nil {
-			return failedOutcome(result, "UPLOAD", "embedded Goss upload failed")
+			return failedOutcomeFor(result, "UPLOAD", "embedded Goss upload failed", err, req.Host.Inventory.ID)
 		}
 		if _, err := runSSH(ctx, conn.client, "cat > '"+configPath+"'", artifact.Config); err != nil {
-			return failedOutcome(result, "UPLOAD", "compiled check configuration upload failed")
+			return failedOutcomeFor(result, "UPLOAD", "compiled check configuration upload failed", err, req.Host.Inventory.ID)
 		}
 		if err := verifyRemoteSHA256(ctx, conn.client, gossPath, gossBinary); err != nil {
-			return failedOutcome(result, "UPLOAD_VERIFY", "embedded Goss digest verification failed")
+			return failedOutcomeFor(result, "UPLOAD_VERIFY", "embedded Goss digest verification failed", err, req.Host.Inventory.ID)
 		}
 		if err := verifyRemoteSHA256(ctx, conn.client, configPath, artifact.Config); err != nil {
-			return failedOutcome(result, "UPLOAD_VERIFY", "compiled configuration digest verification failed")
+			return failedOutcomeFor(result, "UPLOAD_VERIFY", "compiled configuration digest verification failed", err, req.Host.Inventory.ID)
 		}
 		if err := markExecutionStarted(ctx, journal, req.RunID, req.Host.Inventory.ID, artifact.ExecutionMode); err != nil {
 			return failedOutcome(result, "JOURNAL", "execution marker or phase could not be persisted")
@@ -570,18 +716,18 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 			_, ticketErr := runSSH(cleanupCtx, conn.client, "/usr/bin/sudo -k", nil)
 			cleanupCancel()
 			if ticketErr != nil {
-				return failedOutcome(result, "SUDO_TICKET", "sudo timestamp could not be cleared")
+				return failedOutcomeWithCode(result, "SUDO_TICKET", "sudo timestamp could not be cleared", "SUDO_RESULT_UNVERIFIABLE", req.Host.Inventory.ID)
 			}
 		}
 		if err != nil && !isCheckFailure(err) {
-			return failedOutcome(result, "EXECUTE", "Goss execution failed or returned invalid output")
+			return failedOutcomeFor(result, "EXECUTE", "Goss execution failed or returned invalid output", err, req.Host.Inventory.ID)
 		}
 		if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "COLLECTING_"+artifact.ExecutionMode); err != nil {
 			return failedOutcome(result, "JOURNAL", "cannot persist collection phase")
 		}
 		normalized, err := compiler.Normalize(artifact, output)
 		if err != nil {
-			return failedOutcome(result, "COLLECT", "Goss output did not satisfy the result contract")
+			return failedOutcomeFor(result, "COLLECT", "Goss output did not satisfy the result contract", err, req.Host.Inventory.ID)
 		}
 		result.Results = append(result.Results, normalized...)
 		result.Modes[artifact.ExecutionMode] = true
@@ -597,6 +743,10 @@ func markExecutionStarted(ctx context.Context, journal Journal, runID, hostID, m
 }
 
 func classifySSHConnectFailure(err error) FailureClass {
+	var typed *connectError
+	if errors.As(err, &typed) {
+		return typed.class
+	}
 	var keyErr *knownhosts.KeyError
 	switch {
 	case errors.As(err, &keyErr), strings.Contains(strings.ToLower(err.Error()), "known_hosts"):
@@ -905,6 +1055,29 @@ func failedOutcome(out HostOutcome, phase, message string) HostOutcome {
 	return out
 }
 
+func failedOutcomeFor(out HostOutcome, phase, message string, cause error, hostID string) HostOutcome {
+	code := "REMOTE_COMMAND_EXIT_UNEXPECTED"
+	if errors.Is(cause, errOutputLimit) {
+		code = "OUTPUT_LIMIT_EXCEEDED"
+	} else if errors.Is(cause, context.DeadlineExceeded) || errors.Is(cause, context.Canceled) {
+		code = "REMOTE_COMMAND_TIMEOUT"
+	} else if phase == "UPLOAD_VERIFY" {
+		code = "PAYLOAD_DIGEST_MISMATCH"
+	} else if phase == "UPLOAD" {
+		code = "UPLOAD_FAILED"
+	} else if phase == "PREPARE" {
+		code = "REMOTE_TEMP_CANDIDATES_EXHAUSTED"
+	} else if phase == "COLLECT" {
+		code = "RESULT_JSON_INVALID"
+	}
+	return failedOutcomeWithCode(out, phase, message, code, hostID)
+}
+
+func failedOutcomeWithCode(out HostOutcome, phase, message, code, hostID string) HostOutcome {
+	out.Failure = failureWithDiagnostic(FailureExecution, phase, message, code, hostID)
+	return out
+}
+
 func (c *connection) Close() error {
 	var err error
 	if c.client != nil {
@@ -912,6 +1085,20 @@ func (c *connection) Close() error {
 	}
 	return err
 }
+
+type remoteCommandError struct {
+	cause      error
+	exitStatus int
+}
+
+func (e *remoteCommandError) Error() string {
+	if e.exitStatus >= 0 {
+		return fmt.Sprintf("remote command failed with exit status %d", e.exitStatus)
+	}
+	return "remote command failed"
+}
+
+func (e *remoteCommandError) Unwrap() error { return e.cause }
 
 func runSSH(ctx context.Context, client *ssh.Client, command string, input []byte) ([]byte, error) {
 	session, err := client.NewSession()
@@ -978,11 +1165,12 @@ func runSSH(ctx context.Context, client *ssh.Client, command string, input []byt
 			return output.Bytes(), errors.Join(stdoutErr, stderrErr)
 		}
 		if err != nil {
-			stderrText := strings.TrimSpace(stderrBuffer.String())
-			if stderrText != "" {
-				return output.Bytes(), fmt.Errorf("%w: %s", err, stderrText)
+			var exitError *ssh.ExitError
+			exitStatus := -1
+			if errors.As(err, &exitError) {
+				exitStatus = exitError.ExitStatus()
 			}
-			return output.Bytes(), err
+			return output.Bytes(), &remoteCommandError{cause: err, exitStatus: exitStatus}
 		}
 		return output.Bytes(), nil
 	}

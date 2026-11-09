@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fleeto/readyspec/internal/compiler"
+	"github.com/fleeto/readyspec/internal/diagnostic"
 	"github.com/fleeto/readyspec/internal/executor"
 	"github.com/fleeto/readyspec/internal/inventory"
 	"github.com/fleeto/readyspec/internal/plan"
@@ -45,17 +46,48 @@ func (m *Manager) Submit(request runstore.Request, credentials map[string]execut
 		wipeCredentials(credentials)
 		return nil, false, fmt.Errorf("INFRA_ERROR: native SSH credential vault is unavailable")
 	}
+	boundHosts := map[string]bool{}
+	for _, targets := range request.Config.RoleMap {
+		for _, hostID := range targets {
+			boundHosts[hostID] = true
+		}
+	}
+	for hostID := range credentials {
+		if !boundHosts[hostID] {
+			credential := credentials[hostID]
+			for i := range credential.Password {
+				credential.Password[i] = 0
+			}
+			for i := range credential.SudoPassword {
+				credential.SudoPassword[i] = 0
+			}
+			delete(credentials, hostID)
+		}
+	}
 	for _, host := range request.Config.Inventory {
+		if !boundHosts[host.ID] {
+			continue
+		}
 		credential, exists := credentials[host.ID]
-		if !exists || credential.Method != request.Config.Auth.Method {
+		if !exists {
 			wipeCredentials(credentials)
-			return nil, false, fmt.Errorf("AUTH_ERROR: required host credential is missing")
+			return nil, false, &diagnostic.Error{Code: "CREDENTIAL_HOST_MISSING", HostID: host.ID}
+		}
+		if credential.Method != request.Config.Auth.Method {
+			wipeCredentials(credentials)
+			return nil, false, &diagnostic.Error{Code: "CREDENTIAL_METHOD_MISMATCH", HostID: host.ID}
 		}
 		if request.Config.Auth.Method == "private_key" && credential.Signer == nil ||
 			request.Config.Auth.Method == "agent" && credential.AgentSocket == "" ||
 			request.Config.Auth.Method == "password" && len(credential.Password) == 0 {
 			wipeCredentials(credentials)
-			return nil, false, fmt.Errorf("AUTH_ERROR: required host credential is invalid")
+			code := "CREDENTIAL_PASSWORD_EMPTY"
+			if request.Config.Auth.Method == "private_key" {
+				code = "PRIVATE_KEY_PARSE_FAILED"
+			} else if request.Config.Auth.Method == "agent" {
+				code = "AGENT_ENDPOINT_UNAVAILABLE"
+			}
+			return nil, false, &diagnostic.Error{Code: code, HostID: host.ID}
 		}
 	}
 	var once sync.Once
@@ -64,7 +96,7 @@ func (m *Manager) Submit(request runstore.Request, credentials map[string]execut
 		rollback, err := installer.InstallRunCredentials(runID, credentials)
 		if err != nil {
 			if errors.Is(err, executor.ErrCredentialUnavailable) {
-				return nil, fmt.Errorf("AUTH_ERROR: selected local credential is unavailable")
+				return nil, &diagnostic.Error{Code: "AGENT_ENDPOINT_UNAVAILABLE"}
 			}
 			return nil, fmt.Errorf("INFRA_ERROR: install task credentials")
 		}
@@ -103,6 +135,10 @@ func validatePlanState(request runstore.Request) error {
 func (m *Manager) List() []runstore.Run { return m.store.List() }
 
 func (m *Manager) Get(runID string) (*runstore.Run, error) { return m.store.Get(runID) }
+
+func (m *Manager) LookupSubmission(key string) (runstore.Acceptance, bool, error) {
+	return m.store.LookupIdempotency(key)
+}
 
 func (m *Manager) CleanupItems(runID string) []report.CleanupItem {
 	return m.store.CleanupItems(runID)
@@ -330,8 +366,9 @@ func (m *Manager) execute(ctx, parentCtx context.Context, run *runstore.Run, imp
 	for _, host := range compiledPreview.Hosts {
 		artifactsByHost[host.Host.ID] = host.Artifacts
 	}
-	hostInputs := make([]executor.HostInput, 0, len(bindings))
-	for _, host := range run.Config.Inventory {
+	hostInputs := make([]executor.HostInput, 0, len(compiledPreview.Hosts))
+	for _, target := range compiledPreview.Hosts {
+		host := target.Host
 		roles := append([]string(nil), bindings[host.ID]...)
 		sort.Strings(roles)
 		hostInputs = append(hostInputs, executor.HostInput{Inventory: host, Roles: roles, AuthMethod: run.Config.Auth.Method, PublicKeyFingerprint: run.Config.Auth.PublicKeyFingerprint})
@@ -463,7 +500,7 @@ func (m *Manager) execute(ctx, parentCtx context.Context, run *runstore.Run, imp
 		}
 		failures := []report.Failure{}
 		if outcome.Failure != nil {
-			failures = append(failures, report.Failure{Code: string(outcome.Failure.Class), Phase: outcome.Failure.Phase, HostID: item.input.Inventory.ID, Message: outcome.Failure.Message})
+			failures = append(failures, report.Failure{Code: string(outcome.Failure.Class), Phase: outcome.Failure.Phase, HostID: item.input.Inventory.ID, Message: outcome.Failure.Message, Diagnostics: append([]diagnostic.Item(nil), outcome.Failure.Diagnostics...)})
 		}
 		status := "COMPLETED"
 		if outcome.Failure != nil && len(outcome.Modes) > 0 {
@@ -564,19 +601,30 @@ func (m *Manager) finalizeFailure(run *runstore.Run, code, phase, message, verdi
 
 func (m *Manager) archive(run *runstore.Run, status, reason, verdict string, hosts []report.HostResult, topologyResults []topology.Result, failures []report.Failure) error {
 	now := time.Now().UTC()
+	reasons := []string{}
 	if verdict == "" {
-		verdict = report.EvaluateVerdict(run.Plan, run.Config.Mode, run.Config.Scope, run.Config.Backend, status, hosts, topologyResults)
+		verdict, reasons = report.EvaluateVerdictWithReasons(run.Plan, run.Config.Mode, run.Config.Scope, run.Config.Backend, status, hosts, topologyResults)
+	} else {
+		reasons = []string{reason}
 	}
 	if status == "CANCELLED" && verdict == "" {
 		verdict = "UNKNOWN"
 	}
 	cleanup := m.store.CleanupItems(run.Acceptance.RunID)
+	for i := range failures {
+		failures[i] = withFailureDiagnostic(failures[i])
+	}
+	for i := range hosts {
+		for j := range hosts[i].Failures {
+			hosts[i].Failures[j] = withFailureDiagnostic(hosts[i].Failures[j])
+		}
+	}
 	value := report.RunReport{
 		SchemaVersion: "readyspec.report/v1", RunID: run.Acceptance.RunID, PlanDigest: run.Config.PlanDigest,
 		RunMode: run.Config.Mode, RunScope: run.Config.Scope, ExecutorBackend: run.Config.Backend,
 		AuthMethod: run.Config.Auth.Method,
 		RunStatus:  status, Verdict: verdict, TerminationReason: reason,
-		VerdictReasons: []string{}, StartedAt: run.Acceptance.AcceptedAt, FinishedAt: now,
+		VerdictReasons: reasons, StartedAt: run.Acceptance.AcceptedAt, FinishedAt: now,
 		TopologyResults: topologyResults, Hosts: hosts, CleanupItems: cleanup, Failures: failures,
 	}
 	if value.FinishedAt.Before(value.StartedAt) {
@@ -592,6 +640,29 @@ func (m *Manager) archive(run *runstore.Run, status, reason, verdict string, hos
 		return m.store.Finalize(run.Acceptance.RunID, value)
 	}
 	return err
+}
+
+func withFailureDiagnostic(value report.Failure) report.Failure {
+	if len(value.Diagnostics) != 0 {
+		return value
+	}
+	code := "REMOTE_EXECUTION_FAILED"
+	switch value.Code {
+	case "AUTH_ERROR":
+		code = "SSH_HANDSHAKE_UNVERIFIABLE"
+	case "NETWORK_ERROR":
+		code = "SSH_CONNECTION_FAILED"
+	case "IDENTITY_ERROR":
+		code = "SSH_HOST_IDENTITY_UNVERIFIABLE"
+	case "HOST_TIMEOUT":
+		code = "REMOTE_COMMAND_TIMEOUT"
+	case "SUDO_POLICY_UNVERIFIABLE", "SUDO_UNVERIFIABLE":
+		code = "SUDO_RESULT_UNVERIFIABLE"
+	}
+	item := diagnostic.ForCode(code, value.HostID)
+	item.Phase = value.Phase
+	value.Diagnostics = []diagnostic.Item{item}
+	return value
 }
 
 func isCancellationAccepted(store *runstore.Store, runID string) bool {
@@ -619,7 +690,7 @@ func preflightFailures(items []preflightResult) []report.HostResult {
 		result = append(result, report.HostResult{
 			HostID: item.input.Inventory.ID, Status: "FAILED", Roles: append([]string(nil), item.input.Roles...),
 			ItemResults: []compiler.ItemResult{},
-			Failures:    []report.Failure{{Code: string(failure.Class), Phase: failure.Phase, HostID: item.input.Inventory.ID, Message: failure.Message}},
+			Failures:    []report.Failure{{Code: string(failure.Class), Phase: failure.Phase, HostID: item.input.Inventory.ID, Message: failure.Message, Diagnostics: append([]diagnostic.Item(nil), failure.Diagnostics...)}},
 		})
 	}
 	return result
