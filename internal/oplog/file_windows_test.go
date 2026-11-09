@@ -32,6 +32,10 @@ func TestWindowsLogFileUsesPrivateACLAndExclusiveWriter(t *testing.T) {
 		windows.CloseHandle(handle)
 		t.Fatal(err)
 	}
+	if err := verifyPrivateACL(handle); err != nil {
+		windows.CloseHandle(handle)
+		t.Fatalf("private test directory ACL did not verify: %v", err)
+	}
 	_ = windows.CloseHandle(handle)
 	path := filepath.Join(dir, "service.log")
 	first, err := OpenFile(path)
@@ -155,6 +159,10 @@ func privateWindowsLogDir(t *testing.T) string {
 	if err := secureFileACL(handle); err != nil {
 		windows.CloseHandle(handle)
 		t.Fatal(err)
+	}
+	if err := verifyPrivateACL(handle); err != nil {
+		windows.CloseHandle(handle)
+		t.Fatalf("private test directory ACL did not verify: %v", err)
 	}
 	_ = windows.CloseHandle(handle)
 	return dir

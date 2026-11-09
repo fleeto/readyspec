@@ -75,24 +75,27 @@ func checkWindowsDirectory(path string) error {
 			windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING,
 			windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 		if err != nil {
-			return fmt.Errorf("LOG_DIRECTORY_UNSAFE")
+			return fmt.Errorf("LOG_DIRECTORY_OPEN_FAILED")
 		}
 		info, infoErr := fileInfo(h)
 		_ = windows.CloseHandle(h)
-		if infoErr != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-			return fmt.Errorf("LOG_DIRECTORY_UNSAFE")
+		if infoErr != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 {
+			return fmt.Errorf("LOG_DIRECTORY_INVALID_COMPONENT")
+		}
+		if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+			return fmt.Errorf("LOG_DIRECTORY_REPARSE_POINT")
 		}
 		if index == len(parts)-1 {
 			checkHandle, openErr := windows.CreateFile(name, windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES,
 				windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING,
 				windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 			if openErr != nil {
-				return fmt.Errorf("LOG_DIRECTORY_UNSAFE")
+				return fmt.Errorf("LOG_DIRECTORY_OPEN_FAILED")
 			}
 			securityErr := verifyPrivateACL(checkHandle)
 			_ = windows.CloseHandle(checkHandle)
 			if securityErr != nil {
-				return fmt.Errorf("LOG_DIRECTORY_UNSAFE")
+				return fmt.Errorf("LOG_DIRECTORY_ACL_UNSAFE")
 			}
 		}
 	}

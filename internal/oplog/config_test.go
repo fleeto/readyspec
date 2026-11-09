@@ -59,10 +59,7 @@ func TestConfigureRejectsUnknownSettings(t *testing.T) {
 }
 
 func TestConfigureWritesToFileAndStderr(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.Chmod(dir, 0700); err != nil {
-		t.Fatal(err)
-	}
+	dir := privateLogTestDir(t)
 	path := filepath.Join(dir, "service.jsonl")
 	var stderr bytes.Buffer
 	logger, closer, err := Configure(Config{Level: "info", Format: "json", File: path}, &stderr)
