@@ -37,6 +37,9 @@ jobs:
         run: go test ./internal/compiler -run 'Collect|Collector|Symlink' -count=1 -v
       - run: go vet ./...
       - run: go test ./...
+      - if: runner.os == 'Windows'
+        name: Verify native Windows log security and rotation
+        run: go test ./internal/oplog -run 'TestConfigureWritesToFileAndStderr|TestWindowsLogFile|TestWindowsRotatingFile' -count=1 -v
       - run: go run ./cmd/readyspec plan validate examples/minimal-plan.yaml --json
       - run: go build ./cmd/readyspec
         env:
