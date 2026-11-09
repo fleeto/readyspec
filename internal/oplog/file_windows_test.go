@@ -22,13 +22,17 @@ func TestWindowsLogFileUsesPrivateACLAndExclusiveWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handle, err := windows.CreateFile(name, windows.READ_CONTROL|windows.WRITE_DAC|windows.FILE_READ_ATTRIBUTES,
+	handle, err := windows.CreateFile(name, windows.READ_CONTROL|windows.WRITE_DAC|windows.WRITE_OWNER|windows.FILE_READ_ATTRIBUTES,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING,
 		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := secureFileACL(handle); err != nil {
+		windows.CloseHandle(handle)
+		t.Fatal(err)
+	}
+	if err := setTestDirectoryOwner(handle); err != nil {
 		windows.CloseHandle(handle)
 		t.Fatal(err)
 	}
@@ -67,7 +71,7 @@ func TestWindowsLogFileRejectsDirectoryACLForOtherUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handle, err := windows.CreateFile(name, windows.READ_CONTROL|windows.WRITE_DAC|windows.FILE_READ_ATTRIBUTES,
+	handle, err := windows.CreateFile(name, windows.READ_CONTROL|windows.WRITE_DAC|windows.WRITE_OWNER|windows.FILE_READ_ATTRIBUTES,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING,
 		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 	if err != nil {
@@ -150,7 +154,7 @@ func privateWindowsLogDir(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handle, err := windows.CreateFile(name, windows.READ_CONTROL|windows.WRITE_DAC|windows.FILE_READ_ATTRIBUTES,
+	handle, err := windows.CreateFile(name, windows.READ_CONTROL|windows.WRITE_DAC|windows.WRITE_OWNER|windows.FILE_READ_ATTRIBUTES,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING,
 		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 	if err != nil {
@@ -160,10 +164,22 @@ func privateWindowsLogDir(t *testing.T) string {
 		windows.CloseHandle(handle)
 		t.Fatal(err)
 	}
+	if err := setTestDirectoryOwner(handle); err != nil {
+		windows.CloseHandle(handle)
+		t.Fatal(err)
+	}
 	if err := verifyPrivateACL(handle); err != nil {
 		windows.CloseHandle(handle)
 		t.Fatalf("private test directory ACL did not verify: %v", err)
 	}
 	_ = windows.CloseHandle(handle)
 	return dir
+}
+
+func setTestDirectoryOwner(handle windows.Handle) error {
+	user, err := currentSID()
+	if err != nil {
+		return err
+	}
+	return windows.SetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION, user, nil, nil, nil)
 }

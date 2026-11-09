@@ -123,28 +123,28 @@ func verifyPrivateACL(handle windows.Handle) error {
 	}
 	owner, _, err := security.Owner()
 	if err != nil {
-		return err
+		return fmt.Errorf("LOG_ACL_OWNER_UNREADABLE")
 	}
 	user, err := currentSID()
 	if err != nil || !windows.EqualSid(owner, user) {
-		return fmt.Errorf("LOG_FILE_UNSAFE")
+		return fmt.Errorf("LOG_ACL_OWNER_MISMATCH")
 	}
 	control, _, err := security.Control()
 	if err != nil || control&windows.SE_DACL_PROTECTED == 0 {
-		return fmt.Errorf("LOG_FILE_UNSAFE")
+		return fmt.Errorf("LOG_ACL_NOT_PROTECTED")
 	}
 	acl, _, err := security.DACL()
 	if err != nil || acl == nil || acl.AceCount == 0 {
-		return fmt.Errorf("LOG_FILE_UNSAFE")
+		return fmt.Errorf("LOG_ACL_EMPTY")
 	}
 	for i := uint32(0); i < uint32(acl.AceCount); i++ {
 		var ace *windows.ACCESS_ALLOWED_ACE
 		if err := windows.GetAce(acl, i, &ace); err != nil || ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
-			return fmt.Errorf("LOG_FILE_UNSAFE")
+			return fmt.Errorf("LOG_ACL_UNSUPPORTED_ACE")
 		}
 		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
 		if !windows.EqualSid(sid, user) && !sid.IsWellKnown(windows.WinLocalSystemSid) && !sid.IsWellKnown(windows.WinBuiltinAdministratorsSid) {
-			return fmt.Errorf("LOG_FILE_UNSAFE")
+			return fmt.Errorf("LOG_ACL_UNTRUSTED_PRINCIPAL")
 		}
 	}
 	return nil
