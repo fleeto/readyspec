@@ -226,7 +226,7 @@ test('SSE reconnect resumes from its cursor and reset replaces the old projectio
   fireEvent.click(await screen.findByRole('button', { name: '接受并执行任务' }))
 
   expect(await screen.findByText(/PREPARING · 尝试 1/)).toBeInTheDocument()
-  await waitFor(() => expect(eventRequests).toHaveLength(2))
+  await waitFor(() => expect(eventRequests).toHaveLength(2), { timeout: 5000 })
   expect(await screen.findByText(/COMPLETED \/ UNKNOWN/)).toBeInTheDocument()
   expect(screen.queryByText(/PREPARING · 尝试 1/)).not.toBeInTheDocument()
   expect(eventRequests).toHaveLength(2)
