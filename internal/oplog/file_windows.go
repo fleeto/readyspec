@@ -178,16 +178,16 @@ func openWindowsFile(path string, create bool) (*os.File, error) {
 	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE|windows.READ_CONTROL|windows.WRITE_DAC,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_DELETE, nil, creation, windows.FILE_ATTRIBUTE_NORMAL|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 	if err != nil {
-		return nil, fmt.Errorf("LOG_FILE_UNSAFE")
+		return nil, fmt.Errorf("LOG_FILE_OPEN_FAILED")
 	}
 	info, err := fileInfo(handle)
 	if err != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0 || info.NumberOfLinks != 1 {
 		_ = windows.CloseHandle(handle)
-		return nil, fmt.Errorf("LOG_FILE_UNSAFE")
+		return nil, fmt.Errorf("LOG_FILE_INVALID_OBJECT")
 	}
 	if err := verifyPrivateACL(handle); err != nil {
-		// Newly created files inherit the protected directory's owner-only ACL;
-		// verify ownership before installing the required private descriptor.
+		// Newly created files may inherit the process default DACL; only tighten
+		// it after confirming the file owner is the current user.
 		security, secErr := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
 		var owner *windows.SID
 		var ownerErr error
@@ -197,17 +197,17 @@ func openWindowsFile(path string, create bool) (*os.File, error) {
 		user, userErr := currentSID()
 		if secErr != nil || ownerErr != nil || userErr != nil || !windows.EqualSid(owner, user) {
 			_ = windows.CloseHandle(handle)
-			return nil, fmt.Errorf("LOG_FILE_UNSAFE")
+			return nil, fmt.Errorf("LOG_FILE_OWNER_UNSAFE")
 		}
 		if err := secureFileACL(handle); err != nil {
 			_ = windows.CloseHandle(handle)
-			return nil, fmt.Errorf("LOG_FILE_UNSAFE")
+			return nil, err
 		}
 	}
 	file := os.NewFile(uintptr(handle), path)
 	if _, err := file.Seek(0, 2); err != nil {
 		_ = file.Close()
-		return nil, fmt.Errorf("LOG_FILE_UNSAFE")
+		return nil, fmt.Errorf("LOG_FILE_SEEK_FAILED")
 	}
 	return file, nil
 }
