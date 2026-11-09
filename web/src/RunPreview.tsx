@@ -843,7 +843,8 @@ export function RunPreview({
                   `submission_id=${submissionDiagnostic.submissionId || 'unavailable'}`,
                   `acceptance=${submissionDiagnostic.acceptance || 'unknown'}`,
                   ...submissionDiagnostic.diagnostics.map(
-                    (item) => `${item.code}${item.host_id ? ` host_id=${item.host_id}` : ''}: ${item.message}`,
+                    (item) =>
+                      `${item.code}${item.host_id ? ` host_id=${item.host_id}` : ''}: ${item.message}`,
                   ),
                 ]
                 void navigator.clipboard?.writeText(lines.join('\n'))
@@ -856,7 +857,12 @@ export function RunPreview({
         {submissionUncertain && (
           <Notice tone="warning">
             任务接受状态尚未确认。先查询原提交状态；不会自动重新提交。离开向导将要求显式放弃该提交意图。
-            <button type="button" className="button" disabled={busy} onClick={() => void checkSubmissionStatus()}>
+            <button
+              type="button"
+              className="button"
+              disabled={busy}
+              onClick={() => void checkSubmissionStatus()}
+            >
               查询提交状态
             </button>
           </Notice>

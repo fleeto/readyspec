@@ -57,7 +57,12 @@ class Client {
     if (response.status === 401 && path !== '/auth/session') {
       this.csrf = ''
       for (const listener of this.sessionExpiryListeners) listener()
-      throw new ApiError('会话已过期，请重新认证后继续。', 401, [], response.headers.get('X-Request-ID') ?? '')
+      throw new ApiError(
+        '会话已过期，请重新认证后继续。',
+        401,
+        [],
+        response.headers.get('X-Request-ID') ?? '',
+      )
     }
     if (!response.ok)
       throw new ApiError(

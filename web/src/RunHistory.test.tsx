@@ -26,7 +26,10 @@ test('report details show parameter source categories without parameter values',
       )
     }
     if (path.endsWith('/runs/run-1')) {
-      return new Response(JSON.stringify({ run: { status: 'COMPLETED' }, sequence: 1, stage_transitions: [] }), { status: 200 })
+      return new Response(
+        JSON.stringify({ run: { status: 'COMPLETED' }, sequence: 1, stage_transitions: [] }),
+        { status: 200 },
+      )
     }
     return new Response(
       JSON.stringify({
@@ -110,27 +113,27 @@ test('report warns about verified UID zero independently of the login name', asy
               ? { items: [run] }
               : String(input).endsWith('/runs/root-run')
                 ? { run: { status: 'COMPLETED' }, sequence: 1, stage_transitions: [] }
-              : {
-                  ...run,
-                  run_status: 'COMPLETED',
-                  verdict: 'READY',
-                  started_at: run.accepted_at,
-                  finished_at: run.accepted_at,
-                  topology_results: [],
-                  hosts: [
-                    {
-                      host_id: 'admin-alias',
-                      status: 'COMPLETED',
-                      login_uid: 0,
-                      high_risk_root_audit: true,
-                      roles: ['app'],
-                      item_results: [],
-                      failures: [],
-                    },
-                  ],
-                  cleanup_items: [],
-                  failures: [],
-                },
+                : {
+                    ...run,
+                    run_status: 'COMPLETED',
+                    verdict: 'READY',
+                    started_at: run.accepted_at,
+                    finished_at: run.accepted_at,
+                    topology_results: [],
+                    hosts: [
+                      {
+                        host_id: 'admin-alias',
+                        status: 'COMPLETED',
+                        login_uid: 0,
+                        high_risk_root_audit: true,
+                        roles: ['app'],
+                        item_results: [],
+                        failures: [],
+                      },
+                    ],
+                    cleanup_items: [],
+                    failures: [],
+                  },
           ),
           { status: 200 },
         ),

@@ -20,8 +20,23 @@ interface RunSummary {
 interface RunState {
   run: RunSummary
   sequence: number
-  host_phases: { sequence: number; host_id: string; phase: string; status?: string; attempt?: number; at?: string }[]
-  stage_transitions: { sequence: number; host_id: string; phase: string; status?: string; attempt?: number; started_at?: string; ended_at?: string }[]
+  host_phases: {
+    sequence: number
+    host_id: string
+    phase: string
+    status?: string
+    attempt?: number
+    at?: string
+  }[]
+  stage_transitions: {
+    sequence: number
+    host_id: string
+    phase: string
+    status?: string
+    attempt?: number
+    started_at?: string
+    ended_at?: string
+  }[]
   recovery_error?: string
   recovery_warning?: string
 }
@@ -348,12 +363,20 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
                 <div className="table-scroll">
                   <table>
                     <thead>
-                      <tr><th>主机</th><th>阶段</th><th>状态</th><th>开始</th><th>结束</th></tr>
+                      <tr>
+                        <th>主机</th>
+                        <th>阶段</th>
+                        <th>状态</th>
+                        <th>开始</th>
+                        <th>结束</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {runState.stage_transitions.map((stage) => (
                         <tr key={`${stage.sequence}/${stage.host_id}/${stage.phase}`}>
-                          <td>{stage.host_id}</td><td>{stage.phase}</td><td>{stage.status ?? '进行中/未知'}</td>
+                          <td>{stage.host_id}</td>
+                          <td>{stage.phase}</td>
+                          <td>{stage.status ?? '进行中/未知'}</td>
                           <td>{stage.started_at ? formatTime(stage.started_at) : '未记录'}</td>
                           <td>{stage.ended_at ? formatTime(stage.ended_at) : '进行中/未知'}</td>
                         </tr>
