@@ -171,12 +171,18 @@ func openWindowsFile(path string, create bool) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("LOG_FILE_INVALID")
 	}
-	creation := uint32(windows.OPEN_EXISTING)
+	access := uint32(windows.GENERIC_READ | windows.GENERIC_WRITE | windows.READ_CONTROL | windows.WRITE_DAC)
+	share := uint32(windows.FILE_SHARE_READ | windows.FILE_SHARE_DELETE)
+	flags := uint32(windows.FILE_ATTRIBUTE_NORMAL | windows.FILE_FLAG_OPEN_REPARSE_POINT)
+	var handle windows.Handle
 	if create {
-		creation = windows.OPEN_ALWAYS
+		handle, err = createPrivateWindowsFile(name, access, share, flags)
+		if errors.Is(err, windows.ERROR_FILE_EXISTS) || errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+			handle, err = windows.CreateFile(name, access, share, nil, windows.OPEN_EXISTING, flags, 0)
+		}
+	} else {
+		handle, err = windows.CreateFile(name, access, share, nil, windows.OPEN_EXISTING, flags, 0)
 	}
-	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE|windows.READ_CONTROL|windows.WRITE_DAC,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_DELETE, nil, creation, windows.FILE_ATTRIBUTE_NORMAL|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 	if err != nil {
 		return nil, fmt.Errorf("LOG_FILE_OPEN_FAILED")
 	}
@@ -186,23 +192,8 @@ func openWindowsFile(path string, create bool) (*os.File, error) {
 		return nil, fmt.Errorf("LOG_FILE_INVALID_OBJECT")
 	}
 	if err := verifyPrivateACL(handle); err != nil {
-		// Newly created files may inherit the process default DACL; only tighten
-		// it after confirming the file owner is the current user.
-		security, secErr := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
-		var owner *windows.SID
-		var ownerErr error
-		if secErr == nil {
-			owner, _, ownerErr = security.Owner()
-		}
-		user, userErr := currentSID()
-		if secErr != nil || ownerErr != nil || userErr != nil || !windows.EqualSid(owner, user) {
-			_ = windows.CloseHandle(handle)
-			return nil, fmt.Errorf("LOG_FILE_OWNER_UNSAFE")
-		}
-		if err := secureFileACL(handle); err != nil {
-			_ = windows.CloseHandle(handle)
-			return nil, err
-		}
+		_ = windows.CloseHandle(handle)
+		return nil, err
 	}
 	file := os.NewFile(uintptr(handle), path)
 	if _, err := file.Seek(0, 2); err != nil {
@@ -210,6 +201,22 @@ func openWindowsFile(path string, create bool) (*os.File, error) {
 		return nil, fmt.Errorf("LOG_FILE_SEEK_FAILED")
 	}
 	return file, nil
+}
+
+func createPrivateWindowsFile(name *uint16, access, share, flags uint32) (windows.Handle, error) {
+	user, err := currentSID()
+	if err != nil {
+		return windows.InvalidHandle, err
+	}
+	sd, err := windows.SecurityDescriptorFromString("O:" + user.String() + "D:P(A;;FA;;;" + user.String() + ")(A;;FA;;;SY)(A;;FA;;;BA)")
+	if err != nil {
+		return windows.InvalidHandle, err
+	}
+	attributes := &windows.SecurityAttributes{
+		Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
+		SecurityDescriptor: sd,
+	}
+	return windows.CreateFile(name, access, share, attributes, windows.CREATE_NEW, flags, 0)
 }
 
 func (f *RotatingFile) Write(data []byte) (int, error) {
