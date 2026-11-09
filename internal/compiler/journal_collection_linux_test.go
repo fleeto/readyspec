@@ -28,12 +28,13 @@ func journalFixtureTools(t *testing.T, root, id string, boot int) {
 		filter = "-u app.service"
 	}
 	fixtureTool(t, root, "tools/journalctl", `if [ -f /warning ]; then cat /warning >&2; fi
+if [ -f /require-reverse ]; then case "$*" in *' --until @6400 -n 1') exit 0;; esac; fi
 case "$*" in
- '--system --no-pager --quiet -o json `+filter+` --until @6400 -n 1') cat /older;;
+ '--system --no-pager --quiet -o json `+filter+` --until @6400 -n 1'|'--system --no-pager --quiet -o json `+filter+` --until @6400 --reverse -n 1') cat /older;;
  '--system --no-pager --quiet -o json `+filter+` --boot=0 --since @`+fmt.Sprint(boot)+` --until @`+fmt.Sprint(boot+60)+` -n 1') cat /first;;
  '--system --no-pager --quiet -o json `+filter+` --since @6400 --until @10000 -n 10000') cat /events;;
- '--system --no-pager --quiet -o json --until @6400 -n 1') cat /audit-older;;
- '--system --no-pager --quiet -o json --since @6400 --until @10000 -n 10000') cat /audit;;
+ '--no-pager --quiet -o json --until @6400 -n 1'|'--no-pager --quiet -o json --until @6400 --reverse -n 1') cat /audit-older;;
+ '--no-pager --quiet -o json --since @6400 --until @10000 -n 10000') cat /audit;;
  *) exit 2;;
 esac`)
 }
@@ -181,6 +182,86 @@ func TestJournalCollectorsRejectIncompleteHistory(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestJournalCollectorsAuditAcrossSplitUserAndSystemFiles(t *testing.T) {
+	for _, id := range []string{"L02", "L03"} {
+		t.Run(id, func(t *testing.T) {
+			root := collectionRoot(t)
+			journalFixtureTools(t, root, id, 1000)
+			older := journalRecord(5000, 10, "older")
+			first := journalRecord(7000, 11, "system activity")
+			user := journalRecord(7500, 12, "private-user-journal-message")
+			last := journalRecord(8000, 13, "system activity")
+			for name, text := range map[string]string{"older": older, "audit-older": older, "first": "", "events": "", "system-audit": first + last, "audit": first + user + last} {
+				fixtureFile(t, root, name, text)
+			}
+			fixtureTool(t, root, "tools/journalctl", `case "$*" in
+  '--system --no-pager --quiet -o json --until @6400 -n 1'|'--no-pager --quiet -o json --until @6400 -n 1'|'--no-pager --quiet -o json --until @6400 --reverse -n 1') cat /audit-older;;
+  '--system --no-pager --quiet -o json --since @6400 --until @10000 -n 10000') cat /system-audit;;
+  '--no-pager --quiet -o json --since @6400 --until @10000 -n 10000') cat /audit;;
+  *' --until @6400 -n 1'|*' --until @6400 --reverse -n 1') cat /older;;
+  *' --boot=0 '*) cat /first;;
+  *' --since @6400 --until @10000 -n 10000') cat /events;;
+  *) exit 2;;
+esac`)
+			params := map[string]any{"lookback_seconds": float64(3600)}
+			if id == "L03" {
+				params["unit"] = "app.service"
+			}
+			results := collectInSandbox(t, root, collectionArtifact(t, id, params))
+			if len(results) != 1 || results[0].Status != "PASS" {
+				t.Fatalf("readable split journals must establish complete continuity: %+v", results)
+			}
+			raw, _ := json.Marshal(results)
+			if strings.Contains(string(raw), "private-user-journal-message") {
+				t.Fatal("unrelated user journal message leaked into evidence")
+			}
+		})
+	}
+}
+
+func TestJournalCollectorsSeekOlderBoundaryInReverse(t *testing.T) {
+	for _, id := range []string{"L02", "L03"} {
+		t.Run(id, func(t *testing.T) {
+			root := collectionRoot(t)
+			journalFixtureTools(t, root, id, 1000)
+			older := journalRecord(5000, 10, "older")
+			for name, text := range map[string]string{"require-reverse": "", "older": older, "audit-older": older, "first": "", "events": "", "audit": journalRecord(7000, 11, "activity")} {
+				fixtureFile(t, root, name, text)
+			}
+			params := map[string]any{"lookback_seconds": float64(3600)}
+			if id == "L03" {
+				params["unit"] = "app.service"
+			}
+			results := collectInSandbox(t, root, collectionArtifact(t, id, params))
+			if len(results) != 1 || results[0].Status != "PASS" {
+				t.Fatalf("older boundary requires an explicit reverse seek: %+v", results)
+			}
+		})
+	}
+}
+
+func TestJournalCollectorsAcceptFractionalBootTime(t *testing.T) {
+	for _, id := range []string{"L02", "L03"} {
+		t.Run(id, func(t *testing.T) {
+			root := collectionRoot(t)
+			journalFixtureTools(t, root, id, 7000)
+			fixtureFile(t, root, "proc/uptime", "2999.9 0\n")
+			first := journalRecord(7000, 100, "startup")
+			for name, text := range map[string]string{"older": "", "audit-older": "", "first": first, "events": "", "audit": first + journalRecord(8000, 101, "activity")} {
+				fixtureFile(t, root, name, text)
+			}
+			params := map[string]any{"lookback_seconds": float64(3600), "allow_since_boot": true}
+			if id == "L03" {
+				params["unit"] = "app.service"
+			}
+			results := collectInSandbox(t, root, collectionArtifact(t, id, params))
+			if len(results) != 1 || results[0].Status != "PASS" {
+				t.Fatalf("fractional uptime must not move boot beyond its first records: %+v", results)
+			}
+		})
 	}
 }
 

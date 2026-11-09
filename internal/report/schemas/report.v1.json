@@ -75,6 +75,7 @@
         "ssh_host_key_fp": {"type": "string"},
         "arch": {"type": "string"},
         "login_uid": {"type": "integer", "minimum": 0},
+        "high_risk_root_audit": {"type": "boolean"},
         "roles": {"type": "array", "items": {"type": "string"}},
         "item_results": {"type": "array", "items": {"$ref": "#/$defs/item_result"}},
         "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}}
@@ -86,10 +87,12 @@
       "properties": {
         "cleanup_id": {"type": "string", "minLength": 1},
         "host_id": {"type": "string", "minLength": 1},
+        "ssh_host_key_fp": {"type": "string"},
         "machine_id": {"type": "string"},
         "boot_id": {"type": "string"},
         "status": {"enum": ["PENDING", "FAILED", "UNKNOWN", "CLEAN", "IGNORED"]},
         "remote_path": {"type": "string"},
+        "privileged_path": {"type": "string"},
         "owner_token": {"type": "string"},
         "reason": {"type": "string"},
         "audit_reason": {"type": "string"}

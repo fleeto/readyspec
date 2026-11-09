@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +17,43 @@ import (
 	"github.com/fleeto/readyspec/internal/webui"
 	"github.com/fleeto/readyspec/internal/workspace"
 )
+
+func TestDelegatedSubmissionPreservesValidatedPlanDocument(t *testing.T) {
+	const source = `schema_version: readyspec.plan/v1
+plan_id: delegated-document-test
+name: Delegated document test
+description: ''
+software_name: demo
+software_version: '1'
+version: '1.0.0'
+state: DRAFT
+topology_policy: {allowed_arch: [x86_64]}
+roles: [{role_id: app, name: App, min_nodes: 1, max_nodes: 1, allow_colocation: false, items: []}]
+embedded_templates: []
+template_lock: {}
+`
+	p, err := plan.Load(strings.NewReader(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := delegatedSubmission(p, runstore.RunConfig{}, "node=127.0.0.1", "quick", "delegate-document-test", nil, nil, nil, nil, nil, executor.Profiles{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request struct {
+		Plan string `json:"plan"`
+	}
+	if err := json.Unmarshal(body, &request); err != nil {
+		t.Fatal(err)
+	}
+	delegated, err := plan.Load(strings.NewReader(request.Plan))
+	if err != nil {
+		t.Fatalf("delegated document must preserve the validated digest: %v", err)
+	}
+	if delegated.Digest != p.Digest {
+		t.Fatalf("digest changed during delegation: got %s want %s", delegated.Digest, p.Digest)
+	}
+}
 
 func TestDelegateRunVerifiesInstanceAndWaitsForArchivedReport(t *testing.T) {
 	const source = `schema_version: readyspec.plan/v1

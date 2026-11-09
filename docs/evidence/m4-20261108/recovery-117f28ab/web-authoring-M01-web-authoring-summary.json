@@ -1,0 +1,15 @@
+{
+  "case": "M4-E2E-01-M01-native-Web-author-delivery",
+  "run_id": "run-DAYSI7VLKSXIFFT7KSQ5O2SCWQ",
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "native_ssh": true,
+  "item_status": "PASS",
+  "cleanup": [
+    "CLEAN"
+  ],
+  "released": true,
+  "yaml_exported": true,
+  "page_errors": [],
+  "external_requests": []
+}

@@ -1,0 +1,188 @@
+[
+  {
+    "case": "M4-SEC-root-no-sudo-T01",
+    "exit": 0,
+    "run_id": "run-HSJQJO6JUAE2B7R76U4OKGN7FB",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-SEC-root-no-sudo-T01-run-HSJQJO6JUAE2B7R76U4OKGN7FB.json"
+  },
+  {
+    "case": "M4-SEC-root-no-sudo-T02",
+    "exit": 0,
+    "run_id": "run-BLDUYJXLWREDK3MBB2XLME6IRX",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-SEC-root-no-sudo-T02-run-BLDUYJXLWREDK3MBB2XLME6IRX.json"
+  },
+  {
+    "case": "M4-SEC-root-no-sudo-T03",
+    "exit": 0,
+    "run_id": "run-3UNDF2KU5I5PXMZC6VG5DDBFGF",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-SEC-root-no-sudo-T03-run-3UNDF2KU5I5PXMZC6VG5DDBFGF.json"
+  },
+  {
+    "case": "M4-SEC-root-no-sudo-T04",
+    "exit": 0,
+    "run_id": "run-XAFPSRDK7APYIG4TTFZDMKF7LQ",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-SEC-root-no-sudo-T04-run-XAFPSRDK7APYIG4TTFZDMKF7LQ.json"
+  },
+  {
+    "case": "M4-SEC-root-no-sudo-T05",
+    "exit": 11,
+    "run_id": "run-N3PTK5JDDXJA5QCGVCLJE6U53S",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "IDENTITY_ERROR",
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-SEC-root-no-sudo-T05-run-N3PTK5JDDXJA5QCGVCLJE6U53S.json"
+  },
+  {
+    "case": "M4-SEC-root-no-sudo-T05",
+    "exit": 0,
+    "run_id": "run-7JD7FI3FMPU7ULDGDHAGOWPKKO",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-SEC-root-no-sudo-T05-run-7JD7FI3FMPU7ULDGDHAGOWPKKO.json"
+  },
+  {
+    "case": "M4-SEC-root-no-sudo-T06",
+    "exit": 0,
+    "run_id": "run-VCSKOK2TCWC54UQTC5WE3BXS5U",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-SEC-root-no-sudo-T06-run-VCSKOK2TCWC54UQTC5WE3BXS5U.json"
+  },
+  {
+    "case": "M4-SEC-barrier-observed-six-host",
+    "exit": 15,
+    "run_id": "run-HLN4YK6XI3NHG74WWHDS42SCPU",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-SEC-barrier-observed-six-host-run-HLN4YK6XI3NHG74WWHDS42SCPU.json"
+  }
+]

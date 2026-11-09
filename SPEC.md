@@ -344,13 +344,13 @@ SSH 密钥、系统 Agent 或密码均可满足 SSH 认证；实际 UID 为 `0` 
 管理端通过 `golang.org/x/crypto/ssh` 直连 Linux 目标主机（Windows 与 Linux 管理端行为完全一致）：
 
 1. **连接与主机身份核验（`CONNECTING`）**：默认开启 `known_hosts` 主机公钥校验；支持私钥文件、系统 SSH Agent（Linux `SSH_AUTH_SOCK` / Windows `\\.\pipe\openssh-ssh-agent`）及来自内存保险箱的短期密码。仅在尚未进入执行阶段的瞬时连接/传输故障允许有限重试。
-2. **能力发现（`DISCOVERING`）**：单次 `/bin/sh` 采集发行版、内核、CPU 架构（`x86_64` / `aarch64`）、`machine-id`、`boot_id`、登录 UID、`sudo` 能力、SHA-256 校验工具（`sha256sum` → `openssl dgst -sha256`）及非 `noexec` 可执行临时目录（`STANDARD` 候选：`显式指定 → /tmp → /var/tmp → $HOME/.cache`；`PRIVILEGED` 候选：`显式指定 → /run → /var/tmp → /tmp`）。
-3. **分方式编译与残留预登记（`PREPARING`）**：生成目标主机专属 Goss 工件；在远端创建目录前先在本地持久化 `CleanupItem(PENDING)`（记录 `remote_dir`、128-bit `owner_token`、`machine_id`、`boot_id`）。
+2. **能力发现（`DISCOVERING`）**：采集发行版、内核、CPU 架构（`x86_64` / `aarch64`）、`machine-id`、`boot_id`、登录 UID、`sudo` 能力、SHA-256 校验工具（`sha256sum` → `openssl dgst -sha256`）及安全临时目录。`READYSPEC_REMOTE_TEMP_DIR` 可指定首选远端目录；未指定时 `STANDARD` 按 `/tmp → /var/tmp → $HOME/.cache` 选择，`PRIVILEGED` 按 `/run → /var/tmp → /tmp` 选择。两种执行方式分别发现目录，并依据 `/proc/self/mountinfo` 排除 `ro`、`noexec` 挂载、符号链接及不可用目录；没有安全候选时在全主机执行屏障前失败关闭。
+3. **分方式编译与残留预登记（`PREPARING`）**：生成目标主机专属 Goss 工件；在远端创建目录前先在本地持久化 `CleanupItem(PENDING)`（记录 STANDARD `remote_dir`、独立 PRIVILEGED `privileged_path`、128-bit `owner_token`、`machine_id`、`boot_id` 与已核验的 `ssh_host_key_fp`）。主机指纹供崩溃后无 HostResult 的恢复清理重新核验；公开归档报告不得包含 `owner_token`，该令牌仅保留在私有 Journal 中。
 4. **流式投递与远端摘要验真**：远端执行 `umask 0077 && mkdir <unique_dir>`（严禁 `-p` 防符号链接抢占），写入 `.readyspec_owner` 归属令牌，按发现的 CPU 架构从单二进制内嵌镜像流式解压写入原装 `Goss v0.4.9` 与 `standard-goss.yaml`，并在远端校验 SHA-256 一致（缺少校验工具或摘要不符立即 fail closed 中止）。
 5. **普通执行（`RUNNING_STANDARD`）**：若该方式有启用检查项，先按 `(run_id, host_id, execution_mode)` 追加并同步“远端可能已开始执行”标记，成功后才能发送执行命令（一旦置位，任何断线或超时均严禁自动重跑）；运行 `goss -g standard-goss.yaml validate --format json --retry-timeout 0s --no-color --max-concurrent 10`，有界读取输出（上限 `16 MiB`）。
 6. **受控特权执行（`RUNNING_PRIVILEGED`）**：仅对本地可信内置库摘要精确匹配的 `PRIVILEGED` 模板执行，依据模板声明的权限需求自动选择执行方式，无须额外批准。实际 UID 为 `0` 时直接执行特权闭环，无须调用 sudo；其他账户按需使用 sudo。执行前提示受影响主机、检查项及 root/sudo 执行方式；必要凭据及权限不足按前置校验拒绝，通过校验后的执行故障记对应检查项 `ERROR`，不得伪装为 `PASS` 或降级证据。非 `root` 登录下采用单次 `sudo -S -p '' /bin/sh -c` 原子闭环：原子创建 `root:root 0700` 隔离目录 → 独立拷入本地已上传的 `goss` 字节与特权规则 → **`root` 态重新计算校验 SHA-256（防普通用户态 TOCTOU 篡改）** → `env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C HOME=/root` 清洗环境与绝对路径运行 → 正常态当场自清理特权目录 → 末尾强制 `sudo -k` 清除缓存票据。root 直连同样保留隔离、摘要校验、环境清洗与清理，免除 sudo 调用及票据处理。
    - PRIVILEGED 仅在有启用特权项时执行；发送受控命令前必须追加并同步该主机 **独立的 PRIVILEGED 执行标记**，写入失败不发命令，标记后的歧义结果禁止重跑。空 STANDARD 无需执行。正常及可控失败路径均尝试清理和 `sudo -k`，无法确认时保留清理记录，不宣称成功。
-7. **结果回收（`COLLECTING`）**、**归属校验清理（`CLEANING`）** 与 **终态归档（`FINISHED`）**：核对远端 `machine_id`、`boot_id` 与 `.readyspec_owner` 完全一致且不跟随符号链接后删除临时工作目录，将 `CleanupItem` 更新为 `CLEAN`。
+7. **结果回收（`COLLECTING`）**、**归属校验清理（`CLEANING`）** 与 **终态归档（`FINISHED`）**：核对远端 `machine_id`、`boot_id` 与各工作目录中的 `.readyspec_owner` 完全一致且不跟随符号链接后删除临时工作目录。特权闭环正常退出时由 root 脚本 trap 自清理；连接中断等无法确认特权清理结果时，`CleanupItem` 同时保留两条独立路径供恢复处置。
 
 ### 8.3 协作式取消、异常重启与远端残留清理（`RemoteCleanup`）
 
@@ -691,6 +691,8 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 3. **M2（双执行器、Run Manager 与自适应 CLI/API）**：实现 `NativeSSHExecutor`（含进程内回环 SSH Server + 真实内嵌 Goss 全链路集成测试）、`MockSimulatorExecutor`、`RunManager`、受控 HTTP/SSE 服务与自适应双模 CLI（严格验证退出码 `0 / 10~16`）。
 4. **M3（Web UI 四视图控制台与单二进制合流）**：按 `DESIGN.md` 实现 React + TypeScript 前端和 Go 原生生命周期、公共模板、断言、Run 历史及清理闭环；静态产物编译嵌入 Go 单二进制。旧 Python/Docker 遗留物仅在替代用例与迁移验收后清理。
 5. **M4（三架构交叉构建与矩阵验收）**：构建并检验 `windows/amd64`、`linux/amd64`、`linux/arm64` 单二进制产物，执行端到端验收场景、性能压测与六目标 Linux 平台实机认证。
+
+M4 的具体平台矩阵、环境需求、测试判据与证据签署规则见 [M4 验收矩阵与环境清单](docs/m4-acceptance-plan.md)。该计划及其设计评审不代表 M4 实机验收已完成。
 
 ---
 

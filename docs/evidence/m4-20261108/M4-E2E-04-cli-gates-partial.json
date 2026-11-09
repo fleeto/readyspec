@@ -1,0 +1,22 @@
+[
+  {
+    "case": "M4-E2E-04-cli-plan-parse-12",
+    "exit": 12,
+    "stderr": "YAML_SYNTAX_ERROR: invalid YAML document"
+  },
+  {
+    "case": "M4-E2E-04-cli-digest-auth-15",
+    "exit": 15,
+    "stderr": "PLAN_DIGEST_MISMATCH: expected digest does not match validated plan"
+  },
+  {
+    "case": "M4-E2E-04-cli-unavailable-workspace-13",
+    "exit": 13,
+    "stderr": "INFRA_ERROR: cannot open workspace"
+  },
+  {
+    "case": "M4-E2E-04-cli-no-wait-lock-16",
+    "exit": 16,
+    "stderr": "WORKSPACE_BUSY: workspace is owned by a short-lived process"
+  }
+]

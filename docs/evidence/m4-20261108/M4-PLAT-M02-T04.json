@@ -1,0 +1,226 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-LGC2ADELFOKPEY3BBXTFD4GXHV",
+  "plan_digest": "sha256:49dc330c3542f9a9df29a89b723f252c0b8e9298cab9b8e25de7b91d70bf1def",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "COMPLETED",
+  "verdict": "READY",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T15:50:51.132177598Z",
+  "finished_at": "2026-11-08T15:50:52.141490457Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "COMPLETED",
+      "machine_id": "ec2772c4a236dcb1bcdf594133ebedcb",
+      "boot_id": "88fcc2ba-a3e3-475f-9571-389c5cfb75d9",
+      "ssh_host_key_fp": "SHA256:F1C1qm1s+DMn8XlxDxWDrXDucrW5lexBMcRixnnCQTo",
+      "arch": "aarch64",
+      "login_uid": 1000,
+      "roles": [
+        "app"
+      ],
+      "item_results": [
+        {
+          "role_id": "app",
+          "item_id": "h01",
+          "status": "PASS",
+          "template_id": "H01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "allowed_arch": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T15:50:51.621212879Z",
+              "end_time": "2026-11-08T15:50:51.623763509Z",
+              "duration_ns": 2550621
+            },
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "stdout",
+              "expected": {
+                "allowed_arch": [
+                  "x86_64",
+                  "aarch64"
+                ]
+              },
+              "actual": {
+                "normalized_architecture": "aarch64",
+                "uname_raw": "aarch64\n"
+              },
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T15:50:51.623766717Z",
+              "end_time": "2026-11-08T15:50:51.623814652Z",
+              "duration_ns": 47935
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s01",
+          "status": "PASS",
+          "template_id": "S01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EXISTENCE",
+          "parameter_sources": {
+            "exists": "item",
+            "filetype": "item",
+            "follow_symlinks": "default",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T15:50:51.621213117Z",
+              "end_time": "2026-11-08T15:50:51.64885292Z",
+              "duration_ns": 27639794
+            },
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "stdout",
+              "expected": {},
+              "actual": {
+                "follow_symlinks": false,
+                "node_exists": true,
+                "node_type": "file"
+              },
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T15:50:51.648856621Z",
+              "end_time": "2026-11-08T15:50:51.648875952Z",
+              "duration_ns": 19331
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "exists",
+              "expected": true,
+              "actual": true,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T15:50:51.622219501Z",
+              "end_time": "2026-11-08T15:50:51.622229355Z",
+              "duration_ns": 9854
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "filetype",
+              "expected": "file",
+              "actual": "file",
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T15:50:51.622247948Z",
+              "end_time": "2026-11-08T15:50:51.622254077Z",
+              "duration_ns": 6137
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "a03",
+          "status": "PASS",
+          "template_id": "A03",
+          "template_version": "1.0.0",
+          "execution_mode": "PRIVILEGED",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "expected": "item",
+            "key": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-cf094548d41548ea425995c9cc62acdb71efde9a2dca00fbcfefb791a3582980",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/usr/sbin/sshd -T",
+              "start_time": "2026-11-08T15:50:51.874743677Z",
+              "end_time": "2026-11-08T15:50:51.8880771Z",
+              "duration_ns": 13333415
+            },
+            {
+              "resource": "builtin-cf094548d41548ea425995c9cc62acdb71efde9a2dca00fbcfefb791a3582980",
+              "property": "stdout",
+              "expected": {
+                "match-regexp": "(?m)^port[ \\t]+22[ \\t]*$"
+              },
+              "actual": "port 22\naddressfamily any\nlistenaddress [::]:22\nlistenaddress 0.0.0.0:22\nusepam yes\npamservicename sshd\nlogingracetime 120\nx11displayoffset 10\nmaxauthtries 6\nmaxsessions 10\nclientaliveinterval 120\nclientalivecountmax 3\nrequiredrsasize 1024\nstreamlocalbindmask 0177\nunusedconnectiontimeout none\npermitrootlogin without-password\nignorerhosts yes\nignoreuserknownhosts no\nhostbasedauthentication no\nhostbasedusesnamefrompacketonly no\npubkeyauthentication yes\nkerberosauthentication no\nkerberosorlocalpasswd yes\nkerberosticketcleanup yes\ngssapiauthentication no\ngssapicleanupcredentials yes\ngssapikeyexchange no\ngssapistrictacceptorcheck yes\ngssapistorecredentialsonrekey no\ngssapikexalgorithms gss-group14-sha256-,gss-group16-sha512-,gss-nistp256-sha256-,gss-curve25519-sha256-,gss-group14-sha1-,gss-gex-sha1-\npasswordauthentication no\nkbdinteractiveauthentication no\nprintmotd no\nprintlastlog yes\nx11forwarding yes\nx11uselocalhost yes\npermittty yes\npermituserrc yes\nstrictmodes yes\ntcpkeepalive yes\npermitemptypasswords no\ncompression yes\ngatewayports no\nusedns no\nallowtcpforwarding yes\nallowagentforwarding yes\ndisableforwarding no\nallowstreamlocalforwarding yes\nstreamlocalbindunlink no\nfingerprinthash SHA256\nexposeauthinfo no\nrefuseconnection no\ndebianbanner yes\npidfile /run/sshd.pid\nmodulifile /etc/ssh/moduli\nxauthlocation /usr/bin/xauth\nciphers chacha20-poly1305@openssh.com,aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr\nmacs umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1\nbanner none\nforcecommand none\nchrootdirectory none\ntrustedusercakeys none\nrevokedkeys none\nsecuritykeyprovider internal\nauthorizedprincipalsfile none\nversionaddendum none\nauthorizedkeyscommand none\nauthorizedkeyscommanduser none\nauthorizedprincipalscommand none\nauthorizedprincipalscommanduser none\nhostkeyagent none\nkexalgorithms mlkem768x25519-sha256,sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521\ncasignaturealgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256\nhostbasedacceptedalgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256\nhostkeyalgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256\npubkeyacceptedalgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256\nsshdsessionpath /usr/lib/openssh/sshd-session\nsshdauthpath /usr/lib/openssh/sshd-auth\npersourcepenaltyexemptlist none\nloglevel INFO\nsyslogfacility AUTH\nauthorizedkeysfile .ssh/authorized_keys .ssh/authorized_keys2\nhostkey /etc/ssh/ssh_host_rsa_key\nhostkey /etc/ssh/ssh_host_ecdsa_key\nhostkey /etc/ssh/ssh_host_ed25519_key\nacceptenv LANG\nacceptenv LC_*\nacceptenv COLORTERM\nacceptenv NO_COLOR\nauthenticationmethods any\nchanneltimeout none\nsubsystem sftp /usr/lib/openssh/sftp-server\nmaxstartups 10:30:100\npersourcemaxstartups none\npersourcenetblocksize 32:128\npermittunnel no\nipqos ef cs1\nrekeylimit 0 0\npermitopen any\npermitlisten any\npermituserenvironment no\npubkeyauthoptions none\npersourcepenalties crash:90 authfail:5 noauth:1 grace-exceeded:10 refuseconnection:10 max:600 min:15 max-sources4:65536 max-sources6:65536 overflow:permissive overflow6:permissive\n",
+              "error": false,
+              "source": "/usr/sbin/sshd -T",
+              "start_time": "2026-11-08T15:50:51.888080629Z",
+              "end_time": "2026-11-08T15:50:51.888149773Z",
+              "duration_ns": 69144
+            }
+          ]
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-LGC2ADELFOKPEY3BBXTFD4GXHV:96ccdad3fcbf",
+      "host_id": "node",
+      "machine_id": "ec2772c4a236dcb1bcdf594133ebedcb",
+      "boot_id": "88fcc2ba-a3e3-475f-9571-389c5cfb75d9",
+      "status": "CLEAN",
+      "remote_path": "/tmp/readyspec-45574edcf7423c527f911188",
+      "privileged_path": "/var/tmp/readyspec-45574edcf7423c527f911188-privileged"
+    }
+  ],
+  "failures": []
+}

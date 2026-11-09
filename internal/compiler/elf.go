@@ -261,7 +261,9 @@ func elfEvaluation(params map[string]any, text string) (string, map[string]any) 
 			if !validELFHeader(entry.Header) {
 				return "ERROR", summary
 			}
-			if entry.Header.Type != 3 || entry.Header.PIE || entry.Header.Interpreter || entry.Header.Class != observed.Header.Class || entry.Header.ByteOrder != observed.Header.ByteOrder || entry.Header.Machine != observed.Header.Machine {
+			// glibc's shared object has PT_INTERP for its diagnostic entry point.
+			// PIE executables remain invalid library candidates.
+			if entry.Header.Type != 3 || entry.Header.PIE || entry.Header.Class != observed.Header.Class || entry.Header.ByteOrder != observed.Header.ByteOrder || entry.Header.Machine != observed.Header.Machine {
 				bad = true
 			} else {
 				resolved[entry.Name] = true

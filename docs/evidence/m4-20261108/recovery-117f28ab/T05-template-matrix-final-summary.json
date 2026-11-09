@@ -1,0 +1,27 @@
+{
+  "target": "T05",
+  "fail": {
+    "run_id": "run-4WX77VBP5ZS6QZ3ANB623NBTCM",
+    "items": 36,
+    "status": "FAIL",
+    "exit": 10,
+    "verdict": "NOT_READY",
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  "exception": {
+    "run_id": "run-OPPE53Y4KXFLODQFBFEHGAVGB6",
+    "items": 36,
+    "statuses": {
+      "ERROR": 33,
+      "PASS": 3
+    },
+    "exit": 11,
+    "verdict": "UNKNOWN",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "review": "T05-exception-evidence-review.json"
+  }
+}

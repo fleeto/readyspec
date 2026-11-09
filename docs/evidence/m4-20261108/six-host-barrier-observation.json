@@ -1,0 +1,11 @@
+{
+  "case": "M4-SEC-barrier-observed-six-host",
+  "goss_execution_deltas": {
+    "T01": 0,
+    "T02": 0,
+    "T03": 0,
+    "T04": 0,
+    "T05": 0,
+    "T06": 0
+  }
+}

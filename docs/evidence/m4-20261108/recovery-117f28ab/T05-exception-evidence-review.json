@@ -1,0 +1,751 @@
+{
+  "case": "M4-CERT-T05-exception",
+  "run_id": "run-OPPE53Y4KXFLODQFBFEHGAVGB6",
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "cleanup": [
+    "CLEAN"
+  ],
+  "expected_classification": "controlled abnormal-tool matrix; unaffected N02/S02/S03 remain PASS",
+  "items": [
+    {
+      "template_id": "A01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_NSS_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "A02",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_NSS_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "A04",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "D01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "D02",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_COMMAND_METADATA",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "D03",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_RUNTIME_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "D04",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_ELF_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "D05",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "H01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_UNAME_OUTPUT",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "H02",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": true
+        }
+      ]
+    },
+    {
+      "template_id": "H03",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "H04",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "L01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_UPTIME",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "L02",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "L03",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "N01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_INTERFACE_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "N02",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "N03",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "N04",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_DNS_HEADER",
+          "error": false
+        },
+        {
+          "property": "addrs",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "resolvable",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "N05",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "N06",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_ROUTE_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "O01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "O02",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "O03",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "O04",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "R01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_UNIT_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "R02",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_PROCESS_TABLE",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "R03",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_LOADAVG",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "R04",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_LIMIT_OBSERVATION",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "R05",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 0,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "SYNC_QUERY_FAILED",
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "S01",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": "INVALID_PATH_METADATA",
+          "error": false
+        },
+        {
+          "property": "exists",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "filetype",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "S02",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "evidence": [
+        {
+          "property": "exists",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "gid",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "group",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "mode",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "owner",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "uid",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "S03",
+      "expected_status": "PASS",
+      "actual_status": "PASS",
+      "evidence": [
+        {
+          "property": "exists",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "filesystem",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "opts",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "source",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "S04",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "S05",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    },
+    {
+      "template_id": "A03",
+      "expected_status": "ERROR",
+      "actual_status": "ERROR",
+      "evidence": [
+        {
+          "property": "exit-status",
+          "exit_actual": 2,
+          "structured_error": null,
+          "error": false
+        },
+        {
+          "property": "stdout",
+          "exit_actual": null,
+          "structured_error": null,
+          "error": false
+        }
+      ]
+    }
+  ],
+  "assertions_passed": true
+}

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,6 +29,10 @@ import (
 const commandOutputLimit = 16 * 1024 * 1024
 
 var errOutputLimit = errors.New("remote output limit exceeded")
+var errAgentKeyUnavailable = errors.New("selected Agent key is unavailable")
+
+// ErrCredentialUnavailable identifies a rejected local authentication input.
+var ErrCredentialUnavailable = errors.New("selected local credential is unavailable")
 
 type Credential struct {
 	Method       string
@@ -91,7 +96,7 @@ func (v *CredentialVault) InstallRun(runID string, credentials map[string]Creden
 		if value.Method == "agent" {
 			connection, err := dialAgentEndpoint(value.AgentSocket)
 			if err != nil {
-				return errors.New("cannot acquire selected local Agent connection")
+				return fmt.Errorf("%w: cannot acquire selected local Agent connection", ErrCredentialUnavailable)
 			}
 			value.AgentConn = connection
 		}
@@ -158,9 +163,12 @@ func (m CredentialMap) DestroyRun(runID string) {
 type NativeSSH struct {
 	Credentials    CredentialProvider
 	KnownHostsPath string
+	RemoteTempDir  string
 }
 
-func NewNativeSSH() *NativeSSH { return &NativeSSH{Credentials: NewCredentialVault()} }
+func NewNativeSSH() *NativeSSH {
+	return &NativeSSH{Credentials: NewCredentialVault(), RemoteTempDir: os.Getenv("READYSPEC_REMOTE_TEMP_DIR")}
+}
 
 func (e *NativeSSH) InstallRunCredentials(runID string, credentials map[string]Credential) (func(), error) {
 	vault, ok := e.Credentials.(*CredentialVault)
@@ -232,7 +240,7 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 				}
 			}
 			if len(selected) == 0 {
-				return nil, errors.New("selected Agent key is unavailable")
+				return nil, errAgentKeyUnavailable
 			}
 			return selected, nil
 		}))
@@ -266,6 +274,9 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 	if deadline, ok := dialCtx.Deadline(); ok {
 		_ = transport.SetDeadline(deadline)
 	}
+	// Prefer a key already trusted for this endpoint when the server offers
+	// multiple key types. The callback still verifies the negotiated key.
+	config.HostKeyAlgorithms = trustedHostKeyAlgorithms(knownHostsFile, remote, transport.RemoteAddr(), knownHostCallback)
 	clientConn, channels, requests, err := ssh.NewClientConn(transport, remote, config)
 	if err != nil {
 		_ = transport.Close()
@@ -274,6 +285,43 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 	_ = transport.SetDeadline(time.Time{})
 	client := ssh.NewClient(clientConn, channels, requests)
 	return &connection{client: client, keyFP: hostKeyFingerprint}, nil
+}
+
+func trustedHostKeyAlgorithms(path, hostname string, remote net.Addr, verify ssh.HostKeyCallback) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	supported := ssh.SupportedAlgorithms().HostKeys
+	preferred := map[string]bool{}
+	for len(data) > 0 {
+		marker, _, key, _, rest, err := ssh.ParseKnownHosts(data)
+		if err != nil {
+			break
+		}
+		data = rest
+		if marker != "" || verify(hostname, remote, key) != nil {
+			continue
+		}
+		if key.Type() == ssh.KeyAlgoRSA {
+			preferred[ssh.KeyAlgoRSASHA256] = true
+			preferred[ssh.KeyAlgoRSASHA512] = true
+		} else {
+			preferred[key.Type()] = true
+		}
+	}
+	algorithms := make([]string, 0, len(supported))
+	for _, algorithm := range supported {
+		if preferred[algorithm] {
+			algorithms = append(algorithms, algorithm)
+		}
+	}
+	for _, algorithm := range supported {
+		if !preferred[algorithm] {
+			algorithms = append(algorithms, algorithm)
+		}
+	}
+	return algorithms
 }
 
 func userHomeDir() string {
@@ -307,6 +355,14 @@ func (e *NativeSSH) Preflight(ctx context.Context, req PreflightRequest) Preflig
 	}
 	facts.HostKey = conn.keyFP
 	facts.Root = facts.UID == 0
+	if len(req.Artifacts.Standard.Items)+len(req.Artifacts.Privileged.Items) > 0 {
+		paths, pathErr := discoverWorkspacePaths(ctx, conn.client, e.RemoteTempDir, len(req.Artifacts.Privileged.Items) > 0)
+		if pathErr != nil {
+			return PreflightResult{Facts: facts, Failure: &Failure{Class: FailureExecution, Phase: "REMOTE_WORKSPACE", Message: "a safe remote execution directory is unavailable"}}
+		}
+		facts.WorkspaceBase = paths.Standard
+		facts.PrivilegedWorkspaceBase = paths.Privileged
+	}
 	owner := make([]byte, 16)
 	if _, err := rand.Read(owner); err != nil {
 		return PreflightResult{Facts: facts, Failure: &Failure{Class: FailureExecution, Phase: "PREFLIGHT", Message: "cannot establish remote cleanup ownership"}}
@@ -317,7 +373,9 @@ func (e *NativeSSH) Preflight(ctx context.Context, req PreflightRequest) Preflig
 		if credentialErr != nil {
 			return PreflightResult{Facts: facts, Failure: &Failure{Class: FailureAuth, Phase: "SUDO_CREDENTIAL", Message: "required sudo credential is unavailable"}}
 		}
-		if class := checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, credential); class != "" {
+		workspace := executionWorkspace(facts.WorkspaceBase, req.RunID, req.Host.Inventory.ID)
+		rootDir := privilegedExecutionWorkspace(facts.PrivilegedWorkspaceBase, req.RunID, req.Host.Inventory.ID)
+		if class := checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, workspace, rootDir, credential); class != "" {
 			return PreflightResult{Facts: facts, Failure: &Failure{Class: class, Phase: "SUDO_POLICY", Message: "controlled sudo command was denied or could not be verified"}}
 		}
 	}
@@ -325,7 +383,7 @@ func (e *NativeSSH) Preflight(ctx context.Context, req PreflightRequest) Preflig
 }
 
 func discover(ctx context.Context, client *ssh.Client) (HostFacts, error) {
-	command := "printf 'UID='; id -u; printf 'ARCH='; uname -m; printf 'MACHINE='; cat /etc/machine-id 2>/dev/null; printf 'BOOT='; cat /proc/sys/kernel/random/boot_id 2>/dev/null; printf 'CHECKSUM='; command -v sha256sum || command -v shasum || true"
+	command := "printf 'UID='; id -u; printf 'ARCH='; uname -m; printf 'MACHINE='; cat /etc/machine-id 2>/dev/null; printf 'BOOT='; cat /proc/sys/kernel/random/boot_id 2>/dev/null; printf 'CHECKSUM='; command -v sha256sum || command -v openssl || true"
 	output, err := runSSH(ctx, client, command, nil)
 	if err != nil {
 		return HostFacts{}, err
@@ -366,15 +424,26 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		return HostOutcome{Failure: &Failure{Class: FailureIdentity, Phase: "REVALIDATE", Message: "target identity or privilege facts changed after preflight"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 	}
 	facts.OwnerToken = req.Facts.OwnerToken
+	facts.Root = facts.UID == 0
 	if conn.keyFP != req.Facts.HostKey {
 		return HostOutcome{Failure: &Failure{Class: FailureIdentity, Phase: "REVALIDATE", Message: "SSH host key changed after preflight"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+	}
+	if len(req.Artifacts.Standard.Items)+len(req.Artifacts.Privileged.Items) > 0 {
+		paths, pathErr := discoverWorkspacePaths(ctx, conn.client, e.RemoteTempDir, len(req.Artifacts.Privileged.Items) > 0)
+		if pathErr != nil || paths.Standard != req.Facts.WorkspaceBase || paths.Privileged != req.Facts.PrivilegedWorkspaceBase {
+			return HostOutcome{Failure: &Failure{Class: FailureIdentity, Phase: "REVALIDATE", Message: "remote execution directory facts changed after preflight"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+		}
+		facts.WorkspaceBase = paths.Standard
+		facts.PrivilegedWorkspaceBase = paths.Privileged
 	}
 	if len(req.Artifacts.Privileged.Items) > 0 && !facts.Root {
 		credential, credentialErr := e.Credentials.Credential(ctx, req.RunID, req.Host.Inventory.ID)
 		if credentialErr != nil {
 			return HostOutcome{Failure: &Failure{Class: FailureAuth, Phase: "SUDO_CREDENTIAL", Message: "required sudo credential is unavailable"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 		}
-		if class := checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, credential); class != "" {
+		workspace := executionWorkspace(facts.WorkspaceBase, req.RunID, req.Host.Inventory.ID)
+		rootDir := privilegedExecutionWorkspace(facts.PrivilegedWorkspaceBase, req.RunID, req.Host.Inventory.ID)
+		if class := checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, workspace, rootDir, credential); class != "" {
 			return HostOutcome{Failure: &Failure{Class: class, Phase: "SUDO_POLICY", Message: "controlled sudo command was denied or could not be verified"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 		}
 	}
@@ -386,8 +455,12 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 	if len(ownerToken) != 32 {
 		return failedOutcome(result, "PREPARE", "cleanup ownership token is unavailable")
 	}
-	remotePath := executionWorkspace(req.RunID, req.Host.Inventory.ID)
-	cleanup := report.CleanupItem{CleanupID: req.RunID + ":" + ownerToken[:12], HostID: req.Host.Inventory.ID, MachineID: facts.MachineID, BootID: facts.BootID, Status: "PENDING", RemotePath: remotePath, OwnerToken: ownerToken}
+	remotePath := executionWorkspace(facts.WorkspaceBase, req.RunID, req.Host.Inventory.ID)
+	privilegedPath := ""
+	if len(req.Artifacts.Privileged.Items) > 0 {
+		privilegedPath = privilegedExecutionWorkspace(facts.PrivilegedWorkspaceBase, req.RunID, req.Host.Inventory.ID)
+	}
+	cleanup := report.CleanupItem{CleanupID: req.RunID + ":" + ownerToken[:12], HostID: req.Host.Inventory.ID, HostKeyFP: conn.keyFP, MachineID: facts.MachineID, BootID: facts.BootID, Status: "PENDING", RemotePath: remotePath, PrivilegedPath: privilegedPath, OwnerToken: ownerToken}
 	if err := journal.CleanupRegistered(ctx, req.RunID, cleanup); err != nil {
 		return failedOutcome(result, "JOURNAL", "cannot persist cleanup registration")
 	}
@@ -398,8 +471,23 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		result.Cleanup = append(result.Cleanup, cleanup)
 		return failedOutcome(result, "PREPARE", "remote execution workspace could not be created")
 	}
+	privilegedUncertain := false
 	defer func() {
 		_ = journal.Phase(context.Background(), req.RunID, req.Host.Inventory.ID, "CLEANING")
+		if privilegedUncertain {
+			cleanup.Status, cleanup.Reason = "UNKNOWN", "privileged workspace cleanup could not be confirmed"
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			journalErr := journal.CleanupUpdated(cleanupCtx, req.RunID, cleanup)
+			if phaseErr := journal.Phase(cleanupCtx, req.RunID, req.Host.Inventory.ID, "FINISHED"); journalErr == nil {
+				journalErr = phaseErr
+			}
+			cleanupCancel()
+			outcome.Cleanup = append(outcome.Cleanup, cleanup)
+			if journalErr != nil && outcome.Failure == nil {
+				outcome.Failure = &Failure{Class: FailureExecution, Phase: "CLEANUP_JOURNAL", Message: "cleanup outcome could not be persisted"}
+			}
+			return
+		}
 		command := "test \"$(cat /etc/machine-id 2>/dev/null)\" = " + shellQuote(facts.MachineID) + " && test \"$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)\" = " + shellQuote(facts.BootID) + " && test ! -L " + shellQuote(remotePath) + " && test \"$(cat " + shellQuote(remotePath+"/.readyspec_owner") + " 2>/dev/null)\" = " + shellQuote(ownerToken) + " && rm -rf -- " + shellQuote(remotePath)
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_, cleanErr := runSSH(cleanupCtx, conn.client, command, nil)
@@ -426,7 +514,8 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		}
 		if artifact.ExecutionMode == "PRIVILEGED" && !facts.Root {
 			credential, credentialErr := e.Credentials.Credential(ctx, req.RunID, req.Host.Inventory.ID)
-			if credentialErr != nil || checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, credential) != "" {
+			rootDir := privilegedExecutionWorkspace(facts.PrivilegedWorkspaceBase, req.RunID, req.Host.Inventory.ID)
+			if credentialErr != nil || checkSudoPolicy(ctx, conn.client, req.RunID, req.Host, req.Artifacts.Privileged, facts.Arch, facts.OwnerToken, remotePath, rootDir, credential) != "" {
 				return failedOutcome(result, "SUDO_POLICY", "controlled sudo command could not be revalidated")
 			}
 		}
@@ -457,7 +546,7 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 		command := "env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C HOME=/ '" + gossPath + "' -g '" + configPath + "' validate --format json --retry-timeout 0s --no-color --max-concurrent 10"
 		var commandInput []byte
 		if artifact.ExecutionMode == "PRIVILEGED" {
-			rootDir := remotePath + "/privileged"
+			rootDir := privilegedPath
 			script := privilegedShellScript(gossPath, configPath, rootDir, artifact, gossBinary, ownerToken)
 			if facts.Root {
 				command = "/bin/sh -c " + shellQuote(script)
@@ -470,6 +559,9 @@ func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Jou
 			}
 		}
 		output, err := runSSH(ctx, conn.client, command, commandInput)
+		if artifact.ExecutionMode == "PRIVILEGED" && (!remoteCommandFinished(err) || remoteCleanupFailed(err)) {
+			privilegedUncertain = true
+		}
 		for i := range commandInput {
 			commandInput[i] = 0
 		}
@@ -509,7 +601,7 @@ func classifySSHConnectFailure(err error) FailureClass {
 	switch {
 	case errors.As(err, &keyErr), strings.Contains(strings.ToLower(err.Error()), "known_hosts"):
 		return FailureIdentity
-	case strings.Contains(strings.ToLower(err.Error()), "unable to authenticate"), strings.Contains(strings.ToLower(err.Error()), "credential"), strings.Contains(strings.ToLower(err.Error()), "public key identity"):
+	case errors.Is(err, errAgentKeyUnavailable), strings.Contains(strings.ToLower(err.Error()), "unable to authenticate"), strings.Contains(strings.ToLower(err.Error()), "credential"), strings.Contains(strings.ToLower(err.Error()), "public key identity"):
 		return FailureAuth
 	default:
 		return FailureNetwork
@@ -519,6 +611,16 @@ func classifySSHConnectFailure(err error) FailureClass {
 func isCheckFailure(err error) bool {
 	var exitError *ssh.ExitError
 	return errors.As(err, &exitError) && exitError.ExitStatus() == 1
+}
+
+func remoteCommandFinished(err error) bool {
+	var exitError *ssh.ExitError
+	return err == nil || errors.As(err, &exitError)
+}
+
+func remoteCleanupFailed(err error) bool {
+	var exitError *ssh.ExitError
+	return errors.As(err, &exitError) && exitError.ExitStatus() == 125
 }
 
 // ResolveCleanup uses fresh, operation-scoped credentials and never reuses the
@@ -550,7 +652,18 @@ func (e *NativeSSH) ResolveCleanup(ctx context.Context, expectedHostKey string, 
 	if _, err := runSSH(ctx, conn.client, verify, nil); err != nil {
 		return item, fmt.Errorf("CLEANUP_OWNERSHIP_INVALID")
 	}
-	processCommand := "command -v readlink >/dev/null 2>&1 || exit 127; for p in /proc/[0-9]*; do found=; c=$(readlink \"$p/cwd\" 2>/dev/null) || c=; case \"$c\" in " + shellQuote(item.RemotePath) + "|" + shellQuote(item.RemotePath) + "/*) found=1;; esac; for fd in \"$p\"/fd/*; do f=$(readlink \"$fd\" 2>/dev/null) || continue; case \"$f\" in " + shellQuote(item.RemotePath) + "|" + shellQuote(item.RemotePath) + "/*) found=1; break;; esac; done; test -z \"$found\" || echo \"${p##*/}\"; done"
+	rootPath := item.PrivilegedPath
+	if rootPath == "" {
+		rootPath = item.RemotePath + "/privileged"
+	} else if !safeRemoteCleanupPath(rootPath) {
+		return item, fmt.Errorf("CLEANUP_OWNERSHIP_INVALID")
+	}
+	processPatterns := []string{shellQuote(item.RemotePath), shellQuote(item.RemotePath) + "/*"}
+	if item.PrivilegedPath != "" {
+		processPatterns = append(processPatterns, shellQuote(rootPath), shellQuote(rootPath)+"/*")
+	}
+	processPattern := strings.Join(processPatterns, "|")
+	processCommand := "command -v readlink >/dev/null 2>&1 || exit 127; for p in /proc/[0-9]*; do found=; c=$(readlink \"$p/cwd\" 2>/dev/null) || c=; case \"$c\" in " + processPattern + ") found=1;; esac; for fd in \"$p\"/fd/*; do f=$(readlink \"$fd\" 2>/dev/null) || continue; case \"$f\" in " + processPattern + ") found=1; break;; esac; done; test -z \"$found\" || echo \"${p##*/}\"; done"
 	var output []byte
 	if facts.UID == 0 {
 		output, err = runSSH(ctx, conn.client, processCommand, nil)
@@ -570,11 +683,13 @@ func (e *NativeSSH) ResolveCleanup(ctx context.Context, expectedHostKey string, 
 		item.Status, item.Reason = "UNKNOWN", "associated processes are active; explicit termination confirmation is required"
 		return item, nil
 	}
-	rootPath := item.RemotePath + "/privileged"
-	if !safeRemoteCleanupPath(rootPath) {
-		return item, fmt.Errorf("CLEANUP_OWNERSHIP_INVALID")
+	rootInspect := "if test -e " + shellQuote(rootPath) + "; then test ! -L " + shellQuote(rootPath) + " && test -d " + shellQuote(rootPath) + " && test \"$(cat " + shellQuote(rootPath+"/.readyspec_owner") + " 2>/dev/null)\" = " + shellQuote(item.OwnerToken) + " || exit 2; printf yes; else printf no; fi"
+	var rootExistsOutput []byte
+	if facts.UID == 0 {
+		rootExistsOutput, err = runSSH(ctx, conn.client, rootInspect, nil)
+	} else {
+		rootExistsOutput, err = runSudoScript(ctx, conn.client, rootInspect, credential.SudoPassword)
 	}
-	rootExistsOutput, err := runSSH(ctx, conn.client, "if test -e "+shellQuote(rootPath)+"; then printf yes; else printf no; fi", nil)
 	if err != nil {
 		return item, fmt.Errorf("CLEANUP_OWNERSHIP_INVALID")
 	}
@@ -661,7 +776,19 @@ func runSudoScript(ctx context.Context, client *ssh.Client, script string, passw
 }
 
 func safeRemoteCleanupPath(value string) bool {
-	return strings.HasPrefix(value, "/tmp/readyspec-") && !strings.ContainsAny(value, "'\n\r") && !strings.Contains(value, "..")
+	if !strings.HasPrefix(value, "/") || path.Clean(value) != value || strings.ContainsAny(value, "'\x00\n\r\t") || strings.Contains(value, "..") {
+		return false
+	}
+	name := path.Base(value)
+	if !strings.HasPrefix(name, "readyspec-") || len(name) < len("readyspec-x") {
+		return false
+	}
+	for _, character := range name {
+		if !((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '-' || character == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func validOwnerToken(value string) bool {
@@ -672,9 +799,13 @@ func validOwnerToken(value string) bool {
 	return err == nil
 }
 
-func executionWorkspace(runID, hostID string) string {
+func executionWorkspace(base, runID, hostID string) string {
 	sum := sha256.Sum256([]byte(runID + "\x00" + hostID))
-	return "/tmp/readyspec-" + hex.EncodeToString(sum[:12])
+	return path.Join(base, "readyspec-"+hex.EncodeToString(sum[:12]))
+}
+
+func privilegedExecutionWorkspace(base, runID, hostID string) string {
+	return executionWorkspace(base, runID, hostID) + "-privileged"
 }
 
 func shellQuote(value string) string {
@@ -684,22 +815,21 @@ func shellQuote(value string) string {
 func privilegedShellScript(gossPath, configPath, rootDir string, artifact compiler.Artifact, binary []byte, ownerToken string) string {
 	binaryDigest := fmt.Sprintf("%x", sha256.Sum256(binary))
 	configDigest := fmt.Sprintf("%x", sha256.Sum256(artifact.Config))
-	return "set -eu; umask 077; root=" + shellQuote(rootDir) + "; trap 'rm -rf -- \"$root\"' 0; trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; " +
-		"mkdir -- \"$root\"; chown 0:0 -- \"$root\"; chmod 700 -- \"$root\"; printf '%s' '" + ownerToken + "' > \"$root/.readyspec_owner\"; chmod 600 -- \"$root/.readyspec_owner\"; " +
+	return "set -eu; umask 077; root=" + shellQuote(rootDir) + "; created=false; cleanup_root() { status=$?; trap - 0; if [ \"$created\" = true ]; then if ! rm -rf -- \"$root\" || test -e \"$root\"; then status=125; fi; fi; exit \"$status\"; }; trap cleanup_root 0; trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; " +
+		"mkdir -- \"$root\"; created=true; chown 0:0 -- \"$root\"; chmod 700 -- \"$root\"; printf '%s' '" + ownerToken + "' > \"$root/.readyspec_owner\"; chmod 600 -- \"$root/.readyspec_owner\"; " +
 		"cp -- " + shellQuote(gossPath) + " \"$root/goss\"; cp -- " + shellQuote(configPath) + " \"$root/config.yaml\"; " +
 		"chown 0:0 -- \"$root/goss\" \"$root/config.yaml\"; chmod 700 -- \"$root/goss\"; chmod 600 -- \"$root/config.yaml\"; " +
 		"if command -v sha256sum >/dev/null 2>&1; then printf '%s  %s\\n' '" + binaryDigest + "' \"$root/goss\" | sha256sum -c - >/dev/null && printf '%s  %s\\n' '" + configDigest + "' \"$root/config.yaml\" | sha256sum -c - >/dev/null; " +
-		"elif command -v shasum >/dev/null 2>&1; then printf '%s  %s\\n' '" + binaryDigest + "' \"$root/goss\" | shasum -a 256 -c - >/dev/null && printf '%s  %s\\n' '" + configDigest + "' \"$root/config.yaml\" | shasum -a 256 -c - >/dev/null; else exit 127; fi; " +
+		"elif command -v openssl >/dev/null 2>&1; then actual=$(openssl dgst -sha256 < \"$root/goss\") && test \"${actual##*= }\" = '" + binaryDigest + "' && actual=$(openssl dgst -sha256 < \"$root/config.yaml\") && test \"${actual##*= }\" = '" + configDigest + "'; else exit 127; fi; " +
 		"if env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C HOME=/root \"$root/goss\" -g \"$root/config.yaml\" validate --format json --retry-timeout 0s --no-color --max-concurrent 10; then status=0; else status=$?; fi; exit \"$status\""
 }
 
-func checkSudoPolicy(ctx context.Context, client *ssh.Client, runID string, host HostInput, artifact compiler.Artifact, arch, ownerToken string, credential Credential) FailureClass {
+func checkSudoPolicy(ctx context.Context, client *ssh.Client, runID string, host HostInput, artifact compiler.Artifact, arch, ownerToken, workspace, rootDir string, credential Credential) FailureClass {
 	binary, err := goss.Binary(arch)
 	if err != nil {
 		return FailureSudoUnknown
 	}
-	workspace := executionWorkspace(runID, host.Inventory.ID)
-	script := privilegedShellScript(workspace+"/goss", workspace+"/privileged.yaml", workspace+"/privileged", artifact, binary, ownerToken)
+	script := privilegedShellScript(workspace+"/goss", workspace+"/privileged.yaml", rootDir, artifact, binary, ownerToken)
 	command := "/usr/bin/sudo -n -l -- /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C HOME=/root /bin/sh -c " + shellQuote(script)
 	output, queryErr := runSSH(ctx, client, command, nil)
 	if queryErr != nil && len(credential.SudoPassword) > 0 {
@@ -720,6 +850,12 @@ func classifySudoPolicyResult(queryErr, cleanupErr error, output []byte) Failure
 	if queryErr == nil && cleanupErr == nil {
 		return ""
 	}
+	// sudo -l command returns status 1 without output when the command is
+	// explicitly disallowed. Preserve other diagnostics as unverifiable.
+	var exitError *ssh.ExitError
+	if errors.As(queryErr, &exitError) && exitError.ExitStatus() == 1 && len(bytes.TrimSpace(output)) == 0 {
+		return FailureAuth
+	}
 	message := strings.ToLower(fmt.Sprint(queryErr) + " " + fmt.Sprint(cleanupErr) + " " + string(output))
 	if strings.Contains(message, "not allowed to execute") || strings.Contains(message, "not permitted") ||
 		strings.Contains(message, "not in the sudoers") || strings.Contains(message, "incorrect password") ||
@@ -732,16 +868,36 @@ func classifySudoPolicyResult(queryErr, cleanupErr error, output []byte) Failure
 
 func verifyRemoteSHA256(ctx context.Context, client *ssh.Client, remotePath string, local []byte) error {
 	want := fmt.Sprintf("%x", sha256.Sum256(local))
-	command := "if command -v sha256sum >/dev/null 2>&1; then sha256sum '" + remotePath + "'; elif command -v shasum >/dev/null 2>&1; then shasum -a 256 '" + remotePath + "'; else exit 127; fi"
+	quotedPath := shellQuote(remotePath)
+	command := "if command -v sha256sum >/dev/null 2>&1; then sha256sum " + quotedPath + "; elif command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 < " + quotedPath + "; else exit 127; fi"
 	output, err := runSSH(ctx, client, command, nil)
 	if err != nil {
 		return err
 	}
-	fields := strings.Fields(string(output))
-	if len(fields) == 0 || fields[0] != want {
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	fields := strings.Fields(strings.TrimSpace(string(output)))
+	actual := ""
+	if len(fields) >= 1 && isSHA256Hex(fields[0]) {
+		actual = fields[0]
+	} else if len(fields) == 2 && strings.HasPrefix(fields[0], "SHA") && strings.HasSuffix(fields[0], "=") {
+		actual = fields[1]
+	}
+	if len(lines) != 1 || !strings.EqualFold(actual, want) {
 		return errors.New("remote digest mismatch")
 	}
 	return nil
+}
+
+func isSHA256Hex(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	for _, character := range value {
+		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func failedOutcome(out HostOutcome, phase, message string) HostOutcome {

@@ -1,0 +1,179 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-5VBBQBPX4PWDVP4ENLUZHLPRPB",
+  "plan_digest": "sha256:873434f412b9f3165fb7786b8c87b009162a1c25741b0387a273996686bcb0e3",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "COMPLETED",
+  "verdict": "READY",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T18:47:51.346903754Z",
+  "finished_at": "2026-11-08T18:47:52.032622504Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "COMPLETED",
+      "machine_id": "ec273f6b9d8fa31a5d766e8d97b5f63d",
+      "boot_id": "597623e6-554f-4d25-a088-7cdbcae210e0",
+      "ssh_host_key_fp": "SHA256:RwdUL0314OX729zz44n+D7flFM3kzXVlsFAjUUDuI9Q",
+      "arch": "aarch64",
+      "login_uid": 1000,
+      "roles": [
+        "app"
+      ],
+      "item_results": [
+        {
+          "role_id": "app",
+          "item_id": "h01",
+          "status": "PASS",
+          "template_id": "H01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "allowed_arch": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T18:47:51.9954483Z",
+              "end_time": "2026-11-08T18:47:52.000842533Z",
+              "duration_ns": 5394225
+            },
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "stdout",
+              "expected": {
+                "allowed_arch": [
+                  "x86_64",
+                  "aarch64"
+                ]
+              },
+              "actual": {
+                "normalized_architecture": "aarch64",
+                "uname_raw": "aarch64\n"
+              },
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T18:47:52.000846365Z",
+              "end_time": "2026-11-08T18:47:52.000903703Z",
+              "duration_ns": 57346
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "min-shell",
+          "status": "PASS",
+          "template_id": "shell-5d022c10",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "ACTIVE_PROBE",
+          "evidence": [
+            {
+              "resource": "check-acb12f89388562e435c4a4d64b0f329d69bc867b07637b70a2a25e59ec83866a",
+              "property": "exit-status",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": 0,
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T18:47:51.995462092Z",
+              "end_time": "2026-11-08T18:47:51.999765242Z",
+              "duration_ns": 4303125
+            },
+            {
+              "resource": "check-acb12f89388562e435c4a4d64b0f329d69bc867b07637b70a2a25e59ec83866a",
+              "property": "stdout",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "M4_MIN_OK\n",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T18:47:51.999768418Z",
+              "end_time": "2026-11-08T18:47:51.999802092Z",
+              "duration_ns": 33674,
+              "observation_only": true
+            },
+            {
+              "resource": "check-acb12f89388562e435c4a4d64b0f329d69bc867b07637b70a2a25e59ec83866a",
+              "property": "stderr",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T18:47:51.999811216Z",
+              "end_time": "2026-11-08T18:47:51.999814851Z",
+              "duration_ns": 3635,
+              "observation_only": true
+            }
+          ]
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-5VBBQBPX4PWDVP4ENLUZHLPRPB:37b9f18392bc",
+      "host_id": "node",
+      "machine_id": "ec273f6b9d8fa31a5d766e8d97b5f63d",
+      "boot_id": "597623e6-554f-4d25-a088-7cdbcae210e0",
+      "status": "CLEAN",
+      "remote_path": "/tmp/readyspec-7ec941cabaa7bf38cb241bc5"
+    }
+  ],
+  "failures": []
+}

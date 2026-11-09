@@ -1,0 +1,64 @@
+{
+  "ImageId": "AMI_ID",
+  "InstanceType": "INSTANCE_TYPE",
+  "KeyName": "KEY_PAIR_NAME",
+  "MinCount": 1,
+  "MaxCount": 1,
+  "ClientToken": "SESSION_ID-ENV_ID-VARIANT-ATTEMPT",
+  "MetadataOptions": {
+    "HttpEndpoint": "enabled",
+    "HttpTokens": "required",
+    "HttpPutResponseHopLimit": 1
+  },
+  "NetworkInterfaces": [
+    {
+      "DeviceIndex": 0,
+      "SubnetId": "SUBNET_ID",
+      "Groups": ["SECURITY_GROUP_ID"],
+      "AssociatePublicIpAddress": false,
+      "DeleteOnTermination": true
+    }
+  ],
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "ROOT_DEVICE_NAME",
+      "Ebs": {
+        "VolumeSize": 40,
+        "VolumeType": "gp3",
+        "Encrypted": true,
+        "KmsKeyId": "alias/aws/ebs",
+        "DeleteOnTermination": true
+      }
+    }
+  ],
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        { "Key": "Project", "Value": "readyspec-m4" },
+        { "Key": "Session", "Value": "SESSION_ID" },
+        { "Key": "EnvID", "Value": "ENV_ID" },
+        { "Key": "Name", "Value": "readyspec-m4-ENV_ID" },
+        { "Key": "ExpiresAt", "Value": "EXPIRES_AT_UTC" }
+      ]
+    },
+    {
+      "ResourceType": "volume",
+      "Tags": [
+        { "Key": "Project", "Value": "readyspec-m4" },
+        { "Key": "Session", "Value": "SESSION_ID" },
+        { "Key": "EnvID", "Value": "ENV_ID" },
+        { "Key": "ExpiresAt", "Value": "EXPIRES_AT_UTC" }
+      ]
+    },
+    {
+      "ResourceType": "network-interface",
+      "Tags": [
+        { "Key": "Project", "Value": "readyspec-m4" },
+        { "Key": "Session", "Value": "SESSION_ID" },
+        { "Key": "EnvID", "Value": "ENV_ID" },
+        { "Key": "ExpiresAt", "Value": "EXPIRES_AT_UTC" }
+      ]
+    }
+  ]
+}

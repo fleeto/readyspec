@@ -1,0 +1,32 @@
+{
+  "case": "M4-E2E-05-M01-ssh-disconnect-execution",
+  "action": "ssh-disconnect",
+  "candidate_digests": {
+    "amd64": "8e456f446d71f8cbb64c21cdad4f6ae727fed51afed88ad410ebc4732c9ac3b5",
+    "arm64": "552ee82ecef84785e99da4731599e91990bf84f3cd6bd60db989c4c22c3304ec"
+  },
+  "phase": "execution",
+  "phase_marker_observed": true,
+  "run_id": "run-TZ3QXEKBAWEILQ3CXSUFDGKYSA",
+  "ssh_disconnect_exit": 0,
+  "submit_exit": 11,
+  "run_status": "FAILED",
+  "termination_reason": "EXECUTION_ERROR",
+  "verdict": "UNKNOWN",
+  "cleanup": [
+    "UNKNOWN"
+  ],
+  "cleanup_exit": 0,
+  "cleanup_stderr": "",
+  "cleanup_result": {
+    "cleanup_id": "run-TZ3QXEKBAWEILQ3CXSUFDGKYSA:f0b4f02e6217",
+    "host_id": "node",
+    "ssh_host_key_fp": "SHA256:+bLSKYIWAYv6U/WfBI45PjMo0EEeEwjDJkVIxZlERdY",
+    "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+    "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+    "status": "CLEAN",
+    "remote_path": "/tmp/readyspec-a897618ffb88fbd6a7443392"
+  },
+  "exec_count_after_recovery": 1,
+  "assertions_passed": true
+}

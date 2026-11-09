@@ -290,6 +290,9 @@ func (s *Store) Release(source map[string]any, draftKey, sourceRevision string) 
 	if draft["state"] != "DRAFT" {
 		return nil, fmt.Errorf("PLAN_STATE_INVALID")
 	}
+	if err := computePlanLocalTemplateIdentities(draft); err != nil {
+		return nil, err
+	}
 	p, err := strictCompile(draft)
 	if err != nil {
 		return nil, err
@@ -515,6 +518,58 @@ func (s *Store) validateRecord(record Record) error {
 	}
 	if record.Kind == "archive_only" && record.ArchiveSnapshot == nil {
 		return fmt.Errorf("PLAN_RECORD_CORRUPT")
+	}
+	return nil
+}
+
+func computePlanLocalTemplateIdentities(document map[string]any) error {
+	templates, ok := document["embedded_templates"].([]any)
+	if !ok {
+		return fmt.Errorf("PLAN_SCHEMA_ERROR: embedded_templates must be an array")
+	}
+	computed := map[string]string{}
+	for _, raw := range templates {
+		template, ok := raw.(map[string]any)
+		if !ok || template["source"] != "PLAN_LOCAL" {
+			continue
+		}
+		digest, err := semantic.TemplateDigest(template)
+		if err != nil {
+			return err
+		}
+		id, idOK := template["template_id"].(string)
+		version, versionOK := template["version"].(string)
+		if !idOK || !versionOK {
+			return fmt.Errorf("PLAN_SCHEMA_ERROR: local template identity is invalid")
+		}
+		template["digest"] = digest
+		computed[id+"@"+version] = digest
+	}
+	if len(computed) == 0 {
+		return nil
+	}
+	lock, ok := document["template_lock"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("PLAN_SCHEMA_ERROR: template_lock must be an object")
+	}
+	roles, ok := document["roles"].([]any)
+	if !ok {
+		return fmt.Errorf("PLAN_SCHEMA_ERROR: roles must be an array")
+	}
+	for key, digest := range computed {
+		lock[key] = digest
+	}
+	for _, rawRole := range roles {
+		role, _ := rawRole.(map[string]any)
+		items, _ := role["items"].([]any)
+		for _, rawItem := range items {
+			item, _ := rawItem.(map[string]any)
+			id, _ := item["template_id"].(string)
+			version, _ := item["template_version"].(string)
+			if digest, exists := computed[id+"@"+version]; exists {
+				item["template_digest"] = digest
+			}
+		}
 	}
 	return nil
 }

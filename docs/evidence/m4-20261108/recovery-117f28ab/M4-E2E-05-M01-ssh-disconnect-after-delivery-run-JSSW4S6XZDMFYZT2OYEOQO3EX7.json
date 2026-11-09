@@ -1,0 +1,81 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-JSSW4S6XZDMFYZT2OYEOQO3EX7",
+  "plan_digest": "sha256:e72d02806bea82c38a954868eac5943bc40299a8aaf30119deeb16889bee61e0",
+  "run_mode": "TRIAL",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "EXECUTION_ERROR",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T23:25:13.732255949Z",
+  "finished_at": "2026-11-08T23:25:20.977348833Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "FAILED",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "ssh_host_key_fp": "SHA256:+bLSKYIWAYv6U/WfBI45PjMo0EEeEwjDJkVIxZlERdY",
+      "arch": "aarch64",
+      "login_uid": 2102,
+      "roles": [
+        "app"
+      ],
+      "item_results": [],
+      "failures": [
+        {
+          "code": "EXECUTION_ERROR",
+          "phase": "UPLOAD",
+          "host_id": "node",
+          "message": "embedded Goss upload failed"
+        }
+      ]
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-JSSW4S6XZDMFYZT2OYEOQO3EX7:c6b7a75536b5",
+      "host_id": "node",
+      "ssh_host_key_fp": "SHA256:+bLSKYIWAYv6U/WfBI45PjMo0EEeEwjDJkVIxZlERdY",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "status": "UNKNOWN",
+      "remote_path": "/tmp/readyspec-903727184b71bb31ed0a09b0",
+      "reason": "remote cleanup could not be confirmed"
+    }
+  ],
+  "failures": [
+    {
+      "code": "EXECUTION_ERROR",
+      "phase": "UPLOAD",
+      "host_id": "node",
+      "message": "embedded Goss upload failed"
+    }
+  ]
+}

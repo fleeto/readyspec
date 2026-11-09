@@ -1,0 +1,58 @@
+{
+  "checked_at": "2026-11-08T19:02:22.287450+00:00",
+  "account": "891376991548",
+  "region": "us-east-1",
+  "session": "d6b321143e61d7bf2a6c6b5f",
+  "filters": {
+    "Project": "readyspec-m4",
+    "Session": "d6b321143e61d7bf2a6c6b5f"
+  },
+  "checks": {
+    "live_instances": {
+      "count": 0,
+      "ids": []
+    },
+    "images": {
+      "count": 0,
+      "ids": []
+    },
+    "snapshots": {
+      "count": 0,
+      "ids": []
+    },
+    "volumes": {
+      "count": 0,
+      "ids": []
+    },
+    "network_interfaces": {
+      "count": 0,
+      "ids": []
+    },
+    "security_groups": {
+      "count": 0,
+      "ids": []
+    },
+    "subnets": {
+      "count": 0,
+      "ids": []
+    },
+    "route_tables": {
+      "count": 0,
+      "ids": []
+    },
+    "internet_gateways": {
+      "count": 0,
+      "ids": []
+    },
+    "vpcs": {
+      "count": 0,
+      "ids": []
+    },
+    "key_pairs": {
+      "count": 0,
+      "ids": []
+    }
+  },
+  "residuals": {},
+  "cleanup_complete": true
+}

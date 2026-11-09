@@ -78,7 +78,9 @@ func startBarrierSSHServer(t *testing.T, hostSigner ssh.Signer, acceptedKey ssh.
 							_ = ssh.Unmarshal(request.Payload, &payload)
 							server.commands <- payload.Command
 							_ = request.Reply(true, nil)
-							if strings.Contains(payload.Command, "printf 'UID='") {
+							if strings.Contains(payload.Command, "probe_dir()") {
+								_, _ = channel.Write([]byte("DIR\t/tmp\ttrue\ttrue\ttrue\tfalse\nDIR\t/var/tmp\ttrue\ttrue\ttrue\tfalse\nDIR\t/run\ttrue\ttrue\ttrue\tfalse\nHOME=/home/test\nMOUNT\t36 25 0:32 / / rw,nosuid - ext4 /dev/root rw\n"))
+							} else if strings.Contains(payload.Command, "printf 'UID='") {
 								_, _ = channel.Write([]byte(facts))
 							}
 							_, _ = channel.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{Status: 0}))
@@ -267,7 +269,7 @@ func TestNativeSSHRejectsHostKeyRotationBetweenPreflightAndExecution(t *testing.
 	for {
 		select {
 		case command := <-server.commands:
-			if !strings.Contains(command, "printf 'UID='") {
+			if !strings.Contains(command, "printf 'UID='") && !strings.Contains(command, "probe_dir()") {
 				t.Fatalf("unexpected remote command after host-key rotation: %q", command)
 			}
 		default:

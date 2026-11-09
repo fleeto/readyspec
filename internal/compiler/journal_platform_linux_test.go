@@ -34,17 +34,25 @@ func TestOriginalLogArtifactsInspectRealRotatedAndCorruptJournals(t *testing.T) 
 	}
 	source := filepath.Join("/run/log/journal", string(machineID))
 	entries, err := os.ReadDir(source)
+	if os.IsNotExist(err) {
+		source = filepath.Join("/var/log/journal", string(machineID))
+		entries, err = os.ReadDir(source)
+	}
 	if err != nil {
-		t.Skipf("no readable volatile system journal: %v", err)
+		t.Skipf("no readable system journal: %v", err)
 	}
 	var journals []string
+	systemJournals := 0
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "system") && strings.Contains(entry.Name(), ".journal") {
+		if !entry.IsDir() && strings.Contains(entry.Name(), ".journal") {
 			journals = append(journals, entry.Name())
+			if strings.HasPrefix(entry.Name(), "system") {
+				systemJournals++
+			}
 		}
 	}
-	if len(journals) < 2 {
-		t.Skipf("need an active journal and at least one rotated journal; found %d", len(journals))
+	if systemJournals < 2 {
+		t.Skipf("need an active journal and at least one rotated journal; found %d", systemJournals)
 	}
 
 	for _, tc := range []struct {
@@ -103,7 +111,7 @@ func TestOriginalLogArtifactsInspectRealRotatedAndCorruptJournals(t *testing.T) 
 			for _, id := range ids {
 				params := map[string]any{"lookback_seconds": 86400, "allow_since_boot": true, "max_events": 99999}
 				if id == "L03" {
-					params = map[string]any{"unit": "chronyd.service", "lookback_seconds": 86400, "allow_since_boot": true, "max_failures": 99999, "max_restarts": 99999}
+					params = map[string]any{"unit": "systemd-journald.service", "lookback_seconds": 86400, "allow_since_boot": true, "max_failures": 99999, "max_restarts": 99999}
 				}
 				a := collectionArtifact(t, id, params)
 				if err := os.WriteFile(filepath.Join(root, "goss.json"), a.Config, 0600); err != nil {

@@ -1,0 +1,178 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-SZEYT52ILFE4XX7EB2PK7VDSSR",
+  "plan_digest": "sha256:e711130e6b7317a05b22c734707d78001ed27a0e056d9e825559815041bab462",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T18:52:12.727902925Z",
+  "finished_at": "2026-11-08T18:52:13.599583354Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "COMPLETED",
+      "machine_id": "ec28ac4403477ffdd4451f64f984af33",
+      "boot_id": "cfa4f7a5-84ac-440c-9e4a-eba4748669d8",
+      "ssh_host_key_fp": "SHA256:6bkAUr1hqhUcm4JR2iUWca5cDoJ20hrWX66720Ed4ZQ",
+      "arch": "aarch64",
+      "login_uid": 1000,
+      "roles": [
+        "app"
+      ],
+      "item_results": [
+        {
+          "role_id": "app",
+          "item_id": "h01",
+          "status": "PASS",
+          "template_id": "H01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "allowed_arch": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T18:52:13.543104037Z",
+              "end_time": "2026-11-08T18:52:13.546550949Z",
+              "duration_ns": 3446904
+            },
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "stdout",
+              "expected": {
+                "allowed_arch": [
+                  "x86_64",
+                  "aarch64"
+                ]
+              },
+              "actual": {
+                "normalized_architecture": "aarch64",
+                "uname_raw": "aarch64\n"
+              },
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T18:52:13.546553591Z",
+              "end_time": "2026-11-08T18:52:13.546580561Z",
+              "duration_ns": 26970
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s01",
+          "status": "ERROR",
+          "template_id": "S01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EXISTENCE",
+          "parameter_sources": {
+            "exists": "item",
+            "filetype": "item",
+            "follow_symlinks": "default",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 127,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T18:52:13.543111585Z",
+              "end_time": "2026-11-08T18:52:13.546609869Z",
+              "duration_ns": 3498259
+            },
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "stdout",
+              "expected": {},
+              "actual": {
+                "error": "INVALID_PATH_METADATA"
+              },
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T18:52:13.546611091Z",
+              "end_time": "2026-11-08T18:52:13.54661512Z",
+              "duration_ns": 4021
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "exists",
+              "expected": true,
+              "actual": true,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T18:52:13.546307821Z",
+              "end_time": "2026-11-08T18:52:13.546317544Z",
+              "duration_ns": 9723
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "filetype",
+              "expected": "file",
+              "actual": "file",
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T18:52:13.546320235Z",
+              "end_time": "2026-11-08T18:52:13.546326618Z",
+              "duration_ns": 6391
+            }
+          ]
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-SZEYT52ILFE4XX7EB2PK7VDSSR:0110aa47da1c",
+      "host_id": "node",
+      "machine_id": "ec28ac4403477ffdd4451f64f984af33",
+      "boot_id": "cfa4f7a5-84ac-440c-9e4a-eba4748669d8",
+      "status": "CLEAN",
+      "remote_path": "/tmp/readyspec-3bab4493f047a81996a788b8"
+    }
+  ],
+  "failures": []
+}

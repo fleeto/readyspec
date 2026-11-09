@@ -1,0 +1,11 @@
+{
+  "case": "M4-E2E-04-CLI-Web-report-parity",
+  "run_id": "run-FXN4LOTGFUMUNZWRS3Q35BIQEI",
+  "cli_exit": 0,
+  "same_archive_report": true,
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "cleanup": [
+    "CLEAN"
+  ]
+}

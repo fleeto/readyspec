@@ -58,6 +58,35 @@ func TestReleaseArchiveAndStrictImportLifecycle(t *testing.T) {
 	}
 }
 
+func TestReleaseComputesPlanLocalTemplateIdentity(t *testing.T) {
+	store := newTestStore(t)
+	draft := testDraft(t, "plan-local-release")
+	local := testShellTemplate("shell-local", "printf ready")
+	local["digest"] = ""
+	draft["embedded_templates"] = []any{local}
+	draft["roles"].([]any)[0].(map[string]any)["items"] = []any{map[string]any{
+		"item_id": "local-check", "name": "Local check", "template_id": "shell-local", "template_version": "1.0.0",
+		"template_digest": "", "importance": "REQUIRED", "enabled": true, "params": map[string]any{},
+		"explicit_null_params": []any{}, "overridable_params": []any{},
+	}}
+	released, err := store.Release(draft, "local-draft", "local-revision")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := released.ReleaseSnapshot["embedded_templates"].([]any)[0].(map[string]any)
+	digest := snapshot["digest"]
+	if digest == "" || released.ReleaseSnapshot["template_lock"].(map[string]any)["shell-local@1.0.0"] != digest {
+		t.Fatalf("release did not compute and lock the local template digest: %+v", released.ReleaseSnapshot)
+	}
+	item := released.ReleaseSnapshot["roles"].([]any)[0].(map[string]any)["items"].([]any)[0].(map[string]any)
+	if item["template_digest"] != digest {
+		t.Fatalf("release item does not reference the computed digest: %+v", item)
+	}
+	if err := VerifyManifest(released.ReleaseSnapshot); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestImportRejectsReleaseWithoutVerifiableManifest(t *testing.T) {
 	store := newTestStore(t)
 	released, err := store.Release(testDraft(t, "missing-manifest"), "draft-key", "source-revision")

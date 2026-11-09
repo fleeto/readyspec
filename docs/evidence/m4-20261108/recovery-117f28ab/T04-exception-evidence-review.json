@@ -1,0 +1,18 @@
+{
+  "case": "M4-CERT-T04-exception",
+  "run_id": "run-NJAH6HXXBETXIRK5T4YP7IDFYE",
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "cleanup": [
+    "CLEAN"
+  ],
+  "status_counts": {
+    "ERROR": 34,
+    "PASS": 2
+  },
+  "pass_templates": [
+    "S02",
+    "S03"
+  ],
+  "assertions_passed": true
+}

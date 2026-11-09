@@ -1,0 +1,77 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-UHPLHIL2CBYUEWRYSS6DRIZBGN",
+  "plan_digest": "sha256:68d600f00c5933e8a64b43e35013750d5ec8c884518de86a19f29b3276fb51b9",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "EXECUTION_ERROR",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T17:33:53.311240309Z",
+  "finished_at": "2026-11-08T17:33:53.600518411Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "t05",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "t05",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t05",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t05",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t05",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "t05",
+      "status": "FAILED",
+      "roles": [
+        "app"
+      ],
+      "item_results": [],
+      "failures": [
+        {
+          "code": "EXECUTION_ERROR",
+          "phase": "REMOTE_WORKSPACE",
+          "host_id": "t05",
+          "message": "a safe remote execution directory is unavailable"
+        }
+      ]
+    }
+  ],
+  "cleanup_items": [],
+  "failures": [
+    {
+      "code": "EXECUTION_ERROR",
+      "phase": "REMOTE_WORKSPACE",
+      "host_id": "t05",
+      "message": "a safe remote execution directory is unavailable"
+    }
+  ]
+}

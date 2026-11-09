@@ -41,13 +41,15 @@ type PreflightRequest struct {
 }
 
 type HostFacts struct {
-	MachineID  string
-	BootID     string
-	HostKey    string
-	Arch       string
-	UID        int
-	Root       bool
-	OwnerToken string
+	MachineID               string
+	BootID                  string
+	HostKey                 string
+	Arch                    string
+	UID                     int
+	Root                    bool
+	OwnerToken              string
+	WorkspaceBase           string
+	PrivilegedWorkspaceBase string
 }
 
 type PreflightResult struct {

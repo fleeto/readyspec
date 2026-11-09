@@ -61,6 +61,8 @@ D04 增量：`internal/compiler/elf_collection_linux_test.go` 编译仅有一个
 
 日志增量：`internal/compiler/journal_collection_linux_test.go` 运行原编译工件，journalctl 替身核对完整查询参数并读取隔离的日志记录夹具；日志源文件可读性仍由原脚本检查。测试通过连续序号模拟归档文件交接，以跳号模拟中间归档丢失，没有声称创建了真实二进制 journal。新增未按 unit/transport 筛选的系统日志审计，核对窗口边界至窗口内游标的序号域与连续性，并检测消息丢失提示；当前识别 systemd 游标的 s/i 序号结构，未知格式、不同序号域、时序异常或达到 10000 条审计/事件上限均不能证明覆盖。该检查不能证明日志在进入 journald 之前未丢失，也不提供日志真实性保证。allow_since_boot 只在启动晚于窗口起点、当前启动附近有可读记录且审计连续时放宽窗口；不豁免缺口。零事件覆盖不足 ERROR，已知超限仍可 FAIL。stderr 诊断纳入验证，不能静默忽略损坏日志警告。证据仅输出计数/窗口/连续性原因/截断信息，未输出原日志正文。
 
+M4 实机增量（2026-11-08）：六平台真实SSH发现D04误拒绝带PT_INTERP的合法glibc共享对象，已增加带解释器的实际共享库原工件回归，保留PIE/ABI/截断拒绝及执行哨兵。L02/L03审计改为包含可读system/user journal，共享序号域不因系统过滤而假报缺口；新增用户记录不泄漏证据的回归。Rocky旧journalctl历史边界需显式`--reverse -n 1`，已先红复现并修复边界查询。此段记录实现与针对性回归，不替代尚在执行的M4正式认证；完整证据见[执行记录](m4-aws-canary-20261108.md)。
+
 HTTP 增量：`internal/compiler/http_collection_test.go` 通过本地 HTTP/TLS 与原 Goss 工件复现 250ms 预算下持续滴流/重定向仍 PASS，以及超大响应头被接受。现由监督进程执行并按总期限终止/回收网络采集子进程；阶段性 socket timeout 仍存在，但不再代替总预算。状态/头/正文分支统一声明 python3，Goss 外层预算随 timeout_ms 增加 2 秒处理余量，不会将合法 60 秒预算截成原先固定 10 秒。响应头在解析前限量读取，整条链累计 64 KiB；与实际读取正文合计 1 MiB。边界测试包含原始响应的精确字节数、累计重定向响应头、10 次跳转上限、跳转中间正文不耗尽、声明长度不足以及隐私摘要。之前“恰好 1 MiB 正文仍通过”用例已改为 ERROR：响应头也占用规格中的响应读取预算；合计恰好 1 MiB 的原工件用例 PASS。
 
 H01 增量：`internal/compiler/architecture_collection_linux_test.go` 运行原编译工件，uname 替身核对 -m 参数后输出隔离夹具并返回受控退出码，未替换整条采集命令。旧实现的 Shell 命令替换不仅丢失别名原文，还吞掉末尾空行/NUL；新实现直接采集 stdout，在控制面验证单个架构标识并归一化。证据 uname_raw 保留原文，normalized_architecture 保留规范值；无效格式保留原文和 INVALID_UNAME_OUTPUT，查询失败按原退出码归类 ERROR。接口夹具验证采集和归一化，不将其描述为六类目标平台的硬件实机认证。

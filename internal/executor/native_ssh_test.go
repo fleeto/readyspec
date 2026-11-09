@@ -2,7 +2,9 @@ package executor_test
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
 	"encoding/pem"
@@ -66,6 +68,18 @@ func TestNativeSSHLoopbackStandardAndPrivilegedVerticalSlice(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "host_key"), pem.EncodeToMemory(serverPEM), 0600); err != nil {
 		t.Fatal(err)
 	}
+	// Only the ed25519 key is trusted; the server also offers an ECDSA key.
+	ecdsaPrivate, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecdsaPEM, err := ssh.MarshalPrivateKey(ecdsaPrivate, "unregistered-host-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "host_key_ecdsa"), pem.EncodeToMemory(ecdsaPEM), 0600); err != nil {
+		t.Fatal(err)
+	}
 	clientPublic, clientPrivate, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -87,6 +101,7 @@ func TestNativeSSHLoopbackStandardAndPrivilegedVerticalSlice(t *testing.T) {
 	_ = listener.Close()
 	config := strings.Join([]string{
 		"Port " + fmt.Sprint(port), "ListenAddress 127.0.0.1", "HostKey " + filepath.Join(dir, "host_key"),
+		"HostKey " + filepath.Join(dir, "host_key_ecdsa"),
 		"PidFile " + filepath.Join(dir, "sshd.pid"), "AuthorizedKeysFile " + filepath.Join(dir, "authorized_keys"),
 		"StrictModes no", "PasswordAuthentication no", "PubkeyAuthentication yes", "UsePAM no",
 		"PermitRootLogin no", "AllowUsers " + username.Username, "LogLevel ERROR", "Subsystem sftp internal-sftp",
@@ -178,6 +193,7 @@ func TestNativeSSHLoopbackStandardAndPrivilegedVerticalSlice(t *testing.T) {
 	}
 	native := executor.NewNativeSSH()
 	native.KnownHostsPath = knownHosts
+	native.RemoteTempDir = dir
 	manager, err := runmanager.New(store, native)
 	if err != nil {
 		t.Fatal(err)
@@ -208,10 +224,28 @@ func TestNativeSSHLoopbackStandardAndPrivilegedVerticalSlice(t *testing.T) {
 	if len(run.Report.CleanupItems) != 1 || run.Report.CleanupItems[0].Status != "CLEAN" || run.Report.CleanupItems[0].OwnerToken != "" {
 		t.Fatalf("cleanup outcome was not safely archived: %+v", run.Report.CleanupItems)
 	}
+	cleanup := run.Report.CleanupItems[0]
+	if !filepath.IsAbs(cleanup.RemotePath) || filepath.Dir(cleanup.RemotePath) != dir {
+		t.Errorf("standard workspace did not use the selected absolute directory: %q", cleanup.RemotePath)
+	}
+	if !filepath.IsAbs(cleanup.PrivilegedPath) {
+		t.Errorf("privileged workspace was not absolute: %q", cleanup.PrivilegedPath)
+	}
+	for _, path := range []string{cleanup.RemotePath, cleanup.PrivilegedPath} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("workspace %q was not removed: %v", path, err)
+		}
+	}
 	for _, result := range run.Report.Hosts[0].ItemResults {
 		if result.ItemID == "sshd_root_login" && result.Status != "PASS" && result.Status != "FAIL" {
 			t.Fatalf("privileged A03 did not return a check observation: %+v", result)
 		}
 	}
-	_ = serverPublic
+	hostKey, err := ssh.NewPublicKey(serverPublic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanup.HostKeyFP != ssh.FingerprintSHA256(hostKey) {
+		t.Fatalf("cleanup did not retain the verified host identity: got %q", cleanup.HostKeyFP)
+	}
 }

@@ -1,0 +1,2115 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-P4IH5VGRAFTVM3YF77OIXNBGGW",
+  "plan_digest": "sha256:d6e710493ef87ee971d0567485235385081d2060f99f9ae74fa9401722194022",
+  "run_mode": "TRIAL",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T10:06:59.331960793Z",
+  "finished_at": "2026-11-08T10:07:02.309864122Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "COMPLETED",
+      "machine_id": "ec2ab4fc38304b620b362ddd5e0e8211",
+      "boot_id": "99ac3cbc-cde6-4d76-a870-473b364f4e8c",
+      "ssh_host_key_fp": "SHA256:LiytfsHvXgjD65mbRH+tX5fGyYzTpp+o3kitEr1vKYo",
+      "arch": "x86_64",
+      "login_uid": 1000,
+      "roles": [
+        "app"
+      ],
+      "item_results": [
+        {
+          "role_id": "app",
+          "item_id": "a01",
+          "status": "PASS",
+          "template_id": "A01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "exists": "item",
+            "name": "item",
+            "uid": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-7b8404d0484b2ca4fc60d0b750318ff1b00b1ef715ab7a5a753ed383425a89f8",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "libc NSS (configured passwd/group providers)",
+              "start_time": "2026-11-08T10:07:00.851531301Z",
+              "end_time": "2026-11-08T10:07:01.108426755Z",
+              "duration_ns": 256895453
+            },
+            {
+              "resource": "builtin-7b8404d0484b2ca4fc60d0b750318ff1b00b1ef715ab7a5a753ed383425a89f8",
+              "property": "stdout",
+              "expected": {
+                "exists": true,
+                "name": "root",
+                "uid": 0
+              },
+              "actual": {
+                "exists": true,
+                "gid": 0,
+                "lookup_status": "SUCCESS",
+                "name": "root",
+                "shell": "/bin/bash",
+                "source": "libc NSS",
+                "uid": 0
+              },
+              "error": false,
+              "source": "libc NSS (configured passwd/group providers)",
+              "start_time": "2026-11-08T10:07:01.108430413Z",
+              "end_time": "2026-11-08T10:07:01.108446384Z",
+              "duration_ns": 15973
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "a02",
+          "status": "PASS",
+          "template_id": "A02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "members": "item",
+            "name": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-a7e6574f4c8c38023086390cfaf54d95fca68b9971500c7a301ebcbc7e4eab5a",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "libc NSS (configured passwd/group providers)",
+              "start_time": "2026-11-08T10:07:00.69119766Z",
+              "end_time": "2026-11-08T10:07:00.884180043Z",
+              "duration_ns": 192982376
+            },
+            {
+              "resource": "builtin-a7e6574f4c8c38023086390cfaf54d95fca68b9971500c7a301ebcbc7e4eab5a",
+              "property": "stdout",
+              "expected": {
+                "members": [
+                  "root"
+                ],
+                "name": "root"
+              },
+              "actual": {
+                "exists": true,
+                "gid": 0,
+                "lookup_status": "SUCCESS",
+                "membership_scope": "group_entry_and_required_users",
+                "name": "root",
+                "required_users": [
+                  {
+                    "exists": true,
+                    "gid": 0,
+                    "lookup_status": "SUCCESS",
+                    "name": "root",
+                    "requested": "root",
+                    "source": "libc NSS",
+                    "uid": 0
+                  }
+                ],
+                "source": "libc NSS",
+                "supplementary_members": []
+              },
+              "error": false,
+              "source": "libc NSS (configured passwd/group providers)",
+              "start_time": "2026-11-08T10:07:00.884184825Z",
+              "end_time": "2026-11-08T10:07:00.884227381Z",
+              "duration_ns": 42564
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "a04",
+          "status": "PASS",
+          "template_id": "A04",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "framework": "item",
+            "mode": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-cd787c7eced92aae089191d2ffa08241f96a12101eb1f45b693eeb46cbe2f4ff",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "kernel security module state",
+              "start_time": "2026-11-08T10:07:00.71363586Z",
+              "end_time": "2026-11-08T10:07:00.744977515Z",
+              "duration_ns": 31341675
+            },
+            {
+              "resource": "builtin-cd787c7eced92aae089191d2ffa08241f96a12101eb1f45b693eeb46cbe2f4ff",
+              "property": "stdout",
+              "expected": {
+                "framework": "selinux",
+                "mode": "enforcing"
+              },
+              "actual": "Enforcing\n",
+              "error": false,
+              "source": "kernel security module state",
+              "start_time": "2026-11-08T10:07:00.744980125Z",
+              "end_time": "2026-11-08T10:07:00.744991776Z",
+              "duration_ns": 11669
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "d01",
+          "status": "PASS",
+          "template_id": "D01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "installed": "item",
+            "manager": "item",
+            "name": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-0261634a0dacd0d2711b763e551a17982b0461e20df0a00c0f830da0e45c3f29",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "package manager query and version comparison",
+              "start_time": "2026-11-08T10:07:00.866130896Z",
+              "end_time": "2026-11-08T10:07:00.96522617Z",
+              "duration_ns": 99095274
+            },
+            {
+              "resource": "builtin-0261634a0dacd0d2711b763e551a17982b0461e20df0a00c0f830da0e45c3f29",
+              "property": "stdout",
+              "expected": {
+                "installed": true,
+                "manager": "rpm",
+                "name": "bash"
+              },
+              "actual": "installed=true\nversion=0:5.1.8-9.el9\n",
+              "error": false,
+              "source": "package manager query and version comparison",
+              "start_time": "2026-11-08T10:07:00.965234383Z",
+              "end_time": "2026-11-08T10:07:00.965255536Z",
+              "duration_ns": 21152
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "d02",
+          "status": "PASS",
+          "template_id": "D02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EXISTENCE",
+          "parameter_sources": {
+            "command": "item",
+            "executable": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-3652834735dde00da3a133ea40f02d9516f2bd0271936695a7717195bec0c192",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "PATH resolution and filesystem metadata (no target execution)",
+              "start_time": "2026-11-08T10:07:00.687684767Z",
+              "end_time": "2026-11-08T10:07:00.80212189Z",
+              "duration_ns": 114437133
+            },
+            {
+              "resource": "builtin-3652834735dde00da3a133ea40f02d9516f2bd0271936695a7717195bec0c192",
+              "property": "stdout",
+              "expected": {
+                "command": "/bin/sh",
+                "executable": true
+              },
+              "actual": {
+                "command": "/bin/sh",
+                "executable": true,
+                "execution_required": true,
+                "exists": true,
+                "filetype": "file",
+                "mode": "0755",
+                "path": "/bin/sh"
+              },
+              "error": false,
+              "source": "PATH resolution and filesystem metadata (no target execution)",
+              "start_time": "2026-11-08T10:07:00.802124308Z",
+              "end_time": "2026-11-08T10:07:00.803064124Z",
+              "duration_ns": 939827
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "d03",
+          "status": "PASS",
+          "template_id": "D03",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "minimum_version": "item",
+            "runtime": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-786b67930ef9968d3866f017e995f567c439ae541f8363d68b5bf78f8d961795",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "runtime version query",
+              "start_time": "2026-11-08T10:07:00.965261561Z",
+              "end_time": "2026-11-08T10:07:01.049051874Z",
+              "duration_ns": 83790340
+            },
+            {
+              "resource": "builtin-786b67930ef9968d3866f017e995f567c439ae541f8363d68b5bf78f8d961795",
+              "property": "stdout",
+              "expected": {
+                "minimum_version": "3.0",
+                "runtime": "python"
+              },
+              "actual": {
+                "exists": true,
+                "normalized_version": "3.9.25",
+                "path": "/usr/bin/python3",
+                "query_exit_status": 0,
+                "runtime": "python",
+                "version_raw": "Python 3.9.25\n",
+                "version_suffix": "",
+                "version_token": "3.9.25"
+              },
+              "error": false,
+              "source": "runtime version query",
+              "start_time": "2026-11-08T10:07:01.049057753Z",
+              "end_time": "2026-11-08T10:07:01.049079243Z",
+              "duration_ns": 21494
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "d04",
+          "status": "PASS",
+          "template_id": "D04",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "STATIC_BINARY",
+          "parameter_sources": {
+            "architecture": "item",
+            "path": "item",
+            "required_libraries": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-cb800fd2464b0d5643da1be416ae81e6186dbce96631a56755b58f6b711e56e7",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "readelf and ldconfig cache",
+              "start_time": "2026-11-08T10:07:00.692528911Z",
+              "end_time": "2026-11-08T10:07:01.06404663Z",
+              "duration_ns": 371517696
+            },
+            {
+              "resource": "builtin-cb800fd2464b0d5643da1be416ae81e6186dbce96631a56755b58f6b711e56e7",
+              "property": "stdout",
+              "expected": {
+                "architecture": "x86_64",
+                "path": "/bin/true",
+                "required_libraries": [
+                  "libc.so.6"
+                ]
+              },
+              "actual": {
+                "architecture": "x86_64",
+                "cache_entries": [
+                  {
+                    "name": "libc.so.6",
+                    "flags": "libc6,x86-64, OS ABI: Linux 3.2.0",
+                    "path": "/lib64/libc.so.6",
+                    "status": "OK",
+                    "header": {
+                      "class": 64,
+                      "byte_order": "little",
+                      "machine": 62,
+                      "type": 3,
+                      "pie": false,
+                      "interpreter": true
+                    }
+                  }
+                ],
+                "cache_queried": true,
+                "header": {
+                  "class": 64,
+                  "byte_order": "little",
+                  "machine": 62,
+                  "type": 3,
+                  "pie": true,
+                  "interpreter": true
+                },
+                "needed": [
+                  "libc.so.6"
+                ],
+                "readelf": "ELF Header:\n  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 \n  Class:                             ELF64\n  Data:                              2's complement, little endian\n  Version:                           1 (current)\n  OS/ABI:                            UNIX - System V\n  ABI Version:                       0\n  Type:                              DYN (Shared object file)\n  Machine:                           Advanced Micro Devices X86-64\n  Version:                           0x1\n  Entry point address:               0x18c0\n  Start of program headers:          64 (bytes into file)\n  Start of section headers:          26016 (bytes into file)\n  Flags:                             0x0\n  Size of this header:               64 (bytes)\n  Size of program headers:           56 (bytes)\n  Number of program headers:         13\n  Size of section headers:           64 (bytes)\n  Number of section headers:         30\n  Section header string table index: 29\n\nDynamic section at offset 0x5cb8 contains 27 entries:\n  Tag        Type                         Name/Value\n 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]\n 0x000000000000000c (INIT)               0x1000\n 0x000000000000000d (FINI)               0x37f4\n 0x0000000000000019 (INIT_ARRAY)         0x5ca0\n 0x000000000000001b (INIT_ARRAYSZ)       8 (bytes)\n 0x000000000000001a (FINI_ARRAY)         0x5ca8\n 0x000000000000001c (FINI_ARRAYSZ)       8 (bytes)\n 0x000000006ffffef5 (GNU_HASH)           0x3b0\n 0x0000000000000005 (STRTAB)             0x7c0\n 0x0000000000000006 (SYMTAB)             0x3d0\n 0x000000000000000a (STRSZ)              569 (bytes)\n 0x000000000000000b (SYMENT)             24 (bytes)\n 0x0000000000000015 (DEBUG)              0x0\n 0x0000000000000003 (PLTGOT)             0x5ea8\n 0x0000000000000002 (PLTRELSZ)           744 (bytes)\n 0x0000000000000014 (PLTREL)             RELA\n 0x0000000000000017 (JMPREL)             0xbd0\n 0x0000000000000007 (RELA)               0xab0\n 0x0000000000000008 (RELASZ)             288 (bytes)\n 0x0000000000000009 (RELAENT)            24 (bytes)\n 0x0000000000000018 (BIND_NOW)           \n 0x000000006ffffffb (FLAGS_1)            Flags: NOW PIE\n 0x000000006ffffffe (VERNEED)            0xa50\n 0x000000006fffffff (VERNEEDNUM)         1\n 0x000000006ffffff0 (VERSYM)             0x9fa\n 0x000000006ffffff9 (RELACOUNT)          3\n 0x0000000000000000 (NULL)               0x0\n"
+              },
+              "error": false,
+              "source": "readelf and ldconfig cache",
+              "start_time": "2026-11-08T10:07:01.06405123Z",
+              "end_time": "2026-11-08T10:07:01.064136639Z",
+              "duration_ns": 85418
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "d05",
+          "status": "PASS",
+          "template_id": "D05",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "CONFIG",
+          "parameter_sources": {
+            "expected": "item",
+            "format": "item",
+            "key": "item",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-3c898d577b663fd2753fb3f47f9c435deda3766c11946c0f186c5695a474e1e4",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/opt/readyspec-m4/settings.env",
+              "start_time": "2026-11-08T10:07:00.687684765Z",
+              "end_time": "2026-11-08T10:07:00.744732184Z",
+              "duration_ns": 57047414
+            },
+            {
+              "resource": "builtin-3c898d577b663fd2753fb3f47f9c435deda3766c11946c0f186c5695a474e1e4",
+              "property": "stdout",
+              "expected": "***",
+              "actual": {
+                "redacted": true,
+                "sha256": "41fc12dc86bb08dd854b2743cfa0428441c30e7c3cf0eba7b6fd5dfeb2381237"
+              },
+              "error": false,
+              "source": "/opt/readyspec-m4/settings.env",
+              "start_time": "2026-11-08T10:07:00.744736332Z",
+              "end_time": "2026-11-08T10:07:00.744769725Z",
+              "duration_ns": 33379
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "h01",
+          "status": "PASS",
+          "template_id": "H01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "allowed_arch": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T10:07:01.064142355Z",
+              "end_time": "2026-11-08T10:07:01.081262921Z",
+              "duration_ns": 17120624
+            },
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "stdout",
+              "expected": {
+                "allowed_arch": [
+                  "x86_64"
+                ]
+              },
+              "actual": {
+                "normalized_architecture": "x86_64",
+                "uname_raw": "x86_64\n"
+              },
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T10:07:01.081266113Z",
+              "end_time": "2026-11-08T10:07:01.081278125Z",
+              "duration_ns": 12029
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "h02",
+          "status": "PASS",
+          "template_id": "H02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "min_cores": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-d81a58066f280050144aa2e0cb62a42e06b659438ccf4d33c4572f5e29ae428b",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "getconf _NPROCESSORS_ONLN (online logical processors)",
+              "start_time": "2026-11-08T10:07:00.931675394Z",
+              "end_time": "2026-11-08T10:07:00.951684811Z",
+              "duration_ns": 20009462
+            },
+            {
+              "resource": "builtin-d81a58066f280050144aa2e0cb62a42e06b659438ccf4d33c4572f5e29ae428b",
+              "property": "stdout",
+              "expected": {
+                "ge": 2
+              },
+              "actual": "2\n",
+              "error": false,
+              "source": "getconf _NPROCESSORS_ONLN (online logical processors)",
+              "start_time": "2026-11-08T10:07:00.95168987Z",
+              "end_time": "2026-11-08T10:07:00.9516966Z",
+              "duration_ns": 6729
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "h03",
+          "status": "PASS",
+          "template_id": "H03",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "min_memory": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-fc4cd62986411fe08eabd83e6a8667590ae50d932ce8bf63c98b0e27b20c227f",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/proc/meminfo:MemTotal",
+              "start_time": "2026-11-08T10:07:00.744775729Z",
+              "end_time": "2026-11-08T10:07:00.788303517Z",
+              "duration_ns": 43527791
+            },
+            {
+              "resource": "builtin-fc4cd62986411fe08eabd83e6a8667590ae50d932ce8bf63c98b0e27b20c227f",
+              "property": "stdout",
+              "expected": {
+                "min_memory": 1073741824
+              },
+              "actual": {
+                "mem_total_bytes": 1796911104,
+                "mem_total_kib": 1754796,
+                "raw": "MemTotal:        1754796 kB"
+              },
+              "error": false,
+              "source": "/proc/meminfo:MemTotal",
+              "start_time": "2026-11-08T10:07:00.788307371Z",
+              "end_time": "2026-11-08T10:07:00.788327647Z",
+              "duration_ns": 20280
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "h04",
+          "status": "PASS",
+          "template_id": "H04",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "mode": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-7f87de2caaaf1a4d24cefd1780eb170ad1c6514ccb4a96549f87996d3c7822ab",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/proc/swaps",
+              "start_time": "2026-11-08T10:07:00.816540598Z",
+              "end_time": "2026-11-08T10:07:00.851906667Z",
+              "duration_ns": 35366064
+            },
+            {
+              "resource": "builtin-7f87de2caaaf1a4d24cefd1780eb170ad1c6514ccb4a96549f87996d3c7822ab",
+              "property": "stdout",
+              "expected": {
+                "mode": "disabled"
+              },
+              "actual": {
+                "active": false,
+                "devices": [],
+                "total_bytes": 0
+              },
+              "error": false,
+              "source": "/proc/swaps",
+              "start_time": "2026-11-08T10:07:00.851908508Z",
+              "end_time": "2026-11-08T10:07:00.851919853Z",
+              "duration_ns": 11352
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "l01",
+          "status": "PASS",
+          "template_id": "L01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "minimum_seconds": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-647d4b079e7893d20ea5c2d065ae6124a6f59cafb5bad9783319373538144626",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/proc/uptime",
+              "start_time": "2026-11-08T10:07:00.759275306Z",
+              "end_time": "2026-11-08T10:07:00.803084397Z",
+              "duration_ns": 43809081
+            },
+            {
+              "resource": "builtin-647d4b079e7893d20ea5c2d065ae6124a6f59cafb5bad9783319373538144626",
+              "property": "stdout",
+              "expected": {
+                "minimum_seconds": 0
+              },
+              "actual": {
+                "idle_seconds": "3730.11",
+                "minimum_seconds": 0,
+                "uptime_seconds": "1903.86"
+              },
+              "error": false,
+              "source": "/proc/uptime",
+              "start_time": "2026-11-08T10:07:00.803086887Z",
+              "end_time": "2026-11-08T10:07:00.803098131Z",
+              "duration_ns": 11251
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "l02",
+          "status": "PASS",
+          "template_id": "L02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "LOG_HISTORY",
+          "parameter_sources": {
+            "allow_since_boot": "default",
+            "lookback_seconds": "item",
+            "max_events": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-f6d1a34204c87fd6a8aed2f53e533c635bd8233d198e96bf1331e728d84e8015",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "system kernel journal",
+              "start_time": "2026-11-08T10:07:00.692923266Z",
+              "end_time": "2026-11-08T10:07:01.021745498Z",
+              "duration_ns": 328822231
+            },
+            {
+              "resource": "builtin-f6d1a34204c87fd6a8aed2f53e533c635bd8233d198e96bf1331e728d84e8015",
+              "property": "stdout",
+              "expected": {
+                "allow_since_boot": false,
+                "lookback_seconds": 10,
+                "max_events": 10000
+              },
+              "actual": {
+                "audit_records": 33,
+                "continuity_proven": true,
+                "continuity_reason": "CONTIGUOUS_SEQUENCE",
+                "continuity_scope": "unfiltered readable journal cursor sequence",
+                "coverage_proven": true,
+                "coverage_timestamp": 1794132299,
+                "events": 0,
+                "failures": 0,
+                "record_limit": 10000,
+                "redacted": true,
+                "restarts": 0,
+                "source": "system journal",
+                "truncated": false,
+                "window_boundary_proven": true,
+                "window_end": 1794132420,
+                "window_start": 1794132410
+              },
+              "error": false,
+              "source": "system kernel journal",
+              "start_time": "2026-11-08T10:07:01.021749789Z",
+              "end_time": "2026-11-08T10:07:01.027898993Z",
+              "duration_ns": 6149243
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "l03",
+          "status": "PASS",
+          "template_id": "L03",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "LOG_HISTORY",
+          "parameter_sources": {
+            "allow_since_boot": "default",
+            "lookback_seconds": "item",
+            "max_failures": "item",
+            "max_restarts": "item",
+            "unit": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-1e5d3ca33f2f44e80ea367c0a3a241381922247b500376d6fbcc66c31853919d",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "system service journal",
+              "start_time": "2026-11-08T10:07:00.707706478Z",
+              "end_time": "2026-11-08T10:07:01.079843321Z",
+              "duration_ns": 372136838
+            },
+            {
+              "resource": "builtin-1e5d3ca33f2f44e80ea367c0a3a241381922247b500376d6fbcc66c31853919d",
+              "property": "stdout",
+              "expected": {
+                "allow_since_boot": false,
+                "lookback_seconds": 10,
+                "max_failures": 0,
+                "max_restarts": 0,
+                "unit": "readyspec-m4-fixture.service"
+              },
+              "actual": {
+                "audit_records": 33,
+                "continuity_proven": true,
+                "continuity_reason": "CONTIGUOUS_SEQUENCE",
+                "continuity_scope": "unfiltered readable journal cursor sequence",
+                "coverage_proven": true,
+                "coverage_timestamp": 1794131132,
+                "events": 0,
+                "failures": 0,
+                "record_limit": 10000,
+                "redacted": true,
+                "restarts": 0,
+                "source": "system journal",
+                "truncated": false,
+                "window_boundary_proven": true,
+                "window_end": 1794132420,
+                "window_start": 1794132410
+              },
+              "error": false,
+              "source": "system service journal",
+              "start_time": "2026-11-08T10:07:01.079846871Z",
+              "end_time": "2026-11-08T10:07:01.080858353Z",
+              "duration_ns": 1011551
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "n01",
+          "status": "PASS",
+          "template_id": "N01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "addresses": "item",
+            "name": "item",
+            "up": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-a21971a577e0775329cc167a64f721561128e0c5d428f289820fcb3d2523e3a1",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "ip -j address",
+              "start_time": "2026-11-08T10:07:00.708036154Z",
+              "end_time": "2026-11-08T10:07:00.745221949Z",
+              "duration_ns": 37185791
+            },
+            {
+              "resource": "builtin-a21971a577e0775329cc167a64f721561128e0c5d428f289820fcb3d2523e3a1",
+              "property": "stdout",
+              "expected": {
+                "addresses": [
+                  "127.0.0.0/8"
+                ],
+                "name": "lo",
+                "up": true
+              },
+              "actual": {
+                "addresses": [
+                  "127.0.0.1/8",
+                  "::1/128"
+                ],
+                "exists": true,
+                "name": "lo",
+                "observed_name": "lo",
+                "up": true
+              },
+              "error": false,
+              "source": "ip -j address",
+              "start_time": "2026-11-08T10:07:00.745224819Z",
+              "end_time": "2026-11-08T10:07:00.745250411Z",
+              "duration_ns": 25597
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "n02",
+          "status": "PASS",
+          "template_id": "N02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "listening": "item",
+            "port": "item",
+            "protocol": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-16b0ed33dc18ad692715970c5b9e4a7a971aa3bd3753a8433f21e6baa5f4662a",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "ss IPv4/IPv6 listening sockets",
+              "start_time": "2026-11-08T10:07:00.884233928Z",
+              "end_time": "2026-11-08T10:07:00.931628013Z",
+              "duration_ns": 47394088
+            },
+            {
+              "resource": "builtin-16b0ed33dc18ad692715970c5b9e4a7a971aa3bd3753a8433f21e6baa5f4662a",
+              "property": "stdout",
+              "expected": {
+                "listening": false,
+                "port": 65432,
+                "protocol": "tcp"
+              },
+              "actual": "__RS_IPV4__\nLISTEN 0      5      127.0.0.1:18080 0.0.0.0:* ino:45029 sk:1 cgroup:/system.slice/readyspec-m4-http.service <->\nLISTEN 0      128      0.0.0.0:22    0.0.0.0:* ino:25664 sk:2 cgroup:/system.slice/sshd.service <->             \nLISTEN 0      4096     0.0.0.0:111   0.0.0.0:* ino:22272 sk:3 cgroup:/system.slice/rpcbind.socket <->           \n__RS_IPV6__\nLISTEN 0      128    [::]:22  [::]:* ino:25676 sk:1001 cgroup:/system.slice/sshd.service v6only:1 <->\nLISTEN 0      4096   [::]:111 [::]:* ino:17023 sk:1002 cgroup:/system.slice/rpcbind.socket v6only:1 <->\n",
+              "error": false,
+              "source": "ss IPv4/IPv6 listening sockets",
+              "start_time": "2026-11-08T10:07:00.931632723Z",
+              "end_time": "2026-11-08T10:07:00.931669135Z",
+              "duration_ns": 36418
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "n03",
+          "status": "PASS",
+          "template_id": "N03",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "ACTIVE_PROBE",
+          "parameter_sources": {
+            "address": "item",
+            "reachable": "item",
+            "timeout_ms": "default"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-5cc4ce87e7d189e95cbae2dfec3dd072ec12ab5f591793f405f114c46099bda3",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "TCP connection and system resolver",
+              "start_time": "2026-11-08T10:07:00.89593321Z",
+              "end_time": "2026-11-08T10:07:01.037838592Z",
+              "duration_ns": 141905384
+            },
+            {
+              "resource": "builtin-5cc4ce87e7d189e95cbae2dfec3dd072ec12ab5f591793f405f114c46099bda3",
+              "property": "stdout",
+              "expected": {
+                "address": "127.0.0.1:22",
+                "reachable": true,
+                "timeout_ms": 1000
+              },
+              "actual": "{\"reachable\": true, \"reason\": \"CONNECTED\", \"duration_ms\": 13.9633149999554}\n",
+              "error": false,
+              "source": "TCP connection and system resolver",
+              "start_time": "2026-11-08T10:07:01.037843225Z",
+              "end_time": "2026-11-08T10:07:01.03805824Z",
+              "duration_ns": 215020
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "n04",
+          "status": "PASS",
+          "template_id": "N04",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "ACTIVE_PROBE",
+          "parameter_sources": {
+            "addrs": "item",
+            "name": "item",
+            "record_type": "item",
+            "server": "item",
+            "timeout_ms": "default"
+          },
+          "evidence": [
+            {
+              "resource": "dns-rcode-8d4c77c619056d121b1e5b0200db86eae2230c23b4b3ed4c3fca1eb8a0bb8962",
+              "property": "stdout",
+              "expected": {},
+              "actual": {
+                "duration_ms": 0.3235909998693387,
+                "rcode": 0,
+                "truncated": false
+              },
+              "error": false,
+              "source": "DNS query to configured resolver",
+              "start_time": "2026-11-08T10:07:01.088220042Z",
+              "end_time": "2026-11-08T10:07:01.088244394Z",
+              "duration_ns": 24365
+            },
+            {
+              "resource": "A:fixture.test",
+              "property": "addrs",
+              "expected": [
+                "127.0.0.1"
+              ],
+              "actual": [
+                "127.0.0.1"
+              ],
+              "error": false,
+              "source": "DNS query to configured resolver",
+              "start_time": "2026-11-08T10:07:01.066471876Z",
+              "end_time": "2026-11-08T10:07:01.066505263Z",
+              "duration_ns": 33396
+            },
+            {
+              "resource": "A:fixture.test",
+              "property": "resolvable",
+              "expected": true,
+              "actual": true,
+              "error": false,
+              "source": "DNS query to configured resolver",
+              "start_time": "2026-11-08T10:07:01.065520813Z",
+              "end_time": "2026-11-08T10:07:01.066468833Z",
+              "duration_ns": 948015
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "n05",
+          "status": "PASS",
+          "template_id": "N05",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "ACTIVE_PROBE",
+          "parameter_sources": {
+            "follow_redirects": "default",
+            "method": "default",
+            "status": "item",
+            "timeout_ms": "default",
+            "url": "item",
+            "verify_tls": "default"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-e0f3055c318033ad3f8d93e9e8d7d9c2d56602bd0984c3226aa103baf186dc0e",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "HTTP response",
+              "start_time": "2026-11-08T10:07:00.852010133Z",
+              "end_time": "2026-11-08T10:07:01.185848674Z",
+              "duration_ns": 333838548
+            },
+            {
+              "resource": "builtin-e0f3055c318033ad3f8d93e9e8d7d9c2d56602bd0984c3226aa103baf186dc0e",
+              "property": "stdout",
+              "expected": {
+                "follow_redirects": false,
+                "method": "GET",
+                "status": 200,
+                "timeout_ms": 1000,
+                "url": "http://127.0.0.1:18080/",
+                "verify_tls": true
+              },
+              "actual": {
+                "body": {
+                  "redacted": true,
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                },
+                "body_bytes": 0,
+                "body_limit_bytes": 1048576,
+                "duration_ms": 82.44382999987465,
+                "header_bytes": 155,
+                "header_limit_bytes": 65536,
+                "redirect_limit": 10,
+                "redirects": 0,
+                "response_bytes": 155,
+                "response_limit_bytes": 1048576,
+                "status": 200,
+                "timeout_ms": 1000,
+                "tls_verified": false
+              },
+              "error": false,
+              "source": "HTTP response",
+              "start_time": "2026-11-08T10:07:01.185852751Z",
+              "end_time": "2026-11-08T10:07:01.185877241Z",
+              "duration_ns": 24511
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "n06",
+          "status": "PASS",
+          "template_id": "N06",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "interface": "item",
+            "target": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-5968a419bd32220cb628cdf9399ce39487e80bd2c456c134a79293489dfeb937",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "ip -j route get",
+              "start_time": "2026-11-08T10:07:00.816964321Z",
+              "end_time": "2026-11-08T10:07:00.8656362Z",
+              "duration_ns": 48671875
+            },
+            {
+              "resource": "builtin-5968a419bd32220cb628cdf9399ce39487e80bd2c456c134a79293489dfeb937",
+              "property": "stdout",
+              "expected": {
+                "interface": "lo",
+                "target": "127.0.0.1"
+              },
+              "actual": {
+                "interface": "lo",
+                "source": "127.0.0.1",
+                "target": "127.0.0.1"
+              },
+              "error": false,
+              "source": "ip -j route get",
+              "start_time": "2026-11-08T10:07:00.865640369Z",
+              "end_time": "2026-11-08T10:07:00.865662481Z",
+              "duration_ns": 22116
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "o01",
+          "status": "PASS",
+          "template_id": "O01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "allowed_ids": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-d7b4708f1a7e51afd2188c9728a79f325dbf4d414cd01b5526a33088177e7bb6",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/etc/os-release",
+              "start_time": "2026-11-08T10:07:00.825003565Z",
+              "end_time": "2026-11-08T10:07:00.865869567Z",
+              "duration_ns": 40865997
+            },
+            {
+              "resource": "builtin-d7b4708f1a7e51afd2188c9728a79f325dbf4d414cd01b5526a33088177e7bb6",
+              "property": "stdout",
+              "expected": {
+                "allowed_ids": [
+                  "rocky"
+                ]
+              },
+              "actual": {
+                "os_id": "rocky",
+                "raw_fields": {
+                  "ID": "\"rocky\"",
+                  "VERSION_ID": "\"9.8\""
+                },
+                "version_id": "9.8"
+              },
+              "error": false,
+              "source": "/etc/os-release",
+              "start_time": "2026-11-08T10:07:00.865871283Z",
+              "end_time": "2026-11-08T10:07:00.865900111Z",
+              "duration_ns": 28838
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "o02",
+          "status": "PASS",
+          "template_id": "O02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "minimum_version": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-b0b5f48db73133e73678b2de209a73c594249f1e25042d87cd321d2ab1b2516d",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "uname -r",
+              "start_time": "2026-11-08T10:07:00.78845997Z",
+              "end_time": "2026-11-08T10:07:00.824969768Z",
+              "duration_ns": 36509768
+            },
+            {
+              "resource": "builtin-b0b5f48db73133e73678b2de209a73c594249f1e25042d87cd321d2ab1b2516d",
+              "property": "stdout",
+              "expected": {
+                "minimum_version": "4.0"
+              },
+              "actual": {
+                "kernel_raw": "5.14.0-687.15.1.el9_8.x86_64\n",
+                "normalized_version": "5.14.0",
+                "release_suffix": "-687.15.1.el9_8.x86_64"
+              },
+              "error": false,
+              "source": "uname -r",
+              "start_time": "2026-11-08T10:07:00.824973974Z",
+              "end_time": "2026-11-08T10:07:00.824997579Z",
+              "duration_ns": 23607
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "o03",
+          "status": "PASS",
+          "template_id": "O03",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "name": "item",
+            "value": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-91ee6ee0fb887fe64133bcb9ebabe7ff247ed1bb7bb7d236c85c8f22aa5cf39b",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/proc/sys/vm/swappiness",
+              "start_time": "2026-11-08T10:07:00.951702162Z",
+              "end_time": "2026-11-08T10:07:01.003748215Z",
+              "duration_ns": 52046062
+            },
+            {
+              "resource": "builtin-91ee6ee0fb887fe64133bcb9ebabe7ff247ed1bb7bb7d236c85c8f22aa5cf39b",
+              "property": "stdout",
+              "expected": {
+                "name": "vm.swappiness",
+                "value": "60"
+              },
+              "actual": {
+                "exists": true,
+                "value": "60",
+                "value_raw": "60\n"
+              },
+              "error": false,
+              "source": "/proc/sys/vm/swappiness",
+              "start_time": "2026-11-08T10:07:01.003753434Z",
+              "end_time": "2026-11-08T10:07:01.003774256Z",
+              "duration_ns": 20823
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "o04",
+          "status": "PASS",
+          "template_id": "O04",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "loaded": "item",
+            "name": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-34a6950ab7d809aa3450f94393fa675606fe052e7cdb21eb0063b3a641e7149b",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/proc/modules",
+              "start_time": "2026-11-08T10:07:00.788646922Z",
+              "end_time": "2026-11-08T10:07:00.801977344Z",
+              "duration_ns": 13330454
+            },
+            {
+              "resource": "builtin-34a6950ab7d809aa3450f94393fa675606fe052e7cdb21eb0063b3a641e7149b",
+              "property": "stdout",
+              "expected": {
+                "loaded": false,
+                "name": "readyspec_never_module"
+              },
+              "actual": {
+                "loaded": false,
+                "module_count": 35,
+                "name": "readyspec_never_module",
+                "state": ""
+              },
+              "error": false,
+              "source": "/proc/modules",
+              "start_time": "2026-11-08T10:07:00.801982279Z",
+              "end_time": "2026-11-08T10:07:00.802477125Z",
+              "duration_ns": 494858
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "r01",
+          "status": "PASS",
+          "template_id": "R01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "enabled": "item",
+            "name": "item",
+            "running": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-e96b4c3f13a7def3cd1246aaed8e4935a01f362b224cd98048c3df0b2d9d9f1b",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "systemctl show",
+              "start_time": "2026-11-08T10:07:01.02791797Z",
+              "end_time": "2026-11-08T10:07:01.099358007Z",
+              "duration_ns": 71440040
+            },
+            {
+              "resource": "builtin-e96b4c3f13a7def3cd1246aaed8e4935a01f362b224cd98048c3df0b2d9d9f1b",
+              "property": "stdout",
+              "expected": {
+                "enabled": true,
+                "name": "readyspec-m4-fixture.service",
+                "running": true
+              },
+              "actual": {
+                "active_state": "active",
+                "enabled": true,
+                "exists": true,
+                "load_state": "loaded",
+                "name": "readyspec-m4-fixture.service",
+                "running": true,
+                "unit_file_state": "enabled"
+              },
+              "error": false,
+              "source": "systemctl show",
+              "start_time": "2026-11-08T10:07:01.09936423Z",
+              "end_time": "2026-11-08T10:07:01.099389638Z",
+              "duration_ns": 25417
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "r02",
+          "status": "PASS",
+          "template_id": "R02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "minimum_count": "item",
+            "name": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-421c8f595fe2bc97a60c112e91c03473a570aa495eaec484a65a69fb824c76c7",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "ps -eo pid=,comm= (process names only)",
+              "start_time": "2026-11-08T10:07:00.691197643Z",
+              "end_time": "2026-11-08T10:07:00.745439396Z",
+              "duration_ns": 54241743
+            },
+            {
+              "resource": "builtin-421c8f595fe2bc97a60c112e91c03473a570aa495eaec484a65a69fb824c76c7",
+              "property": "stdout",
+              "expected": {
+                "minimum_count": 1,
+                "name": "sleep"
+              },
+              "actual": {
+                "matched_count": 1,
+                "matching_mode": "exact_comm",
+                "name": "sleep",
+                "process_records": 126,
+                "redacted": true
+              },
+              "error": false,
+              "source": "ps -eo pid=,comm= (process names only)",
+              "start_time": "2026-11-08T10:07:00.745441531Z",
+              "end_time": "2026-11-08T10:07:00.745546288Z",
+              "duration_ns": 104781
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "r03",
+          "status": "PASS",
+          "template_id": "R03",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "maximum": "item",
+            "window": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-e40d0b5420df92be75e304baca40c0b7568aba2cb98a0e734d943dad9e6cbf2e",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/proc/loadavg",
+              "start_time": "2026-11-08T10:07:01.049084068Z",
+              "end_time": "2026-11-08T10:07:01.076153272Z",
+              "duration_ns": 27069384
+            },
+            {
+              "resource": "builtin-e40d0b5420df92be75e304baca40c0b7568aba2cb98a0e734d943dad9e6cbf2e",
+              "property": "stdout",
+              "expected": {
+                "maximum": 1000,
+                "window": 1
+              },
+              "actual": {
+                "load_average": "0.00",
+                "maximum": 1000,
+                "measurement": "average runnable or uninterruptible tasks",
+                "window_minutes": 1
+              },
+              "error": false,
+              "source": "/proc/loadavg",
+              "start_time": "2026-11-08T10:07:01.076156486Z",
+              "end_time": "2026-11-08T10:07:01.076185652Z",
+              "duration_ns": 29185
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "r04",
+          "status": "PASS",
+          "template_id": "R04",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "bound": "default",
+            "limit": "item",
+            "minimum": "item",
+            "pid": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-5dc1690043edea9cd25ad11a661fb726b7de829b386c100f7785fad23db06f78",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/proc/1/limits",
+              "start_time": "2026-11-08T10:07:01.042585792Z",
+              "end_time": "2026-11-08T10:07:01.065420101Z",
+              "duration_ns": 22834311
+            },
+            {
+              "resource": "builtin-5dc1690043edea9cd25ad11a661fb726b7de829b386c100f7785fad23db06f78",
+              "property": "stdout",
+              "expected": {
+                "bound": "soft",
+                "limit": "NOFILE",
+                "minimum": 1,
+                "pid": 1
+              },
+              "actual": {
+                "bound": "soft",
+                "hard": "1073741816",
+                "limit": "NOFILE",
+                "minimum": 1,
+                "pid": 1,
+                "soft": "1073741816",
+                "source_kind": "effective_process_limit",
+                "units": "files",
+                "unlimited": false,
+                "value": "1073741816"
+              },
+              "error": false,
+              "source": "/proc/1/limits",
+              "start_time": "2026-11-08T10:07:01.065423714Z",
+              "end_time": "2026-11-08T10:07:01.06549744Z",
+              "duration_ns": 73745
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "r05",
+          "status": "PASS",
+          "template_id": "R05",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "allowed_services": "item",
+            "synchronized": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-a3dc40195716fc6c10670a4ae971ebd8969978e5dbee2ce90c8c1bc31c6ca3d6",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "timedatectl and systemctl",
+              "start_time": "2026-11-08T10:07:00.724310004Z",
+              "end_time": "2026-11-08T10:07:00.895894666Z",
+              "duration_ns": 171584713
+            },
+            {
+              "resource": "builtin-a3dc40195716fc6c10670a4ae971ebd8969978e5dbee2ce90c8c1bc31c6ca3d6",
+              "property": "stdout",
+              "expected": {
+                "allowed_services": [
+                  "chronyd"
+                ],
+                "synchronized": true
+              },
+              "actual": {
+                "active_services": [
+                  "chronyd"
+                ],
+                "service_queries": [
+                  {
+                    "exit_status": 0,
+                    "name": "chronyd",
+                    "state": "active"
+                  }
+                ],
+                "sync_exit_status": 0,
+                "synchronized": true
+              },
+              "error": false,
+              "source": "timedatectl and systemctl",
+              "start_time": "2026-11-08T10:07:00.895899324Z",
+              "end_time": "2026-11-08T10:07:00.89591967Z",
+              "duration_ns": 20354
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s01",
+          "status": "PASS",
+          "template_id": "S01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EXISTENCE",
+          "parameter_sources": {
+            "exists": "item",
+            "filetype": "item",
+            "follow_symlinks": "default",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:00.865667733Z",
+              "end_time": "2026-11-08T10:07:01.102810225Z",
+              "duration_ns": 237142547
+            },
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "stdout",
+              "expected": {},
+              "actual": {
+                "follow_symlinks": false,
+                "node_exists": true,
+                "node_type": "file"
+              },
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.102814573Z",
+              "end_time": "2026-11-08T10:07:01.102832586Z",
+              "duration_ns": 18016
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "exists",
+              "expected": true,
+              "actual": true,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.06672263Z",
+              "end_time": "2026-11-08T10:07:01.066732466Z",
+              "duration_ns": 9840
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "filetype",
+              "expected": "file",
+              "actual": "file",
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.066832787Z",
+              "end_time": "2026-11-08T10:07:01.066836536Z",
+              "duration_ns": 3760
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s02",
+          "status": "PASS",
+          "template_id": "S02",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "mode": "item",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "/etc/passwd",
+              "property": "exists",
+              "expected": true,
+              "actual": true,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.06672263Z",
+              "end_time": "2026-11-08T10:07:01.066732466Z",
+              "duration_ns": 9840
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "gid",
+              "expected": null,
+              "actual": 0,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.066827282Z",
+              "end_time": "2026-11-08T10:07:01.066831917Z",
+              "duration_ns": 4646,
+              "observation_only": true
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "group",
+              "expected": null,
+              "actual": "root",
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.066803469Z",
+              "end_time": "2026-11-08T10:07:01.066825478Z",
+              "duration_ns": 22033,
+              "observation_only": true
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "mode",
+              "expected": "0644",
+              "actual": "0644",
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.066733525Z",
+              "end_time": "2026-11-08T10:07:01.066739621Z",
+              "duration_ns": 6098
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "owner",
+              "expected": null,
+              "actual": "root",
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.066740609Z",
+              "end_time": "2026-11-08T10:07:01.066794815Z",
+              "duration_ns": 54224,
+              "observation_only": true
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "uid",
+              "expected": null,
+              "actual": 0,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T10:07:01.066797086Z",
+              "end_time": "2026-11-08T10:07:01.066802978Z",
+              "duration_ns": 5904,
+              "observation_only": true
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s03",
+          "status": "PASS",
+          "template_id": "S03",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "filesystem": "item",
+            "path": "item",
+            "required_options": "item"
+          },
+          "evidence": [
+            {
+              "resource": "/",
+              "property": "exists",
+              "expected": true,
+              "actual": true,
+              "error": false,
+              "source": "/proc/self/mountinfo",
+              "start_time": "2026-11-08T10:07:01.066840379Z",
+              "end_time": "2026-11-08T10:07:01.06705029Z",
+              "duration_ns": 209918
+            },
+            {
+              "resource": "/",
+              "property": "filesystem",
+              "expected": "xfs",
+              "actual": "xfs",
+              "error": false,
+              "source": "/proc/self/mountinfo",
+              "start_time": "2026-11-08T10:07:01.067081379Z",
+              "end_time": "2026-11-08T10:07:01.067082573Z",
+              "duration_ns": 1196
+            },
+            {
+              "resource": "/",
+              "property": "opts",
+              "expected": {
+                "and": [
+                  {
+                    "contain-elements": [
+                      "rw"
+                    ]
+                  }
+                ]
+              },
+              "actual": [
+                "rw",
+                "relatime"
+              ],
+              "error": false,
+              "source": "/proc/self/mountinfo",
+              "start_time": "2026-11-08T10:07:01.067052046Z",
+              "end_time": "2026-11-08T10:07:01.067070966Z",
+              "duration_ns": 18941
+            },
+            {
+              "resource": "/",
+              "property": "source",
+              "expected": null,
+              "actual": "/dev/nvme0n1p4",
+              "error": false,
+              "source": "/proc/self/mountinfo",
+              "start_time": "2026-11-08T10:07:01.067072367Z",
+              "end_time": "2026-11-08T10:07:01.067080197Z",
+              "duration_ns": 7849,
+              "observation_only": true
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s04",
+          "status": "PASS",
+          "template_id": "S04",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "min_available": "item",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-9f24cfb7019c9052cfe95999a342eb6f2cd4c8c43ffddf0a796d6a7130734f8a",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "stat -f (f_bavail) and /proc/self/mountinfo: /",
+              "start_time": "2026-11-08T10:07:00.760788057Z",
+              "end_time": "2026-11-08T10:07:00.851371733Z",
+              "duration_ns": 90583680
+            },
+            {
+              "resource": "builtin-9f24cfb7019c9052cfe95999a342eb6f2cd4c8c43ffddf0a796d6a7130734f8a",
+              "property": "stdout",
+              "expected": {
+                "min_available": 1048576,
+                "path": "/"
+              },
+              "actual": {
+                "available_bytes": 40285585408,
+                "available_inodes": 20372117,
+                "block_size_bytes": 4096,
+                "filesystem": "xfs",
+                "filesystem_family": "xfs",
+                "free_bytes": 40285585408,
+                "free_percent": 99.83019849101,
+                "mount_point": "/",
+                "mount_root": "/",
+                "source": "/dev/nvme0n1p4",
+                "stat_mount_point": "/",
+                "total_bytes": 41725964288,
+                "total_inodes": 20406768
+              },
+              "error": false,
+              "source": "stat -f (f_bavail) and /proc/self/mountinfo: /",
+              "start_time": "2026-11-08T10:07:00.851376746Z",
+              "end_time": "2026-11-08T10:07:00.851524349Z",
+              "duration_ns": 147630
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s05",
+          "status": "PASS",
+          "template_id": "S05",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "min_available": "item",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-12534c743a1ad8c9ca85a154da6abee046292af7d53c9312529715cf84a04fb9",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "stat -f (inode counts) and /proc/self/mountinfo: /",
+              "start_time": "2026-11-08T10:07:01.00377977Z",
+              "end_time": "2026-11-08T10:07:01.073892933Z",
+              "duration_ns": 70113192
+            },
+            {
+              "resource": "builtin-12534c743a1ad8c9ca85a154da6abee046292af7d53c9312529715cf84a04fb9",
+              "property": "stdout",
+              "expected": {
+                "min_available": 1,
+                "path": "/"
+              },
+              "actual": {
+                "available_bytes": 40285585408,
+                "available_inodes": 20372117,
+                "block_size_bytes": 4096,
+                "filesystem": "xfs",
+                "filesystem_family": "xfs",
+                "free_bytes": 40285585408,
+                "free_percent": 99.83019849101,
+                "mount_point": "/",
+                "mount_root": "/",
+                "source": "/dev/nvme0n1p4",
+                "stat_mount_point": "/",
+                "total_bytes": 41725964288,
+                "total_inodes": 20406768
+              },
+              "error": false,
+              "source": "stat -f (inode counts) and /proc/self/mountinfo: /",
+              "start_time": "2026-11-08T10:07:01.073896326Z",
+              "end_time": "2026-11-08T10:07:01.073993733Z",
+              "duration_ns": 97414
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "a03",
+          "status": "PASS",
+          "template_id": "A03",
+          "template_version": "1.0.0",
+          "execution_mode": "PRIVILEGED",
+          "evidence_mode": "EFFECTIVE_STATE",
+          "parameter_sources": {
+            "expected": "item",
+            "key": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-cf094548d41548ea425995c9cc62acdb71efde9a2dca00fbcfefb791a3582980",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/usr/sbin/sshd -T",
+              "start_time": "2026-11-08T10:07:02.204022593Z",
+              "end_time": "2026-11-08T10:07:02.217128607Z",
+              "duration_ns": 13105997
+            },
+            {
+              "resource": "builtin-cf094548d41548ea425995c9cc62acdb71efde9a2dca00fbcfefb791a3582980",
+              "property": "stdout",
+              "expected": {
+                "match-regexp": "(?m)^permitrootlogin[ \\t]+without-password[ \\t]*$"
+              },
+              "actual": "port 22\naddressfamily any\nlistenaddress [::]:22\nlistenaddress 0.0.0.0:22\nusepam yes\npamservicename sshd\nlogingracetime 120\nx11displayoffset 10\nx11maxdisplays 1000\nmaxauthtries 6\nmaxsessions 10\nclientaliveinterval 0\nclientalivecountmax 3\nrequiredrsasize 2048\nstreamlocalbindmask 0177\nunusedconnectiontimeout none\npermitrootlogin without-password\nignorerhosts yes\nignoreuserknownhosts no\nhostbasedauthentication no\nhostbasedusesnamefrompacketonly no\npubkeyauthentication yes\nkerberosauthentication no\nkerberosorlocalpasswd yes\nkerberosticketcleanup yes\nkerberosuniqueccache no\nkerberosusekuserok yes\ngssapienablek5users no\ngssapiauthentication yes\ngssapicleanupcredentials no\ngssapikeyexchange no\ngssapistrictacceptorcheck yes\ngssapistorecredentialsonrekey no\ngssapikexalgorithms gss-curve25519-sha256-,gss-nistp256-sha256-,gss-group14-sha256-,gss-group16-sha512-\ngssapiindicators none\npasswordauthentication no\nkbdinteractiveauthentication no\nprintmotd no\nprintlastlog yes\nx11forwarding yes\nx11uselocalhost yes\npermittty yes\npermituserrc yes\nstrictmodes yes\ntcpkeepalive yes\npermitemptypasswords no\ncompression yes\ngatewayports no\nusedns no\nallowtcpforwarding yes\nallowagentforwarding yes\ndisableforwarding no\nallowstreamlocalforwarding yes\nstreamlocalbindunlink no\nfingerprinthash SHA256\nexposeauthinfo no\nrefuseconnection no\ncanonicalmatchuser no\npidfile /var/run/sshd.pid\nmodulifile /etc/ssh/moduli\nxauthlocation /usr/bin/xauth\nciphers aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr,aes128-gcm@openssh.com,aes128-ctr\nmacs hmac-sha2-256-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha1,umac-128@openssh.com,hmac-sha2-512\nbanner none\nforcecommand none\nchrootdirectory none\ntrustedusercakeys none\nrevokedkeys none\nsecuritykeyprovider internal\nauthorizedprincipalsfile none\nversionaddendum none\nauthorizedkeyscommand none\nauthorizedkeyscommanduser none\nauthorizedprincipalscommand none\nauthorizedprincipalscommanduser none\nhostkeyagent none\nkexalgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512\ncasignaturealgorithms ecdsa-sha2-nistp256,sk-ecdsa-sha2-nistp256@openssh.com,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,sk-ssh-ed25519@openssh.com,rsa-sha2-256,rsa-sha2-512\nhostbasedacceptedalgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256\nhostkeyalgorithms ecdsa-sha2-nistp256,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,rsa-sha2-256,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-512-cert-v01@openssh.com\npubkeyacceptedalgorithms ecdsa-sha2-nistp256,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,rsa-sha2-256,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-512-cert-v01@openssh.com\nsshdsessionpath /usr/libexec/openssh/sshd-session\npersourcepenaltyexemptlist none\nloglevel INFO\nsyslogfacility AUTHPRIV\nauthorizedkeysfile .ssh/authorized_keys\nhostkey /etc/ssh/ssh_host_rsa_key\nhostkey /etc/ssh/ssh_host_ecdsa_key\nhostkey /etc/ssh/ssh_host_ed25519_key\nauthenticationmethods any\nchanneltimeout none\nsubsystem sftp /usr/libexec/openssh/sftp-server\nmaxstartups 10:30:100\npersourcemaxstartups none\npersourcenetblocksize 32:128\npermittunnel no\nipqos af21 cs1\nrekeylimit 0 0\npermitopen any\npermitlisten any\npermituserenvironment no\npubkeyauthoptions none\npersourcepenalties crash:90 authfail:5 noauth:1 grace-exceeded:10 refuseconnection:10 max:600 min:15 max-sources4:65536 max-sources6:65536 overflow:permissive overflow6:permissive\n",
+              "error": false,
+              "source": "/usr/sbin/sshd -T",
+              "start_time": "2026-11-08T10:07:02.2171324Z",
+              "end_time": "2026-11-08T10:07:02.217214291Z",
+              "duration_ns": 81902
+            }
+          ]
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-P4IH5VGRAFTVM3YF77OIXNBGGW:e7756e15fea3",
+      "host_id": "node",
+      "machine_id": "ec2ab4fc38304b620b362ddd5e0e8211",
+      "boot_id": "99ac3cbc-cde6-4d76-a870-473b364f4e8c",
+      "status": "CLEAN",
+      "remote_path": "/tmp/readyspec-0ae5a99163fd4d756bc51611",
+      "privileged_path": "/run/readyspec-0ae5a99163fd4d756bc51611-privileged"
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,40 @@
+{
+  "case": "M4-E2E-02-final-M01-M02-M01",
+  "source_sha256": "60a1f4c92d0029c56e55236a5d587806a7ca8474708a7e51d04617f8680d442d",
+  "steps": [
+    {
+      "step": 1,
+      "manager": "M01",
+      "workspace": "e2e-offline-final-cfb5bb16870948b1b98bdf906f91a529",
+      "created": true,
+      "plan_id": "m4-m02-native-web-final",
+      "digest": "sha256:f0470cc78ab1af6e72e9df9cc99a23fb5adf7827af4a014c347c052951daba4f",
+      "export_sha256": "853636aff016a1cc5acf34fb1020057a4498bd131d80d09f3a800f49462e1187"
+    },
+    {
+      "step": 2,
+      "manager": "M02",
+      "workspace": "e2e-offline-final-3109def3b9414e489307bda18d6e1cd3",
+      "created": true,
+      "plan_id": "m4-m02-native-web-final",
+      "digest": "sha256:f0470cc78ab1af6e72e9df9cc99a23fb5adf7827af4a014c347c052951daba4f",
+      "export_sha256": "853636aff016a1cc5acf34fb1020057a4498bd131d80d09f3a800f49462e1187"
+    },
+    {
+      "step": 3,
+      "manager": "M01",
+      "workspace": "e2e-offline-final-7cfd6fabf26446a4b8c5bc088b2b52e4",
+      "created": true,
+      "plan_id": "m4-m02-native-web-final",
+      "digest": "sha256:f0470cc78ab1af6e72e9df9cc99a23fb5adf7827af4a014c347c052951daba4f",
+      "export_sha256": "853636aff016a1cc5acf34fb1020057a4498bd131d80d09f3a800f49462e1187"
+    }
+  ],
+  "stable_identity": true,
+  "static_only_no_target_connections": true,
+  "candidate_digests": {
+    "amd64": "afb0d716ee19351b24e7030d2ff06b3cfd7bb67435668d787a3e609d3ad522e7",
+    "arm64": "a1348677524ff0b6b4163e0a859ca402d37e51b35adc63e9e301f0bb1f27fc6a"
+  },
+  "assertions_passed": true
+}

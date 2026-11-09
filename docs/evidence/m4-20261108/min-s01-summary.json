@@ -1,0 +1,614 @@
+[
+  {
+    "case": "M4-MIN-03-T01-S01-python-missing",
+    "target": "T01",
+    "cli_exit": 11,
+    "run_id": "run-LS6M57XVJWPI4PK44JNOO4OWB3",
+    "run_status": "COMPLETED",
+    "verdict": "UNKNOWN",
+    "items": [
+      {
+        "template_id": "H01",
+        "status": "PASS",
+        "evidence": [
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 0,
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:51:42.528266159Z",
+            "end_time": "2026-11-08T18:51:42.536421456Z",
+            "duration_ns": 8155324
+          },
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "stdout",
+            "expected": {
+              "allowed_arch": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "actual": {
+              "normalized_architecture": "x86_64",
+              "uname_raw": "x86_64\n"
+            },
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:51:42.536426176Z",
+            "end_time": "2026-11-08T18:51:42.53650354Z",
+            "duration_ns": 77350
+          }
+        ]
+      },
+      {
+        "template_id": "S01",
+        "status": "ERROR",
+        "evidence": [
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 127,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:42.528632195Z",
+            "end_time": "2026-11-08T18:51:42.532411534Z",
+            "duration_ns": 3779329
+          },
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "stdout",
+            "expected": {},
+            "actual": {
+              "error": "INVALID_PATH_METADATA"
+            },
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:42.532413262Z",
+            "end_time": "2026-11-08T18:51:42.532450272Z",
+            "duration_ns": 37018
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "exists",
+            "expected": true,
+            "actual": true,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:42.532089071Z",
+            "end_time": "2026-11-08T18:51:42.532097493Z",
+            "duration_ns": 8418
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "filetype",
+            "expected": "file",
+            "actual": "file",
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:42.532100581Z",
+            "end_time": "2026-11-08T18:51:42.532107653Z",
+            "duration_ns": 7081
+          }
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "termination_reason": null
+  },
+  {
+    "case": "M4-MIN-03-T02-S01-python-missing",
+    "target": "T02",
+    "cli_exit": 11,
+    "run_id": "run-XKKP3SG54KWSBQ3ALRIWM4FXQA",
+    "run_status": "COMPLETED",
+    "verdict": "UNKNOWN",
+    "items": [
+      {
+        "template_id": "H01",
+        "status": "PASS",
+        "evidence": [
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 0,
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:51:48.933654378Z",
+            "end_time": "2026-11-08T18:51:48.93897168Z",
+            "duration_ns": 5317278
+          },
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "stdout",
+            "expected": {
+              "allowed_arch": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "actual": {
+              "normalized_architecture": "aarch64",
+              "uname_raw": "aarch64\n"
+            },
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:51:48.938975217Z",
+            "end_time": "2026-11-08T18:51:48.939024522Z",
+            "duration_ns": 49330
+          }
+        ]
+      },
+      {
+        "template_id": "S01",
+        "status": "ERROR",
+        "evidence": [
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 127,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:48.933735782Z",
+            "end_time": "2026-11-08T18:51:48.9357376Z",
+            "duration_ns": 2001801
+          },
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "stdout",
+            "expected": {},
+            "actual": {
+              "error": "INVALID_PATH_METADATA"
+            },
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:48.935739109Z",
+            "end_time": "2026-11-08T18:51:48.935784098Z",
+            "duration_ns": 45030
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "exists",
+            "expected": true,
+            "actual": true,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:48.935450303Z",
+            "end_time": "2026-11-08T18:51:48.935459526Z",
+            "duration_ns": 9240
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "filetype",
+            "expected": "file",
+            "actual": "file",
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:48.935461184Z",
+            "end_time": "2026-11-08T18:51:48.93546618Z",
+            "duration_ns": 4997
+          }
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "termination_reason": null
+  },
+  {
+    "case": "M4-MIN-03-T03-S01-python-missing",
+    "target": "T03",
+    "cli_exit": 11,
+    "run_id": "run-UVAGUGDCSY3HAHSLUUUBSPZ7WW",
+    "run_status": "COMPLETED",
+    "verdict": "UNKNOWN",
+    "items": [
+      {
+        "template_id": "H01",
+        "status": "PASS",
+        "evidence": [
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 0,
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:51:54.155162108Z",
+            "end_time": "2026-11-08T18:51:54.162214873Z",
+            "duration_ns": 7052758
+          },
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "stdout",
+            "expected": {
+              "allowed_arch": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "actual": {
+              "normalized_architecture": "x86_64",
+              "uname_raw": "x86_64\n"
+            },
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:51:54.162216934Z",
+            "end_time": "2026-11-08T18:51:54.162248236Z",
+            "duration_ns": 31306
+          }
+        ]
+      },
+      {
+        "template_id": "S01",
+        "status": "ERROR",
+        "evidence": [
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 127,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:54.154959042Z",
+            "end_time": "2026-11-08T18:51:54.161968942Z",
+            "duration_ns": 7009699
+          },
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "stdout",
+            "expected": {},
+            "actual": {
+              "error": "INVALID_PATH_METADATA"
+            },
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:54.161971662Z",
+            "end_time": "2026-11-08T18:51:54.162010698Z",
+            "duration_ns": 39048
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "exists",
+            "expected": true,
+            "actual": true,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:54.155675097Z",
+            "end_time": "2026-11-08T18:51:54.155683966Z",
+            "duration_ns": 8862
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "filetype",
+            "expected": "file",
+            "actual": "file",
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:51:54.155686395Z",
+            "end_time": "2026-11-08T18:51:54.155692642Z",
+            "duration_ns": 6262
+          }
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "termination_reason": null
+  },
+  {
+    "case": "M4-MIN-03-T04-S01-python-missing",
+    "target": "T04",
+    "cli_exit": 11,
+    "run_id": "run-VTADFYA77TJUN6JTJJL5GNRNVH",
+    "run_status": "COMPLETED",
+    "verdict": "UNKNOWN",
+    "items": [
+      {
+        "template_id": "H01",
+        "status": "PASS",
+        "evidence": [
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 0,
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:52:00.732250263Z",
+            "end_time": "2026-11-08T18:52:00.736529623Z",
+            "duration_ns": 4279360
+          },
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "stdout",
+            "expected": {
+              "allowed_arch": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "actual": {
+              "normalized_architecture": "aarch64",
+              "uname_raw": "aarch64\n"
+            },
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:52:00.73653288Z",
+            "end_time": "2026-11-08T18:52:00.736562336Z",
+            "duration_ns": 29448
+          }
+        ]
+      },
+      {
+        "template_id": "S01",
+        "status": "ERROR",
+        "evidence": [
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 127,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:00.732277192Z",
+            "end_time": "2026-11-08T18:52:00.73681983Z",
+            "duration_ns": 4542630
+          },
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "stdout",
+            "expected": {},
+            "actual": {
+              "error": "INVALID_PATH_METADATA"
+            },
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:00.736821479Z",
+            "end_time": "2026-11-08T18:52:00.736832203Z",
+            "duration_ns": 10732
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "exists",
+            "expected": true,
+            "actual": true,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:00.733770681Z",
+            "end_time": "2026-11-08T18:52:00.733780691Z",
+            "duration_ns": 9994
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "filetype",
+            "expected": "file",
+            "actual": "file",
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:00.733782964Z",
+            "end_time": "2026-11-08T18:52:00.733788937Z",
+            "duration_ns": 5981
+          }
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "termination_reason": null
+  },
+  {
+    "case": "M4-MIN-03-T05-S01-python-missing",
+    "target": "T05",
+    "cli_exit": 11,
+    "run_id": "run-H2VX5UOQUEQB52NYI2BWXZRLQY",
+    "run_status": "COMPLETED",
+    "verdict": "UNKNOWN",
+    "items": [
+      {
+        "template_id": "H01",
+        "status": "PASS",
+        "evidence": [
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 0,
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:52:07.218758244Z",
+            "end_time": "2026-11-08T18:52:07.226726002Z",
+            "duration_ns": 7967755
+          },
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "stdout",
+            "expected": {
+              "allowed_arch": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "actual": {
+              "normalized_architecture": "x86_64",
+              "uname_raw": "x86_64\n"
+            },
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:52:07.226728576Z",
+            "end_time": "2026-11-08T18:52:07.226741882Z",
+            "duration_ns": 13306
+          }
+        ]
+      },
+      {
+        "template_id": "S01",
+        "status": "ERROR",
+        "evidence": [
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 127,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:07.219040858Z",
+            "end_time": "2026-11-08T18:52:07.224070296Z",
+            "duration_ns": 5029438
+          },
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "stdout",
+            "expected": {},
+            "actual": {
+              "error": "INVALID_PATH_METADATA"
+            },
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:07.224073477Z",
+            "end_time": "2026-11-08T18:52:07.224098109Z",
+            "duration_ns": 24640
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "exists",
+            "expected": true,
+            "actual": true,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:07.219452746Z",
+            "end_time": "2026-11-08T18:52:07.219461177Z",
+            "duration_ns": 8426
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "filetype",
+            "expected": "file",
+            "actual": "file",
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:07.219465055Z",
+            "end_time": "2026-11-08T18:52:07.219471186Z",
+            "duration_ns": 6138
+          }
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "termination_reason": null
+  },
+  {
+    "case": "M4-MIN-03-T06-S01-python-missing",
+    "target": "T06",
+    "cli_exit": 11,
+    "run_id": "run-SZEYT52ILFE4XX7EB2PK7VDSSR",
+    "run_status": "COMPLETED",
+    "verdict": "UNKNOWN",
+    "items": [
+      {
+        "template_id": "H01",
+        "status": "PASS",
+        "evidence": [
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 0,
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:52:13.543104037Z",
+            "end_time": "2026-11-08T18:52:13.546550949Z",
+            "duration_ns": 3446904
+          },
+          {
+            "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+            "property": "stdout",
+            "expected": {
+              "allowed_arch": [
+                "x86_64",
+                "aarch64"
+              ]
+            },
+            "actual": {
+              "normalized_architecture": "aarch64",
+              "uname_raw": "aarch64\n"
+            },
+            "error": false,
+            "source": "uname -m",
+            "start_time": "2026-11-08T18:52:13.546553591Z",
+            "end_time": "2026-11-08T18:52:13.546580561Z",
+            "duration_ns": 26970
+          }
+        ]
+      },
+      {
+        "template_id": "S01",
+        "status": "ERROR",
+        "evidence": [
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "exit-status",
+            "expected": 0,
+            "actual": 127,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:13.543111585Z",
+            "end_time": "2026-11-08T18:52:13.546609869Z",
+            "duration_ns": 3498259
+          },
+          {
+            "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+            "property": "stdout",
+            "expected": {},
+            "actual": {
+              "error": "INVALID_PATH_METADATA"
+            },
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:13.546611091Z",
+            "end_time": "2026-11-08T18:52:13.54661512Z",
+            "duration_ns": 4021
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "exists",
+            "expected": true,
+            "actual": true,
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:13.546307821Z",
+            "end_time": "2026-11-08T18:52:13.546317544Z",
+            "duration_ns": 9723
+          },
+          {
+            "resource": "/etc/passwd",
+            "property": "filetype",
+            "expected": "file",
+            "actual": "file",
+            "error": false,
+            "source": "/etc/passwd",
+            "start_time": "2026-11-08T18:52:13.546320235Z",
+            "end_time": "2026-11-08T18:52:13.546326618Z",
+            "duration_ns": 6391
+          }
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "termination_reason": null
+  }
+]

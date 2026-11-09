@@ -1,0 +1,34 @@
+{
+  "case": "M4-SEC-final-root-no-sudo-T01",
+  "report_file": "M4-SEC-final-root-no-sudo-T01-run-FM2TRDY7NSQHD4LUMSXCXTEFDB.json",
+  "report_candidate_sha256": "fda324aa221464ed9301eb9a50fe9565e54d271ae5abd47730f2b25d1969a622",
+  "goss_executions": [
+    {
+      "binary_gid": 0,
+      "binary_mode": "0700",
+      "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+      "binary_uid": 0,
+      "effective_uid": 0,
+      "mode": "STANDARD",
+      "workspace": "readyspec-58b3ad92482d0841650cf8a4",
+      "workspace_gid": 0,
+      "workspace_mode": "0700",
+      "workspace_uid": 0
+    },
+    {
+      "binary_gid": 0,
+      "binary_mode": "0700",
+      "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+      "binary_uid": 0,
+      "effective_uid": 0,
+      "mode": "PRIVILEGED",
+      "workspace": "readyspec-58b3ad92482d0841650cf8a4-privileged",
+      "workspace_gid": 0,
+      "workspace_mode": "0700",
+      "workspace_uid": 0
+    }
+  ],
+  "sudo_called": false,
+  "host_login_uid": 0,
+  "cleanup": "CLEAN"
+}

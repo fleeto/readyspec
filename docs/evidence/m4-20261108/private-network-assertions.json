@@ -1,0 +1,12 @@
+{
+  "verified_at": "2026-11-08T15:53:36.474211+00:00",
+  "instance_count": 9,
+  "running_vcpus": 16,
+  "private_instances_without_public_ip": 7,
+  "private_routes_local_only": true,
+  "manager_and_target_egress_vpc_only": true,
+  "encrypted_gp3_volumes": 9,
+  "provisioned_gib": 400,
+  "imdsv2_required": true,
+  "delete_on_termination": true
+}

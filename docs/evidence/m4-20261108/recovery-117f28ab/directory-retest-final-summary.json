@@ -1,0 +1,275 @@
+[
+  {
+    "case": "M4-RETEST-TMP-T02-standard-rsm4nopw-ro-depth-4",
+    "run_id": "run-TDXTCGCBJBGDEJ5Z3VXJRAJSDZ",
+    "exit": 11,
+    "reason": "EXECUTION_ERROR",
+    "expected_selected": null,
+    "cleanup": [],
+    "report_sha256": "0ae93adb8e7724e3a2d9d8b2eefc41361afb0dde2bbafa8f8622c650f730c337",
+    "baseline_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/home/rsm4nopw/.cache": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      }
+    },
+    "restricted_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4097,
+        "readonly": true,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 4097,
+        "readonly": true,
+        "noexec": false
+      },
+      "/var/tmp": {
+        "flags": 4097,
+        "readonly": true,
+        "noexec": false
+      },
+      "/home/rsm4nopw/.cache": {
+        "flags": 4097,
+        "readonly": true,
+        "noexec": false
+      }
+    }
+  },
+  {
+    "case": "M4-RETEST-TMP-T03-privileged-rsm4nopw-noexec-depth-1",
+    "run_id": "run-6D5PTFBAPK5M6H6IVSIFKDMW7B",
+    "exit": 0,
+    "reason": null,
+    "expected_selected": "/var/tmp",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_sha256": "3942cfc443821865a7895617f4304d3a35768672c1a4ffaa4de8308fca5e04f0",
+    "baseline_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/run": {
+        "flags": 4110,
+        "readonly": false,
+        "noexec": true
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 6,
+        "readonly": false,
+        "noexec": false
+      }
+    },
+    "restricted_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4104,
+        "readonly": false,
+        "noexec": true
+      },
+      "/run": {
+        "flags": 4110,
+        "readonly": false,
+        "noexec": true
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 6,
+        "readonly": false,
+        "noexec": false
+      }
+    }
+  },
+  {
+    "case": "M4-RETEST-TMP-T01-privileged-rsm4nopw-noexec-depth-2",
+    "run_id": "run-RDJ2NMIZGIFEXSM2GIXZHXCSZE",
+    "exit": 0,
+    "reason": null,
+    "expected_selected": "/var/tmp",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_sha256": "4a9d2106cf274b7ca4a4dcfbc0a72ee235563e729d4e8f53e06b003afa1f3fe3",
+    "baseline_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/run": {
+        "flags": 6,
+        "readonly": false,
+        "noexec": false
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      }
+    },
+    "restricted_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4104,
+        "readonly": false,
+        "noexec": true
+      },
+      "/run": {
+        "flags": 14,
+        "readonly": false,
+        "noexec": true
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      }
+    }
+  },
+  {
+    "case": "M4-RETEST-TMP-T03-privileged-rsm4nopw-ro-depth-1",
+    "run_id": "run-F3DZJQ342RK2D2H3T65H4F5K7G",
+    "exit": 0,
+    "reason": null,
+    "expected_selected": "/var/tmp",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_sha256": "1dfd63ae531aa1eac1af460962e78d480e4e49b54efef677ecf114eee23206cb",
+    "baseline_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/run": {
+        "flags": 4110,
+        "readonly": false,
+        "noexec": true
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 6,
+        "readonly": false,
+        "noexec": false
+      }
+    },
+    "restricted_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4097,
+        "readonly": true,
+        "noexec": false
+      },
+      "/run": {
+        "flags": 4110,
+        "readonly": false,
+        "noexec": true
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 6,
+        "readonly": false,
+        "noexec": false
+      }
+    }
+  },
+  {
+    "case": "M4-RETEST-TMP-T03-privileged-root-noexec-depth-1",
+    "run_id": "run-5ATXM2JZ6AJM35VOMMADLKHTKB",
+    "exit": 0,
+    "reason": null,
+    "expected_selected": "/var/tmp",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_sha256": "4976d8f02cc305b8df6c3cbc5aa45c5aa04d1cb10871659e240d1e84c341f85a",
+    "baseline_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/run": {
+        "flags": 4110,
+        "readonly": false,
+        "noexec": true
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 6,
+        "readonly": false,
+        "noexec": false
+      }
+    },
+    "restricted_namespace_mounts": {
+      "/opt/readyspec-m4/workspace-explicit": {
+        "flags": 4104,
+        "readonly": false,
+        "noexec": true
+      },
+      "/run": {
+        "flags": 4110,
+        "readonly": false,
+        "noexec": true
+      },
+      "/var/tmp": {
+        "flags": 4096,
+        "readonly": false,
+        "noexec": false
+      },
+      "/tmp": {
+        "flags": 6,
+        "readonly": false,
+        "noexec": false
+      }
+    }
+  }
+]

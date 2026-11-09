@@ -1,0 +1,182 @@
+[
+  {
+    "case": "M4-PLAT-M01-T01",
+    "exit": 0,
+    "run_id": "run-J22U3CYZBQGHHJJGFP7E2BTYU6",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M01-T02",
+    "exit": 0,
+    "run_id": "run-WJ2QRWV37ZXMS2H2UOBFRFAVVL",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M01-T03",
+    "exit": 0,
+    "run_id": "run-RE7G5ZMKRISU4I7QLD44C3TOCJ",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M01-T04",
+    "exit": 0,
+    "run_id": "run-KAKB5KIKOP7GLXUMW2ZIUWI4O5",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M01-T05",
+    "exit": 0,
+    "run_id": "run-WEUORFGK2EZHAZAIQHQ7LLXFZ3",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M01-T06",
+    "exit": 0,
+    "run_id": "run-6XEQBODVF3X7XOSINQOYT4YSSV",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M02-T01",
+    "exit": 0,
+    "run_id": "run-B4YWZAV3UFW4WJZNVPCTBNUXZK",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M02-T02",
+    "exit": 0,
+    "run_id": "run-3HO4KAGXWZPSY2JNQ3FLTLB2A6",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M02-T03",
+    "exit": 0,
+    "run_id": "run-UDHQ6J6OG6WZA7HKJVADVSFFSS",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M02-T04",
+    "exit": 0,
+    "run_id": "run-LGC2ADELFOKPEY3BBXTFD4GXHV",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M02-T05",
+    "exit": 0,
+    "run_id": "run-USJNZW2HU5UMEXBILXF6ASBFZR",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-PLAT-M02-T06",
+    "exit": 0,
+    "run_id": "run-FFYDL2IAEHMP6P7IL7ZJOQR2I7",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "item_statuses": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  }
+]

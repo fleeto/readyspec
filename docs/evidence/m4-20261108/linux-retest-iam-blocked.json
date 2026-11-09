@@ -1,0 +1,10 @@
+{
+  "attempted_at": "2026-11-08T19:05:52.221296+00:00",
+  "region": "us-east-1",
+  "session": "117f28ab8bdbd660bf43405d",
+  "operation": "ec2:CreateVpc",
+  "error_code": "UnauthorizedOperation",
+  "resource_created": false,
+  "live_instances_created": 0,
+  "explanation": "The active AWS IAM identity does not permit VPC creation; no alternative identity or permission path was used."
+}

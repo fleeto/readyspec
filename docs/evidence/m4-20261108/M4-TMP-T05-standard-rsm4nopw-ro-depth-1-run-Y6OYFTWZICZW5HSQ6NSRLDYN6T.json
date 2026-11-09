@@ -1,0 +1,250 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-Y6OYFTWZICZW5HSQ6NSRLDYN6T",
+  "plan_digest": "sha256:68d600f00c5933e8a64b43e35013750d5ec8c884518de86a19f29b3276fb51b9",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "COMPLETED",
+  "verdict": "READY",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T17:34:02.305050302Z",
+  "finished_at": "2026-11-08T17:34:03.175623399Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "t05",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "t05",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t05",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t05",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t05",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "t05",
+      "status": "COMPLETED",
+      "machine_id": "ec2dd10f4fd2b9e3ca735b9c45ef953c",
+      "boot_id": "88d476f9-b4f4-48a3-948c-d03e5621c067",
+      "ssh_host_key_fp": "SHA256:gl+26CXKTEhTo/BCtM7RmHTf9A0SGyvhzkH+h0TyiWQ",
+      "arch": "x86_64",
+      "login_uid": 2102,
+      "roles": [
+        "app"
+      ],
+      "item_results": [
+        {
+          "role_id": "app",
+          "item_id": "h01",
+          "status": "PASS",
+          "template_id": "H01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "METADATA",
+          "parameter_sources": {
+            "allowed_arch": "item"
+          },
+          "evidence": [
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T17:34:03.100015632Z",
+              "end_time": "2026-11-08T17:34:03.114086637Z",
+              "duration_ns": 14071003
+            },
+            {
+              "resource": "builtin-c246e5b6fb0f2b3df7642027c72d82110100146eaaa8843b7f1fe0406ca591ae",
+              "property": "stdout",
+              "expected": {
+                "allowed_arch": [
+                  "x86_64",
+                  "aarch64"
+                ]
+              },
+              "actual": {
+                "normalized_architecture": "x86_64",
+                "uname_raw": "x86_64\n"
+              },
+              "error": false,
+              "source": "uname -m",
+              "start_time": "2026-11-08T17:34:03.114089668Z",
+              "end_time": "2026-11-08T17:34:03.11410732Z",
+              "duration_ns": 17621
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "s01",
+          "status": "PASS",
+          "template_id": "S01",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "EXISTENCE",
+          "parameter_sources": {
+            "exists": "item",
+            "filetype": "item",
+            "follow_symlinks": "default",
+            "path": "item"
+          },
+          "evidence": [
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "exit-status",
+              "expected": 0,
+              "actual": 0,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T17:34:03.100718442Z",
+              "end_time": "2026-11-08T17:34:03.141309251Z",
+              "duration_ns": 40590820
+            },
+            {
+              "resource": "path-metadata-f5e53745c30b35ce16734190201b21e12b37cc2870beb88c155087f177edf1bf",
+              "property": "stdout",
+              "expected": {},
+              "actual": {
+                "follow_symlinks": false,
+                "node_exists": true,
+                "node_type": "file"
+              },
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T17:34:03.141314875Z",
+              "end_time": "2026-11-08T17:34:03.141345209Z",
+              "duration_ns": 30336
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "exists",
+              "expected": true,
+              "actual": true,
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T17:34:03.100832001Z",
+              "end_time": "2026-11-08T17:34:03.100841205Z",
+              "duration_ns": 9200
+            },
+            {
+              "resource": "/etc/passwd",
+              "property": "filetype",
+              "expected": "file",
+              "actual": "file",
+              "error": false,
+              "source": "/etc/passwd",
+              "start_time": "2026-11-08T17:34:03.100843193Z",
+              "end_time": "2026-11-08T17:34:03.100848955Z",
+              "duration_ns": 5778
+            }
+          ]
+        },
+        {
+          "role_id": "app",
+          "item_id": "shell",
+          "status": "PASS",
+          "template_id": "m4-auth-shell",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "ACTIVE_PROBE",
+          "evidence": [
+            {
+              "resource": "check-c2bae09ebb036df843e42b33c79717a48504d2adacf687544cf369743379e14e",
+              "property": "exit-status",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": 0,
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T17:34:03.100271613Z",
+              "end_time": "2026-11-08T17:34:03.113080331Z",
+              "duration_ns": 12808803
+            },
+            {
+              "resource": "check-c2bae09ebb036df843e42b33c79717a48504d2adacf687544cf369743379e14e",
+              "property": "stdout",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "m4-auth-shell\n",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T17:34:03.113085495Z",
+              "end_time": "2026-11-08T17:34:03.113119769Z",
+              "duration_ns": 34258,
+              "observation_only": true
+            },
+            {
+              "resource": "check-c2bae09ebb036df843e42b33c79717a48504d2adacf687544cf369743379e14e",
+              "property": "stderr",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T17:34:03.113121415Z",
+              "end_time": "2026-11-08T17:34:03.113126581Z",
+              "duration_ns": 5117,
+              "observation_only": true
+            }
+          ]
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-Y6OYFTWZICZW5HSQ6NSRLDYN6T:4420edd12bbc",
+      "host_id": "t05",
+      "machine_id": "ec2dd10f4fd2b9e3ca735b9c45ef953c",
+      "boot_id": "88d476f9-b4f4-48a3-948c-d03e5621c067",
+      "status": "CLEAN",
+      "remote_path": "/tmp/readyspec-a8793e862438c51114348f90"
+    }
+  ],
+  "failures": []
+}

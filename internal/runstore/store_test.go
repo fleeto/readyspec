@@ -192,6 +192,52 @@ func TestCrashRecoveryArchivesAcceptedRunWithoutRerun(t *testing.T) {
 	t.Fatal("recovery lost the durable execution marker")
 }
 
+func TestCrashRecoveryRetainsCleanupHostIdentityWithoutOwnerToken(t *testing.T) {
+	dir, ws, lease, store, p, cfg := newHarness(t)
+	run, _, err := store.Accept(runstore.Request{IdempotencyKey: "crash-cleanup-identity", Plan: p, Config: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := report.CleanupItem{CleanupID: run.Acceptance.RunID + ":cleanup", HostID: "node-a", HostKeyFP: "SHA256:trusted-host", MachineID: "machine", BootID: "boot", Status: "PENDING", RemotePath: "/tmp/readyspec-run-owner", OwnerToken: "0123456789abcdef0123456789abcdef"}
+	if err := store.CleanupRegistered(context.Background(), run.Acceptance.RunID, item); err != nil {
+		t.Fatal(err)
+	}
+	if err := lease.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ws2, err := workspace.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws2.Close()
+	lease2, err := ws2.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease2.Close()
+	recovered, err := runstore.Open(ws2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := recovered.Get(run.Acceptance.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Report.CleanupItems) != 1 || got.Report.CleanupItems[0].HostKeyFP != item.HostKeyFP {
+		t.Fatalf("recovery lost cleanup host identity: %+v", got.Report.CleanupItems)
+	}
+	if got.Report.CleanupItems[0].OwnerToken != "" {
+		t.Fatal("recovery exposed the private cleanup owner token in the archived report")
+	}
+	privateItems := recovered.CleanupItems(run.Acceptance.RunID)
+	if len(privateItems) != 1 || privateItems[0].OwnerToken != item.OwnerToken {
+		t.Fatal("private journal must retain the owner token for later verified cleanup")
+	}
+}
+
 func TestCrashRecoverySubprocessHelper(t *testing.T) {
 	dir := os.Getenv("READYSPEC_CRASH_TEST_ROOT")
 	if dir == "" {

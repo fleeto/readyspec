@@ -1,0 +1,31 @@
+{
+  "timeline": {
+    "execution_marker": "2026-11-08T22:50:59.770836+00:00",
+    "cancel_returned": "2026-11-08T22:51:00.588867+00:00"
+  },
+  "case": "M4-E2E-05-M02-delegated-cancel",
+  "candidate_digests": {
+    "amd64": "8e456f446d71f8cbb64c21cdad4f6ae727fed51afed88ad410ebc4732c9ac3b5",
+    "arm64": "552ee82ecef84785e99da4731599e91990bf84f3cd6bd60db989c4c22c3304ec"
+  },
+  "plan_digest": "sha256:d4b74d7092e8b55ed52db16729a9b94b02e0e1b5556f95521142e949faee590b",
+  "execution_marker_observed": true,
+  "cancel_exit": 0,
+  "cancel_stdout": "{\"before_cancel\": {\"run_id\": \"run-2GORFRAQML54RTY72SD7PHJMDX\", \"plan_id\": \"m4-cancel-m4-694e9dfc62db430286addce25fbd7ab7\", \"plan_name\": \"M4 controlled cancellation\", \"plan_version\": \"1.0.0\", \"status\": \"RUNNING\", \"accepted_at\": \"2026-11-08T22:50:57.91228847Z\", \"plan_digest\": \"sha256:d4b74d7092e8b55ed52db16729a9b94b02e0e1b5556f95521142e949faee590b\", \"run_mode\": \"TRIAL\", \"run_scope\": \"FULL\", \"executor_backend\": \"native_ssh\"}}\n{\"run_id\": \"run-2GORFRAQML54RTY72SD7PHJMDX\", \"status\": \"CANCELLING\"}\n",
+  "cancel_stderr": "",
+  "cancel_response": {
+    "run_id": "run-2GORFRAQML54RTY72SD7PHJMDX",
+    "status": "CANCELLING"
+  },
+  "run_id": "run-2GORFRAQML54RTY72SD7PHJMDX",
+  "submit_exit": 14,
+  "run_status": "CANCELLED",
+  "termination_reason": "CANCEL_ACCEPTED",
+  "verdict": "UNKNOWN",
+  "cleanup": [
+    "CLEAN"
+  ],
+  "exec_count": 1,
+  "status_after_cancel": "CANCELLED",
+  "assertions_passed": true
+}

@@ -4,14 +4,79 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+func TestAgentMissingSelectedKeyIsAuthenticationFailure(t *testing.T) {
+	for _, populated := range []bool{false, true} {
+		t.Run(fmt.Sprintf("other_key_present_%t", populated), func(t *testing.T) {
+			_, private, err := ed25519.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			signer, err := ssh.NewSignerFromKey(private)
+			if err != nil {
+				t.Fatal(err)
+			}
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			config := &ssh.ServerConfig{PublicKeyCallback: func(ssh.ConnMetadata, ssh.PublicKey) (*ssh.Permissions, error) { return nil, nil }}
+			config.AddHostKey(signer)
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				conn, err := listener.Accept()
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+				_, _, _, _ = ssh.NewServerConn(conn, config)
+			}()
+			keyring := agent.NewKeyring()
+			if populated {
+				if err := keyring.Add(agent.AddedKey{PrivateKey: private}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			client, server := net.Pipe()
+			defer client.Close()
+			defer server.Close()
+			go func() { _ = agent.ServeAgent(keyring, server) }()
+			known := filepath.Join(t.TempDir(), "known_hosts")
+			if err := os.WriteFile(known, []byte(knownhosts.Line([]string{listener.Addr().String()}, signer.PublicKey())+"\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			native := NewNativeSSH()
+			native.KnownHostsPath = known
+			native.Credentials = CredentialMap{"run": {"host": {Method: "agent", AgentSocket: "test-owned-agent", AgentConn: client}}}
+			port := listener.Addr().(*net.TCPAddr).Port
+			conn, err := native.connect(context.Background(), "run", "host", "127.0.0.1", port, "tester", "agent", "SHA256:unavailable")
+			if conn != nil {
+				conn.Close()
+				t.Fatal("accepted unavailable Agent identity")
+			}
+			if err == nil || classifySSHConnectFailure(err) != FailureAuth {
+				t.Fatalf("missing selected key must be AUTH_ERROR, got %v", err)
+			}
+			<-done
+		})
+	}
+}
 
 func loopbackSSHClient(t *testing.T, handle func(ssh.Channel, <-chan *ssh.Request, string)) *ssh.Client {
 	t.Helper()
@@ -97,6 +162,31 @@ func TestRunSSHRejectsRemoteOutputBeyondLimit(t *testing.T) {
 	}
 }
 
+func TestSudoCommandListingSilentDenialUsesRemoteExitStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status uint32
+		output string
+		want   FailureClass
+	}{
+		{"command_not_permitted", 1, "", FailureAuth},
+		{"unknown_diagnostic", 1, "policy output could not be parsed", FailureSudoUnknown},
+		{"unknown_exit_status", 2, "", FailureSudoUnknown},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := loopbackSSHClient(t, func(channel ssh.Channel, _ <-chan *ssh.Request, _ string) {
+				_, _ = channel.Write([]byte(tc.output))
+				_, _ = channel.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{tc.status}))
+				_ = channel.Close()
+			})
+			output, err := runSSH(context.Background(), client, "/usr/bin/sudo -n -l -- /usr/bin/env -i /bin/sh -c true", nil)
+			if got := classifySudoPolicyResult(err, nil, output); got != tc.want {
+				t.Fatalf("policy result=%q want=%q; remote error=%v output=%q", got, tc.want, err, output)
+			}
+		})
+	}
+}
+
 func TestRunSSHStopsSessionWhenExecutionContextExpires(t *testing.T) {
 	client := loopbackSSHClient(t, func(_ ssh.Channel, requests <-chan *ssh.Request, _ string) {
 		for range requests {
@@ -149,6 +239,37 @@ func TestVerifyRemoteSHA256RejectsMismatch(t *testing.T) {
 	})
 	if err := verifyRemoteSHA256(context.Background(), client, "/tmp/fixture", []byte("expected bytes")); err == nil {
 		t.Fatal("checksum mismatch was accepted")
+	}
+}
+
+func TestVerifyRemoteSHA256AcceptsSHA256sumOutput(t *testing.T) {
+	payload := []byte("expected bytes")
+	want := fmt.Sprintf("%x", sha256.Sum256(payload))
+	client := loopbackSSHClient(t, func(channel ssh.Channel, _ <-chan *ssh.Request, command string) {
+		if !strings.Contains(command, "sha256sum") {
+			t.Errorf("sha256sum-only target did not select sha256sum: %q", command)
+		}
+		_, _ = channel.Write([]byte(want + "  /tmp/fixture\n"))
+	})
+	if err := verifyRemoteSHA256(context.Background(), client, "/tmp/fixture", payload); err != nil {
+		t.Fatalf("verifyRemoteSHA256 rejected a valid sha256sum digest: %v", err)
+	}
+}
+
+func TestVerifyRemoteSHA256FallsBackToOpenSSL(t *testing.T) {
+	payload := []byte("expected bytes")
+	want := fmt.Sprintf("%x", sha256.Sum256(payload))
+	client := loopbackSSHClient(t, func(channel ssh.Channel, _ <-chan *ssh.Request, command string) {
+		if !strings.Contains(command, "openssl dgst -sha256") {
+			t.Errorf("openssl-only target did not select OpenSSL: %q", command)
+		}
+		if strings.Contains(command, "shasum") {
+			t.Errorf("unsupported shasum fallback was selected: %q", command)
+		}
+		_, _ = channel.Write([]byte("SHA2-256(stdin)= " + want + "\n"))
+	})
+	if err := verifyRemoteSHA256(context.Background(), client, "/tmp/fixture", payload); err != nil {
+		t.Fatalf("verifyRemoteSHA256 rejected a valid OpenSSL digest: %v", err)
 	}
 }
 

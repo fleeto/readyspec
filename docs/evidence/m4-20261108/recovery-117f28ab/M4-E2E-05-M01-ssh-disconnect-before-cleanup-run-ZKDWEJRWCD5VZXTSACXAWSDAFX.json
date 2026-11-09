@@ -1,0 +1,131 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-ZKDWEJRWCD5VZXTSACXAWSDAFX",
+  "plan_digest": "sha256:d877adcdaabfabcf2bcf4b42bf6e22c59460b8e810c20328ac1d1351be1d40ec",
+  "run_mode": "TRIAL",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T23:34:41.229422223Z",
+  "finished_at": "2026-11-08T23:34:48.721562542Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "COMPLETED",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "ssh_host_key_fp": "SHA256:+bLSKYIWAYv6U/WfBI45PjMo0EEeEwjDJkVIxZlERdY",
+      "arch": "aarch64",
+      "login_uid": 2102,
+      "roles": [
+        "app"
+      ],
+      "item_results": [
+        {
+          "role_id": "app",
+          "item_id": "window-shell",
+          "status": "PASS",
+          "template_id": "m4-window-shell-m4-e39603aa2",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "ACTIVE_PROBE",
+          "evidence": [
+            {
+              "resource": "check-200b083bfb302f9a73aa6f181bf183100389e27b73552265f3d5b4657839d197",
+              "property": "exit-status",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": 0,
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T23:34:41.75247082Z",
+              "end_time": "2026-11-08T23:34:41.756522349Z",
+              "duration_ns": 4051521
+            },
+            {
+              "resource": "check-200b083bfb302f9a73aa6f181bf183100389e27b73552265f3d5b4657839d197",
+              "property": "stdout",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T23:34:41.756525475Z",
+              "end_time": "2026-11-08T23:34:41.756591928Z",
+              "duration_ns": 66469,
+              "observation_only": true
+            },
+            {
+              "resource": "check-200b083bfb302f9a73aa6f181bf183100389e27b73552265f3d5b4657839d197",
+              "property": "stderr",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T23:34:41.756597105Z",
+              "end_time": "2026-11-08T23:34:41.756601577Z",
+              "duration_ns": 4488,
+              "observation_only": true
+            }
+          ]
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-ZKDWEJRWCD5VZXTSACXAWSDAFX:8ee09bf8ac0b",
+      "host_id": "node",
+      "ssh_host_key_fp": "SHA256:+bLSKYIWAYv6U/WfBI45PjMo0EEeEwjDJkVIxZlERdY",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "status": "UNKNOWN",
+      "remote_path": "/tmp/readyspec-53c16d5ee765f6f085802e88",
+      "reason": "remote cleanup could not be confirmed"
+    }
+  ],
+  "failures": []
+}

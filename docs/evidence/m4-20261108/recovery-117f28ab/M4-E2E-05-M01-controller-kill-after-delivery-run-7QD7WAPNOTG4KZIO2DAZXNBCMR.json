@@ -1,0 +1,36 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-7QD7WAPNOTG4KZIO2DAZXNBCMR",
+  "plan_digest": "sha256:15e08460eae951157f49c27e7e3afa55b9d1108d77c34c7f839a98c68c14b68f",
+  "run_mode": "TRIAL",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "CONTROLLER_INTERRUPTED",
+  "verdict_reasons": [
+    "CONTROLLER_INTERRUPTED"
+  ],
+  "started_at": "2026-11-08T23:06:57.57288326Z",
+  "finished_at": "2026-11-08T23:07:06.91331127Z",
+  "topology_results": [],
+  "hosts": [],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-7QD7WAPNOTG4KZIO2DAZXNBCMR:ba3c9c0bf70c",
+      "host_id": "node",
+      "ssh_host_key_fp": "SHA256:+bLSKYIWAYv6U/WfBI45PjMo0EEeEwjDJkVIxZlERdY",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "status": "PENDING",
+      "remote_path": "/tmp/readyspec-7d44ea9e81301c25d9e974f0"
+    }
+  ],
+  "failures": [
+    {
+      "code": "CONTROLLER_INTERRUPTED",
+      "phase": "RECOVERY",
+      "message": "Run was interrupted before a final report was committed"
+    }
+  ]
+}

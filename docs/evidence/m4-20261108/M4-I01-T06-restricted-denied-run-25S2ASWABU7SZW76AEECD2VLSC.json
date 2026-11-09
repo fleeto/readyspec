@@ -1,0 +1,42 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-25S2ASWABU7SZW76AEECD2VLSC",
+  "plan_digest": "sha256:55387bfcbced5ef9664bc86cc46cdf6fbf796da45122370e073c1c9927d0ecd4",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "AUTH_PREFLIGHT_REJECTED",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T16:07:32.248528471Z",
+  "finished_at": "2026-11-08T16:07:32.700575984Z",
+  "topology_results": [],
+  "hosts": [
+    {
+      "host_id": "t06",
+      "status": "FAILED",
+      "roles": [
+        "app"
+      ],
+      "item_results": [],
+      "failures": [
+        {
+          "code": "AUTH_ERROR",
+          "phase": "SUDO_POLICY",
+          "host_id": "t06",
+          "message": "controlled sudo command was denied or could not be verified"
+        }
+      ]
+    }
+  ],
+  "cleanup_items": [],
+  "failures": [
+    {
+      "code": "AUTH_ERROR",
+      "phase": "PREFLIGHT",
+      "message": "authentication or required privilege was rejected"
+    }
+  ]
+}

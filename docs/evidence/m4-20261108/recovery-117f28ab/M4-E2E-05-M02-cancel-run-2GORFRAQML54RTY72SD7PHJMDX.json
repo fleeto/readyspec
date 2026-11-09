@@ -1,0 +1,85 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-2GORFRAQML54RTY72SD7PHJMDX",
+  "plan_digest": "sha256:d4b74d7092e8b55ed52db16729a9b94b02e0e1b5556f95521142e949faee590b",
+  "run_mode": "TRIAL",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "CANCELLED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "CANCEL_ACCEPTED",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T22:50:57.91228847Z",
+  "finished_at": "2026-11-08T22:51:00.285817329Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "FAILED",
+      "machine_id": "ec2511c20bf0e5531e066126ab18b0b1",
+      "boot_id": "fb1a714b-9b9c-45a1-895f-2de18d56e2ad",
+      "ssh_host_key_fp": "SHA256:+qcRobBnb2dG2aykA57U3S7FB3klTgo8P8lAGRkrvak",
+      "arch": "aarch64",
+      "login_uid": 1000,
+      "roles": [
+        "app"
+      ],
+      "item_results": [],
+      "failures": [
+        {
+          "code": "EXECUTION_ERROR",
+          "phase": "EXECUTE",
+          "host_id": "node",
+          "message": "Goss execution failed or returned invalid output"
+        }
+      ]
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-2GORFRAQML54RTY72SD7PHJMDX:d368593264c4",
+      "host_id": "node",
+      "ssh_host_key_fp": "SHA256:+qcRobBnb2dG2aykA57U3S7FB3klTgo8P8lAGRkrvak",
+      "machine_id": "ec2511c20bf0e5531e066126ab18b0b1",
+      "boot_id": "fb1a714b-9b9c-45a1-895f-2de18d56e2ad",
+      "status": "CLEAN",
+      "remote_path": "/tmp/readyspec-d9ba62bcd15b0a6bb1eb774b"
+    }
+  ],
+  "failures": [
+    {
+      "code": "CANCEL_ACCEPTED",
+      "phase": "CANCELLATION",
+      "message": "cancellation was durably accepted"
+    },
+    {
+      "code": "EXECUTION_ERROR",
+      "phase": "EXECUTE",
+      "host_id": "node",
+      "message": "Goss execution failed or returned invalid output"
+    }
+  ]
+}

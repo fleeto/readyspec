@@ -22,11 +22,13 @@ func logCommand(id string, values map[string]plan.ResolvedParam) (string, bool) 
 	// journalctl can silently omit inaccessible system journals. Prove access to
 	// every system journal before accepting coverage from a filtered query.
 	access := `for dir in /var/log/journal /run/log/journal; do if [ -d "$dir" ]; then [ -r "$dir" ] && [ -x "$dir" ] || exit 2; inaccessible=$(find "$dir" \( \( -type d ! -executable \) -o \( -type f -name '*.journal*' ! -readable \) \) -print) || exit 2; [ -z "$inaccessible" ] || exit 2; fi; done; `
-	command := access + `now=$(date +%s) || exit 2; up=$(awk '{printf "%.0f", int($1)}' /proc/uptime) || exit 2; case "$now:$up" in *[!0-9:]*) exit 2;; esac; start=$((now-` + fmt.Sprint(values["lookback_seconds"].Value) + `)); boot=$((now-up)); printf '__RS_WINDOW__\n%s\n%s\n%s\n__RS_OLDER__\n' "$now" "$start" "$boot"; ` + query + ` --until "@$start" -n 1 || exit 2; printf '__RS_BOOT_START__\n'; ` + query + ` --boot=0 --since "@$boot" --until "@$((boot+60))" -n 1 || exit 2; printf '__RS_EVENTS__\n'; ` + query + ` --since "@$start" --until "@$now" -n 10000 || exit 2`
-	// Filtered cursors legitimately skip unrelated messages. Audit the unfiltered
-	// system stream to detect missing archives and rate-limited/dropped records.
-	audit := `journalctl --system --no-pager --quiet -o json 2>&1`
-	command += `; printf '__RS_AUDIT_OLDER__\n'; ` + audit + ` --until "@$start" -n 1 || exit 2; printf '__RS_AUDIT__\n'; ` + audit + ` --since "@$start" --until "@$now" -n 10000 || exit 2; printf '__RS_AUDIT_END__\n'`
+	// Round elapsed time up so the boot estimate cannot exclude its first second.
+	command := access + `now=$(date +%s) || exit 2; up=$(awk '{printf "%.0f", int($1)+($1>int($1))}' /proc/uptime) || exit 2; case "$now:$up" in *[!0-9:]*) exit 2;; esac; start=$((now-` + fmt.Sprint(values["lookback_seconds"].Value) + `)); boot=$((now-up)); printf '__RS_WINDOW__\n%s\n%s\n%s\n__RS_OLDER__\n' "$now" "$start" "$boot"; ` + query + ` --until "@$start" --reverse -n 1 || exit 2; printf '__RS_BOOT_START__\n'; ` + query + ` --boot=0 --since "@$boot" --until "@$((boot+60))" -n 1 || exit 2; printf '__RS_EVENTS__\n'; ` + query + ` --since "@$start" --until "@$now" -n 10000 || exit 2`
+	// System and per-user files can share one sequence domain. Include all
+	// readable journals in the continuity audit so split user records are not
+	// mistaken for missing archives. Target event queries remain system-only.
+	audit := `journalctl --no-pager --quiet -o json 2>&1`
+	command += `; printf '__RS_AUDIT_OLDER__\n'; ` + audit + ` --until "@$start" --reverse -n 1 || exit 2; printf '__RS_AUDIT__\n'; ` + audit + ` --since "@$start" --until "@$now" -n 10000 || exit 2; printf '__RS_AUDIT_END__\n'`
 	return command, true
 }
 
@@ -204,7 +206,7 @@ func logEvaluation(id string, params map[string]any, text string) (string, map[s
 	}
 	summary["continuity_proven"] = continuous
 	summary["continuity_reason"] = reason
-	summary["continuity_scope"] = "unfiltered system journal cursor sequence"
+	summary["continuity_scope"] = "unfiltered readable journal cursor sequence"
 	summary["record_limit"] = 10000
 	summary["audit_records"] = len(audit)
 	summary["truncated"] = len(events) >= 10000 || len(audit) >= 10000

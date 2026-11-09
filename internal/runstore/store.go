@@ -797,6 +797,9 @@ func (s *Store) recoverAcceptedRuns() error {
 		if status == "FAILED" && value.Verdict == "NOT_READY" {
 			value.VerdictReasons = append(value.VerdictReasons, "observed required or topology failure is preserved")
 		}
+		for i := range value.CleanupItems {
+			value.CleanupItems[i].OwnerToken = ""
+		}
 		if err := report.Validate(value); err != nil {
 			return fmt.Errorf("build recovery report for %s: %w", id, err)
 		}

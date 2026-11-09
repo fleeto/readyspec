@@ -1,0 +1,477 @@
+[
+  {
+    "case": "M4-MIN-02-T01-sha256sum-only",
+    "target": "T01",
+    "cli_exit": 0,
+    "run_id": "run-RM6LV4VK6UZJNV2GPZUP6HYGWF",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T01-openssl-only",
+    "target": "T01",
+    "cli_exit": 0,
+    "run_id": "run-DVJFTWM673X4DD6EYL3JQE4WL2",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T01-checksum-missing",
+    "target": "T01",
+    "cli_exit": 11,
+    "run_id": "run-CK7AHCEB7LYT2KROQQ3PMKDOEO",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "IDENTITY_ERROR",
+    "items": [],
+    "host_failures": [
+      "IDENTITY_ERROR"
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-MIN-01-T02",
+    "target": "T02",
+    "cli_exit": 0,
+    "run_id": "run-5VBBQBPX4PWDVP4ENLUZHLPRPB",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T02-sha256sum-only",
+    "target": "T02",
+    "cli_exit": 0,
+    "run_id": "run-6OKQ5SYKSIAU2X7U5ONSZEJZGZ",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T02-openssl-only",
+    "target": "T02",
+    "cli_exit": 0,
+    "run_id": "run-IETKOU5G5VZS6KNKDRM7I5PGHB",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T02-checksum-missing",
+    "target": "T02",
+    "cli_exit": 11,
+    "run_id": "run-DVOO6W5OFIXJ7KU6OZV4VNO76C",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "IDENTITY_ERROR",
+    "items": [],
+    "host_failures": [
+      "IDENTITY_ERROR"
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-MIN-01-T03",
+    "target": "T03",
+    "cli_exit": 0,
+    "run_id": "run-XP6AFMZQWPFMM5BKENZCTBTONJ",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T03-sha256sum-only",
+    "target": "T03",
+    "cli_exit": 0,
+    "run_id": "run-5DYAD5SY5L5B3BIQ3MBI4NBY4Y",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T03-openssl-only",
+    "target": "T03",
+    "cli_exit": 0,
+    "run_id": "run-YE62XBC4POE7VPZT7K7XTP6XLH",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T03-checksum-missing",
+    "target": "T03",
+    "cli_exit": 11,
+    "run_id": "run-E64DRHXFULP4MCWRRT7MOBDILO",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "IDENTITY_ERROR",
+    "items": [],
+    "host_failures": [
+      "IDENTITY_ERROR"
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-MIN-01-T04",
+    "target": "T04",
+    "cli_exit": 0,
+    "run_id": "run-OW47AOX7P2UQT4V7BUMEDR2UPR",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T04-sha256sum-only",
+    "target": "T04",
+    "cli_exit": 0,
+    "run_id": "run-IPX6QCFXZKI3J6FERNHZKYNKBS",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T04-openssl-only",
+    "target": "T04",
+    "cli_exit": 0,
+    "run_id": "run-GWDL5TKGMCEO3ZADDCMK24KRMF",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T04-checksum-missing",
+    "target": "T04",
+    "cli_exit": 11,
+    "run_id": "run-TUFXX5RDCEY54RLMGVOT2277HC",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "IDENTITY_ERROR",
+    "items": [],
+    "host_failures": [
+      "IDENTITY_ERROR"
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-MIN-01-T05",
+    "target": "T05",
+    "cli_exit": 0,
+    "run_id": "run-RTIUTTZQCDXWO56NUAPGUSCVXP",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T05-sha256sum-only",
+    "target": "T05",
+    "cli_exit": 0,
+    "run_id": "run-B7UQUAUVEFMUHO7FB2SO62HC5I",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T05-openssl-only",
+    "target": "T05",
+    "cli_exit": 0,
+    "run_id": "run-PMGFSCKTE6KMIKUS4CARCZ74UP",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T05-checksum-missing",
+    "target": "T05",
+    "cli_exit": 11,
+    "run_id": "run-MEWD26ASA4K5CNZGGI6UIF3NEF",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "IDENTITY_ERROR",
+    "items": [],
+    "host_failures": [
+      "IDENTITY_ERROR"
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-MIN-01-T06",
+    "target": "T06",
+    "cli_exit": 0,
+    "run_id": "run-PVU7NOEQDIURDRS5NBTSDX4B7W",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T06-sha256sum-only",
+    "target": "T06",
+    "cli_exit": 0,
+    "run_id": "run-EUFVJ4NY6WP6XKB5EVGSSRAQF2",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T06-openssl-only",
+    "target": "T06",
+    "cli_exit": 0,
+    "run_id": "run-WCH6PAREONHLNOW6XGV32XIGIG",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "items": [
+      [
+        "H01",
+        "PASS"
+      ],
+      [
+        "shell-5d022c10",
+        "PASS"
+      ]
+    ],
+    "host_failures": [],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-MIN-02-T06-checksum-missing",
+    "target": "T06",
+    "cli_exit": 11,
+    "run_id": "run-BE2HYEGNSF75X6VEHVK2KPU2WN",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "IDENTITY_ERROR",
+    "items": [],
+    "host_failures": [
+      "IDENTITY_ERROR"
+    ],
+    "cleanup": []
+  }
+]

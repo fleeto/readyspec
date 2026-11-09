@@ -1,0 +1,77 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-CXYO2KTDJH3YPOOL5K3ALHNFHE",
+  "plan_digest": "sha256:68d600f00c5933e8a64b43e35013750d5ec8c884518de86a19f29b3276fb51b9",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "NETWORK_ERROR",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T17:25:49.665619181Z",
+  "finished_at": "2026-11-08T17:25:49.684092748Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "t02",
+      "status": "ERROR"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "t02",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t02",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t02",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t02",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "t02",
+      "status": "FAILED",
+      "roles": [
+        "app"
+      ],
+      "item_results": [],
+      "failures": [
+        {
+          "code": "NETWORK_ERROR",
+          "phase": "SSH_AUTHENTICATION",
+          "host_id": "t02",
+          "message": "SSH connection or host key verification failed"
+        }
+      ]
+    }
+  ],
+  "cleanup_items": [],
+  "failures": [
+    {
+      "code": "NETWORK_ERROR",
+      "phase": "SSH_AUTHENTICATION",
+      "host_id": "t02",
+      "message": "SSH connection or host key verification failed"
+    }
+  ]
+}

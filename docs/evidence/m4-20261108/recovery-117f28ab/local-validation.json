@@ -1,0 +1,14 @@
+{
+  "candidate_digests": {
+    "amd64": "afb0d716ee19351b24e7030d2ff06b3cfd7bb67435668d787a3e609d3ad522e7",
+    "arm64": "a1348677524ff0b6b4163e0a859ca402d37e51b35adc63e9e301f0bb1f27fc6a"
+  },
+  "source_fingerprint_sha256": "9eaa8225ff78f8b51245c2fbe148f4edd136a0431ea270ecf145f887b8f105a0",
+  "commands": [
+    {"command": "go test ./...", "exit": 0, "result": "all packages passed"},
+    {"command": "go vet ./...", "exit": 0, "result": "passed"},
+    {"command": "go test -race ./...", "exit": 0, "result": "all packages passed", "notable_duration_seconds": {"internal/compiler": 445.832}}
+  ],
+  "scope": "Local correctness and race regression only; no pressure/stress/performance test was run.",
+  "evidence_note": "Observed command results in the active OpenCode tool session; race output included every package passing. This summary does not replace the raw AWS Run reports."
+}

@@ -1,0 +1,34 @@
+{
+  "case": "M4-SEC-final-root-no-sudo-T06",
+  "report_file": "M4-SEC-final-root-no-sudo-T06-run-O5QJXS5EJITSUN254PM2SYX55P.json",
+  "report_candidate_sha256": "c3861f3b0882f5802e8da43cb4a7bef38772559b40dc37437c9ecc3034027c6d",
+  "goss_executions": [
+    {
+      "binary_gid": 0,
+      "binary_mode": "0700",
+      "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+      "binary_uid": 0,
+      "effective_uid": 0,
+      "mode": "STANDARD",
+      "workspace": "readyspec-443e34e8e629b872b3dc8818",
+      "workspace_gid": 0,
+      "workspace_mode": "0700",
+      "workspace_uid": 0
+    },
+    {
+      "binary_gid": 0,
+      "binary_mode": "0700",
+      "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+      "binary_uid": 0,
+      "effective_uid": 0,
+      "mode": "PRIVILEGED",
+      "workspace": "readyspec-443e34e8e629b872b3dc8818-privileged",
+      "workspace_gid": 0,
+      "workspace_mode": "0700",
+      "workspace_uid": 0
+    }
+  ],
+  "sudo_called": false,
+  "host_login_uid": 0,
+  "cleanup": "CLEAN"
+}

@@ -1,0 +1,130 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-DAYSI7VLKSXIFFT7KSQ5O2SCWQ",
+  "plan_digest": "sha256:79dc1fc5f870bdb48082548f39d81b63df5a40deaa6706f9d82cb4983fe3a893",
+  "run_mode": "TRIAL",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "COMPLETED",
+  "verdict": "UNKNOWN",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T23:45:50.683240075Z",
+  "finished_at": "2026-11-08T23:45:51.962485521Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "PASS"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "COMPLETED",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "ssh_host_key_fp": "SHA256:ZzGC11LQ4ztP8OkOrD/eaJONTfNu004r+nVVAMO+Nu4",
+      "arch": "aarch64",
+      "login_uid": 1000,
+      "roles": [
+        "app"
+      ],
+      "item_results": [
+        {
+          "role_id": "app",
+          "item_id": "check-e4dd5d88",
+          "status": "PASS",
+          "template_id": "shell-e4dd5d88",
+          "template_version": "1.0.0",
+          "execution_mode": "STANDARD",
+          "evidence_mode": "ACTIVE_PROBE",
+          "evidence": [
+            {
+              "resource": "check-dd34857895f7f57f3135d609dfb87f786ea964cc34c923d25dca9d5245dd10d1",
+              "property": "exit-status",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": 0,
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T23:45:51.925974178Z",
+              "end_time": "2026-11-08T23:45:51.928834546Z",
+              "duration_ns": 2860367
+            },
+            {
+              "resource": "check-dd34857895f7f57f3135d609dfb87f786ea964cc34c923d25dca9d5245dd10d1",
+              "property": "stdout",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T23:45:51.928837335Z",
+              "end_time": "2026-11-08T23:45:51.928886082Z",
+              "duration_ns": 48747,
+              "observation_only": true
+            },
+            {
+              "resource": "check-dd34857895f7f57f3135d609dfb87f786ea964cc34c923d25dca9d5245dd10d1",
+              "property": "stderr",
+              "expected": [
+                {
+                  "operator": "equals",
+                  "stream": "exit_code",
+                  "value": 0
+                }
+              ],
+              "actual": "",
+              "error": false,
+              "source": "custom Shell command",
+              "start_time": "2026-11-08T23:45:51.928890159Z",
+              "end_time": "2026-11-08T23:45:51.928894377Z",
+              "duration_ns": 4209,
+              "observation_only": true
+            }
+          ]
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-DAYSI7VLKSXIFFT7KSQ5O2SCWQ:5d49bab1ab9c",
+      "host_id": "node",
+      "ssh_host_key_fp": "SHA256:ZzGC11LQ4ztP8OkOrD/eaJONTfNu004r+nVVAMO+Nu4",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "status": "CLEAN",
+      "remote_path": "/tmp/readyspec-54abd18a8faf6f02082a4e8b"
+    }
+  ],
+  "failures": []
+}

@@ -84,3 +84,54 @@ test('report details show parameter source categories without parameter values',
   ).toBeInTheDocument()
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
 })
+
+test('report warns about verified UID zero independently of the login name', async () => {
+  const run = {
+    run_id: 'root-run',
+    plan_id: 'root-plan',
+    plan_name: 'Root fixture',
+    plan_version: '1.0.0',
+    status: 'COMPLETED',
+    accepted_at: '2026-11-08T12:00:00Z',
+    run_mode: 'GATE',
+    run_scope: 'FULL',
+    executor_backend: 'native_ssh',
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async (input: RequestInfo | URL) =>
+        new Response(
+          JSON.stringify(
+            String(input).endsWith('/runs')
+              ? { items: [run] }
+              : {
+                  ...run,
+                  run_status: 'COMPLETED',
+                  verdict: 'READY',
+                  started_at: run.accepted_at,
+                  finished_at: run.accepted_at,
+                  topology_results: [],
+                  hosts: [
+                    {
+                      host_id: 'admin-alias',
+                      status: 'COMPLETED',
+                      login_uid: 0,
+                      high_risk_root_audit: true,
+                      roles: ['app'],
+                      item_results: [],
+                      failures: [],
+                    },
+                  ],
+                  cleanup_items: [],
+                  failures: [],
+                },
+          ),
+          { status: 200 },
+        ),
+    ),
+  )
+  render(<RunHistory />)
+  fireEvent.click(await screen.findByRole('button', { name: '查看报告' }))
+  expect(await screen.findByText(/root（UID 0）身份执行检查/)).toHaveTextContent('admin-alias')
+})

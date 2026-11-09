@@ -46,16 +46,17 @@ type ItemResult struct {
 }
 
 type Evidence struct {
-	Resource        string `json:"resource"`
-	Property        string `json:"property"`
-	Expected        any    `json:"expected"`
-	Actual          any    `json:"actual"`
-	Error           bool   `json:"error"`
-	Source          string `json:"source"`
-	StartTime       string `json:"start_time,omitempty"`
-	EndTime         string `json:"end_time,omitempty"`
-	DurationNS      int64  `json:"duration_ns,omitempty"`
-	ObservationOnly bool   `json:"observation_only,omitempty"`
+	Resource          string `json:"resource"`
+	Property          string `json:"property"`
+	Expected          any    `json:"expected"`
+	Actual            any    `json:"actual"`
+	Error             bool   `json:"error"`
+	Source            string `json:"source"`
+	StartTime         string `json:"start_time,omitempty"`
+	EndTime           string `json:"end_time,omitempty"`
+	DurationNS        int64  `json:"duration_ns,omitempty"`
+	ObservationOnly   bool   `json:"observation_only,omitempty"`
+	HighRiskRootAudit bool   `json:"high_risk_root_audit,omitempty"`
 }
 
 type Artifact struct {

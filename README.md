@@ -38,7 +38,7 @@ make build-all
 
 后端已实现安全 YAML、RFC 8785 语义摘要、新方案/模板 Schema、模板引用与快照摘要校验、工作区互斥与原子 JSON 写入、会话 Cookie、CSRF、Origin 防护，以及双架构官方 Goss 内嵌完整性校验。Host 头校验分档：回环监听保持严格校验，非回环监听（内网部署）只校验端口一致，允许通过主机名、网卡 IP、域名等任意入口访问。浏览器启动令牌通过 URL Fragment 传递，交换为会话后立即从地址栏移除；自动生成的启动令牌仅可使用一次，同一浏览器可凭 Cookie 恢复会话。Windows 权限与锁实现已交叉编译，仍需原生环境验收。
 
-CLI 提供 `serve`、`plan validate/compile/list/release/archive/import/export`、`template list`、`run preview/submit/status/cancel`、`report list/show/export`、`cleanup list/resolve`。生命周期与报告命令在同工作区服务运行时委托到本机服务，服务未运行时使用工作区锁直接访问记录。发布与导入使用工作区生命周期记录；GATE 任务必须带可验证发布清单。内置模板必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。Run 生命周期、离线模拟器、Native SSH、报告归档、Web Run API/SSE、活动服务上的本机 CLI 委托、精确 sudo 策略查询与受控特权执行已实现。sudo 密码可通过 `READYSPEC_SUDO_PASSWORD` 提供；策略拒绝或缺少凭据会在全目标屏障处拒绝整次任务。自动及人工清理会重新核对目标身份和 owner token，人工清理发现活动进程时必须显式确认。离线单二进制 smoke 已覆盖嵌入页面、方案发布/导出/停用，以及模板、报告和清理 CLI 委托；完整 M3 行为验收仍未完成，浏览器 E2E 尚未通过，因此不能据此宣称 M3 已验收或环境 `READY`。旧 Python 原型须在替代用例和 M3 验收后再清理。
+CLI 提供 `serve`、`plan validate/compile/list/release/archive/import/export`、`template list`、`run preview/submit/status/cancel`、`report list/show/export`、`cleanup list/resolve`。生命周期与报告命令在同工作区服务运行时委托到本机服务，服务未运行时使用工作区锁直接访问记录。发布与导入使用工作区生命周期记录；GATE 任务必须带可验证发布清单。内置模板必须精确匹配本地注册表 ID、版本及内容摘要；自称 `BUILTIN` 或重签快照不能获得内置实现或特权资格。Native SSH 分别发现 STANDARD 与 PRIVILEGED 远端执行目录，检查 noexec/只读挂载并回退；可用 `READYSPEC_REMOTE_TEMP_DIR` 指定首选目录。SHA-256 验真支持 `sha256sum`，以及 `openssl` 回退。sudo 密码可通过 `READYSPEC_SUDO_PASSWORD` 提供；策略拒绝或缺少凭据会在全目标屏障处拒绝整次任务。自动及人工清理会重新核对目标身份和 owner token，人工清理发现活动进程时必须显式确认。离线单二进制 smoke 已覆盖嵌入页面、方案发布/导出/停用，以及模板、报告和清理 CLI 委托；完整 M3 行为验收仍未完成，浏览器 E2E 尚未通过，因此不能据此宣称 M3 已验收或环境 `READY`。旧 Python 原型须在替代用例和 M3 验收后再清理。
 
 ```bash
 # 查询当前已实现模板的自包含快照
@@ -90,6 +90,8 @@ D03 区分显式指定路径与按 PATH 查找到的运行时，先确认它是�
 
 D04 目标需提供 Python 3、`readelf` 和 `ldconfig`。采集仅静态读取目标 ELF 的架构与直接 NEEDED，并检查库缓存候选文件的存在性、ELF 结构和 ABI；不会调用 `ldd`、运行目标程序或加载共享库。缓存名称相同但文件失效、截断、ABI 不符或实际为 PIE 可执行文件均不能通过；无法读取候选文件或工具查询失败返回 ERROR。证据保留目标头、NEEDED 列表、缓存候选路径/flags/状态及库头。该静态检查不等于实际动态加载验收。
 
+合法共享库可包含解释器段（例如 glibc 的 `libc.so.6` 提供诊断入口）；存在解释器段本身不构成失败，仍检查共享对象类型、PIE 标记及 ABI。
+
 R05 分别记录 `timedatectl` 的同步标志和 `systemctl is-active` 的状态/退出码，确认原始输出合法且一致后再判定。支持 chronyd/chrony、systemd-timesyncd、ntpd/ntp；同步状态符合预期且至少一个允许服务活动时通过，合法未活动或同步不符判 FAIL，查询失败、缺工具、多行或状态矛盾判 ERROR。证据保留允许服务的状态摘要，不输出原始诊断。采集不调整系统时钟或启动时间服务。
 
 L01 使用 `cat` 完整读取 `/proc/uptime`，校验单行两个十进制字段后，将 uptime 秒数与最短/最长要求做精确比较；缺字段、额外字段、多行、NUL 或读取失败返回 ERROR。证据保留 uptime 与 idle 秒数及界限；idle 字段只用于记录，不参与判定。
@@ -97,6 +99,8 @@ L01 使用 `cat` 完整读取 `/proc/uptime`，校验单行两个十进制字段
 D05 的 JSON/YAML 键路径遵循 RFC 6901：`~1` 表示 `/`、`~0` 表示 `~`，数组使用无前导零的十进制索引。非法转义、前导零或非数字索引返回 ERROR，键不存在或索引越界返回 FAIL；env/ini 键按字面匹配。`expected` 按 JSON 类型严格比较，敏感值只保留脱敏摘要。
 
 L02/L03 除事件查询外，还审计未按内核/服务筛选的系统日志游标序列。只有窗口边界与连续性均有证据时，零事件才能通过；日志序号缺口、消息丢失提示、不同序号域无法衔接、读取失败或诊断警告均不能作为完整覆盖。事件和审计分别最多读取 10000 条，达到上限返回 ERROR（已发现超限事件仍可 FAIL）。`allow_since_boot` 仅在本次启动晚于要求窗口起点、启动后 60 秒内有可读证据且审计连续时允许缩短窗口；该选项不会忽略中间缺口。L02 使用内核 transport 条件查询所有可读启动的窗口记录；结果保留覆盖与连续性原因，不包含原日志正文。
+
+连续性审计纳入可读的 system/user journal，避免共享序号域中的用户日志被误判为缺口；事件计数仍只来自目标系统日志。查询窗口之前的边界记录时显式反向查找，兼容旧版 journalctl 的历史窗口行为。无法读取日志文件时仍拒绝证明覆盖，不输出无关用户日志正文。
 
 S02/S03 会保留未声明为业务要求的文件身份与挂载元数据，并标记为 `observation_only`。S04/S05 目标需提供 GNU `stat`、`cat` 和可读的 `/proc/self/mountinfo`；采集只读文件系统计数，报告总量、非特权可用量、inode 比例、挂载点及精确文件系统类型。容量判定使用 `f_bavail`，不会把保留块计入非特权可用空间，也不会通过写测试文件测量空间。
 
@@ -122,9 +126,10 @@ ReadySpec 解决企业级软件交付中的高频协作断层：**软件研发�
   - 无参启动或 `readyspec serve` 默认在 `127.0.0.1:18480` 启动受保护的本地 Web 控制台（亦支持显式指定内网监听并强制访问令牌鉴权）。
   - 非交互 CLI 在检测到同工作区运行中的 `readyspec serve` 时自动通过本地受控 API 委托执行（Web UI 可实时同步观察进度）；未启动服务时直接获取跨平台文件锁（Linux `flock` / Windows `LockFileEx`）在进程内独立完成任务。
 - **双执行器与严苛安全边界**：
-  - 同时内置基于 `golang.org/x/crypto/ssh` 的真实原生 SSH 执行器与供无目标机预演使用的离线仿真执行器（`mock_simulator`）。
+  - 同时内置基于 `golang.org/x/crypto/ssh` 的真实原生 SSH 执行器与供无目标机预演使用的离线仿真执行器（`mock_simulator`）。原生 SSH 使用管理端 `~/.ssh/known_hosts` 校验主机身份；目标提供多种主机密钥时优先协商该端点已信任的密钥类型，未知或变更密钥仍被拒绝。
   - 区分 **正式门禁（`GateRun`）** 与 **草稿试跑（`TrialRun`）**、**全量检查（`FullRun`）** 与 **局部复测（`PartialRun`）**；仅 `RELEASED` 方案在真实目标主机上完成的全量正式门禁检查可产出放行级 `READY`（退出码 `0`）。
   - 短期 SSH/Sudo 密码仅驻留内存并在任务终态立即覆写销毁，绝不落盘；异常中断遗留的临时目录纳入 **远端残留清理（`RemoteCleanup`）** 归属核验与处置。
+  - 实际登录 UID 为 `0` 时，归档主机记录及每条观测证据写入 `high_risk_root_audit=true`，覆盖其他用户名映射到 UID 0 的情形；不以用户名猜测实际权限。
 - **纯宽松开源许可（零 `GPL / LGPL / AGPL`）**：
   - 全栈依赖严格限定在 `Apache-2.0 / MIT / BSD / ISC`（详见 [`NOTICE`](./NOTICE)）。
 

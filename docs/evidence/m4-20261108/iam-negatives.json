@@ -1,0 +1,52 @@
+[
+  {
+    "case": "wrong-session",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "large-instance",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "optional-imdsv2",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "large-volume",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "excess-iops",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "excess-throughput",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "private-label-public-ip",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "untagged",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "unencrypted",
+    "iam_denied": true,
+    "exit": 254
+  },
+  {
+    "case": "gp2",
+    "iam_denied": true,
+    "exit": 254
+  }
+]

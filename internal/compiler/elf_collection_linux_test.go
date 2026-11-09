@@ -51,7 +51,7 @@ static void mark(const char *path) {
 }
 `
 
-type elfFixture struct{ target, library, loader, ldconfig, otherABI []byte }
+type elfFixture struct{ target, library, interpreterLibrary, loader, ldconfig, otherABI []byte }
 
 func buildDynamicELFFixture(t *testing.T) elfFixture {
 	t.Helper()
@@ -85,7 +85,20 @@ func buildDynamicELFFixture(t *testing.T) elfFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Ubuntu's ldconfig entry point can be a wrapper around ldconfig.real.
+	// Copy the ELF executable so the isolated fixture has no host script paths.
+	if len(ldconfig) >= 2 && string(ldconfig[:2]) == "#!" {
+		ldconfig, err = os.ReadFile(filepath.Join(filepath.Dir(tool), "ldconfig.real"))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(ldconfig) < 4 || string(ldconfig[:4]) != "\x7fELF" {
+		t.Fatal("isolated ldconfig fixture requires an ELF executable")
+	}
 	fixture := elfFixture{target: target, library: library, loader: loader, ldconfig: ldconfig}
+	fixture.interpreterLibrary = build("libinterp.so", elfFixtureSyscalls+`const char interp[] __attribute__((section(".interp")))="/sentinel-loader"; __attribute__((constructor)) static void guard(void) {mark("/state/library-executed");} int fixture_value(void) {return 7;}`,
+		"-shared", "-fPIC", "-nostdlib", "-Wl,-soname,libreadyspec_fixture.so.1")
 	if runtime.GOARCH == "amd64" {
 		fixture.otherABI = build("lib32.so", `int fixture_value(void) {return 7;}`, "-m32", "-shared", "-fPIC", "-nostdlib", "-Wl,-soname,libreadyspec_fixture.so.1")
 	}
@@ -166,6 +179,7 @@ func assertELFSentinelsUntouched(t *testing.T, root string) {
 func TestDynamicELFCollectorUsesActualLibrariesAndCache(t *testing.T) {
 	fixture := buildDynamicELFFixture(t)
 	cases := []struct{ name, status string }{
+		{"shared_library_with_interpreter", "PASS"},
 		{"cache_hit", "PASS"}, {"wrong_architecture", "FAIL"}, {"required_not_needed", "FAIL"}, {"cache_miss", "FAIL"},
 		{"stale_cache_path", "FAIL"}, {"invalid_library", "FAIL"}, {"library_unreadable", "ERROR"}, {"readelf_failure", "ERROR"}, {"cache_tool_failure", "ERROR"},
 		{"truncated_library", "FAIL"}, {"pie_executable_as_library", "FAIL"},
@@ -185,6 +199,11 @@ func TestDynamicELFCollectorUsesActualLibrariesAndCache(t *testing.T) {
 				cacheLib = fixture.otherABI
 			}
 			root := prepareELFFixture(t, fixture, cacheLib)
+			if tt.name == "shared_library_with_interpreter" {
+				if err := os.WriteFile(filepath.Join(root, "opt/lib/libreadyspec_fixture.so.1"), fixture.interpreterLibrary, 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if tt.name == "library_wrong_abi" {
 				if err := os.WriteFile(filepath.Join(root, "opt/lib/libreadyspec_fixture.so.1"), fixture.otherABI, 0644); err != nil {
 					t.Fatal(err)

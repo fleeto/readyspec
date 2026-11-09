@@ -1,0 +1,13 @@
+{
+  "case": "M4-E2E-05-controlled-cancel-one-target",
+  "plan_id": "m4-e2e05-18ca2163-3",
+  "run_id": "run-3Q7EE3U67MJRDBYIRSSVJ4CL6T",
+  "run_status": "COMPLETED",
+  "cancel_exit": 12,
+  "cli_run_exit": null,
+  "exec_count": 1,
+  "report_verdict": null,
+  "cleanup": [],
+  "target_barrier_released": true,
+  "report_keys": []
+}

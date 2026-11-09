@@ -2,6 +2,8 @@ package runmanager_test
 
 import (
 	"context"
+	"encoding/json"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"github.com/fleeto/readyspec/internal/report"
 	"github.com/fleeto/readyspec/internal/runmanager"
 	"github.com/fleeto/readyspec/internal/runstore"
+	"github.com/fleeto/readyspec/internal/template"
 	"github.com/fleeto/readyspec/internal/workspace"
 )
 
@@ -36,6 +39,41 @@ roles:
 embedded_templates: []
 template_lock: {}
 `
+
+func TestSubmitUnavailableAgentIsAuthenticationError(t *testing.T) {
+	ws, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := runstore.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := plan.Load(strings.NewReader(planSource))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := runmanager.New(store, executor.NewNativeSSH())
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := runstore.Request{IdempotencyKey: "unavailable-agent", Plan: p, Config: runstore.RunConfig{
+		PlanDigest: p.Digest, Mode: "TRIAL", Scope: "FULL", Backend: "native_ssh",
+		Inventory: []inventory.Host{{ID: "node", Address: "127.0.0.1", Port: 22, Username: "tester"}},
+		RoleMap:   map[string][]string{"app": {"node"}},
+		Auth:      runstore.AuthIdentity{Method: "agent", PublicKeyFingerprint: "SHA256:selected"},
+		Budgets:   runstore.Budgets{QueueSeconds: 1800, RunSeconds: 3600, HostSeconds: 600},
+	}}
+	run, _, err := manager.Submit(request, map[string]executor.Credential{"node": {
+		Method: "agent", AgentSocket: filepath.Join(t.TempDir(), "missing.sock"),
+	}})
+	if err == nil || !strings.HasPrefix(err.Error(), "AUTH_ERROR:") || run != nil {
+		t.Fatalf("unavailable Agent must reject submission as AUTH_ERROR, got run=%v err=%v", run, err)
+	}
+	if runs := store.List(); len(runs) != 0 {
+		t.Fatalf("unavailable Agent left %d accepted runs", len(runs))
+	}
+}
 
 type countingExecutor struct {
 	executions atomic.Int32
@@ -774,7 +812,61 @@ func TestSimulatorEmptyPlanCompletesWithoutInventingReady(t *testing.T) {
 	}
 }
 
-func setupWithConfig(t *testing.T, hosts []inventory.Host, roleMap map[string][]string, implementation executor.Executor, backend string) (*workspace.Store, *workspace.Lease, *runstore.Store, *runmanager.Manager, string) {
+func TestArchivedRootAuditUsesVerifiedIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name, username string
+		uid            int
+		root           bool
+	}{
+		{"root", "root", 0, true},
+		{"uid_zero_alias", "root-alias", 0, true},
+		{"username_is_not_identity", "root", 1000, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			snapshot, ok := template.Lookup("H01", "1.0.0")
+			if !ok {
+				t.Fatal("H01 template unavailable")
+			}
+			item := plan.CheckItem{ItemID: "arch", Name: "Architecture", TemplateID: "H01", TemplateVersion: "1.0.0", TemplateDigest: snapshot["digest"].(string), Importance: "REQUIRED", Enabled: true, Params: map[string]any{"allowed_arch": []any{"x86_64"}}, ExplicitNullParams: []string{}, OverridableParams: []string{}}
+			doc := map[string]any{"schema_version": "readyspec.plan/v1", "plan_id": "root-audit", "name": "Root audit", "software_name": "fixture", "software_version": "1", "version": "1.0.0", "state": "DRAFT", "topology_policy": map[string]any{"allowed_arch": []string{"x86_64"}}, "roles": []plan.Role{{RoleID: "app", Name: "App", MinNodes: 1, AllowColocation: false, Items: []plan.CheckItem{item}}}, "embedded_templates": []any{snapshot}, "template_lock": map[string]any{"H01@1.0.0": snapshot["digest"]}}
+			raw, _ := json.Marshal(doc)
+			implementation := &matrixExecutor{
+				facts:    map[string]executor.HostFacts{"node": {MachineID: "machine", BootID: "boot", HostKey: "key", Arch: "x86_64", UID: tc.uid, Root: tc.root}},
+				outcomes: map[string]executor.HostOutcome{"node": {Results: []compiler.ItemResult{{RoleID: "app", ItemID: "arch", Status: "PASS", TemplateID: "H01", TemplateVersion: "1.0.0", ExecutionMode: "STANDARD", EvidenceMode: "METADATA", Evidence: []compiler.Evidence{{Resource: "architecture", Property: "stdout", Actual: "x86_64", Source: "uname -m"}}}}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{"STANDARD": true}}},
+			}
+			ws, lease, store, manager, runID := setupWithConfig(t, []inventory.Host{{ID: "node", Address: "127.0.0.1", Port: 22, Username: tc.username}}, map[string][]string{"app": {"node"}}, implementation, "native_ssh", string(raw))
+			defer ws.Close()
+			defer lease.Close()
+			if _, err := manager.ProcessNext(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			run, err := store.Get(runID)
+			if err != nil || run.Report == nil {
+				t.Fatalf("report unavailable: %v", err)
+			}
+			encoded, _ := json.Marshal(run.Report)
+			var archived map[string]any
+			if err := json.Unmarshal(encoded, &archived); err != nil {
+				t.Fatal(err)
+			}
+			host := archived["hosts"].([]any)[0].(map[string]any)
+			if host["login_uid"] != float64(tc.uid) {
+				t.Fatalf("verified UID was not archived: %+v", host)
+			}
+			if audit, _ := host["high_risk_root_audit"].(bool); audit != tc.root {
+				t.Fatalf("host root audit = %v, want %v", audit, tc.root)
+			}
+			result := host["item_results"].([]any)[0].(map[string]any)
+			for _, value := range result["evidence"].([]any) {
+				if audit, _ := value.(map[string]any)["high_risk_root_audit"].(bool); audit != tc.root {
+					t.Fatalf("evidence root audit = %v, want %v", audit, tc.root)
+				}
+			}
+		})
+	}
+}
+
+func setupWithConfig(t *testing.T, hosts []inventory.Host, roleMap map[string][]string, implementation executor.Executor, backend string, sources ...string) (*workspace.Store, *workspace.Lease, *runstore.Store, *runmanager.Manager, string) {
 	t.Helper()
 	dir := t.TempDir()
 	ws, err := workspace.Open(dir)
@@ -785,7 +877,11 @@ func setupWithConfig(t *testing.T, hosts []inventory.Host, roleMap map[string][]
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := plan.Load(strings.NewReader(planSource))
+	source := planSource
+	if len(sources) > 0 {
+		source = sources[0]
+	}
+	p, err := plan.Load(strings.NewReader(source))
 	if err != nil {
 		t.Fatal(err)
 	}

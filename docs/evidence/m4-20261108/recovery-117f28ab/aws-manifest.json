@@ -1,0 +1,41 @@
+{
+  "account": "891376991548",
+  "region": "us-east-1",
+  "session": "117f28ab8bdbd660bf43405d",
+  "budget_usd": 30,
+  "expires_at": "2026-11-09T00:28:52.936424+00:00",
+  "phase": "cleanup-complete",
+  "resources": {
+    "T02-prep": "i-0f70e805409c3e14b",
+    "T01-prep": "i-04faee47cd19da5ad",
+    "T03-prep": "i-0be9361d52fc2ca15",
+    "T04-prep": "i-06ae1ee8d3127a6f7",
+    "T05-prep": "i-02ff78a7a71ce2bc9",
+    "T06-prep": "i-013ac5c22b687a2ef",
+    "T01-FULL-image": "ami-0bd464bf4b6c809f1",
+    "T02-FULL-image": "ami-0668eeb1a2f416bff",
+    "T03-FULL-image": "ami-0b5ce0d8da764c619",
+    "T04-FULL-image": "ami-034bf51fb8d429647",
+    "T05-FULL-image": "ami-05641e59c66fa6357",
+    "T06-FULL-image": "ami-0ea350e215de7e05e",
+    "M01": "i-0baed80b7764cff44",
+    "M02": "i-056b6972e31b08637",
+    "T01": "i-01add862958eafc55",
+    "T02": "i-0b080ffb7a01a49a1",
+    "T03": "i-09cc7a463f73c76dd",
+    "T04": "i-0ce3da6e06446e961",
+    "T05": "i-0d8082f150caf4d64",
+    "T06": "i-08a8296e9fffb900a",
+    "B01": "i-07bde16eb7d9aefc0"
+  },
+  "retired_instances": [
+    {
+      "name": "B01-original",
+      "id": "i-0ac221176f8cacaa3",
+      "reason": "Original trusted key record overwritten by recovery harness; no formal evidence on host",
+      "terminated_at": "2026-11-08T21:25:31.057798+00:00"
+    }
+  ],
+  "cleanup_complete": true,
+  "cleanup_completed_at": "2026-11-08T23:58:16.990240+00:00"
+}

@@ -1,0 +1,206 @@
+[
+  {
+    "case": "M4-SEC-final-root-no-sudo-T01",
+    "report_file": "M4-SEC-final-root-no-sudo-T01-run-FM2TRDY7NSQHD4LUMSXCXTEFDB.json",
+    "report_candidate_sha256": "fda324aa221464ed9301eb9a50fe9565e54d271ae5abd47730f2b25d1969a622",
+    "goss_executions": [
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "STANDARD",
+        "workspace": "readyspec-58b3ad92482d0841650cf8a4",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      },
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-58b3ad92482d0841650cf8a4-privileged",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      }
+    ],
+    "sudo_called": false,
+    "host_login_uid": 0,
+    "cleanup": "CLEAN"
+  },
+  {
+    "case": "M4-SEC-final-root-no-sudo-T02",
+    "report_file": "M4-SEC-final-root-no-sudo-T02-run-Y654IV2JDTXA6KJITDCOAAEC3J.json",
+    "report_candidate_sha256": "c3861f3b0882f5802e8da43cb4a7bef38772559b40dc37437c9ecc3034027c6d",
+    "goss_executions": [
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "STANDARD",
+        "workspace": "readyspec-9170eeb18e2077f1f75a72d2",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      },
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-9170eeb18e2077f1f75a72d2-privileged",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      }
+    ],
+    "sudo_called": false,
+    "host_login_uid": 0,
+    "cleanup": "CLEAN"
+  },
+  {
+    "case": "M4-SEC-final-root-no-sudo-T03",
+    "report_file": "M4-SEC-final-root-no-sudo-T03-run-YFNPPSSXUAYZUYS7WQTAMPYW5K.json",
+    "report_candidate_sha256": "fda324aa221464ed9301eb9a50fe9565e54d271ae5abd47730f2b25d1969a622",
+    "goss_executions": [
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "STANDARD",
+        "workspace": "readyspec-bb2eb44e20fe4ef5fb5e3e3d",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      },
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-bb2eb44e20fe4ef5fb5e3e3d-privileged",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      }
+    ],
+    "sudo_called": false,
+    "host_login_uid": 0,
+    "cleanup": "CLEAN"
+  },
+  {
+    "case": "M4-SEC-final-root-no-sudo-T04",
+    "report_file": "M4-SEC-final-root-no-sudo-T04-run-XJ5LAEBEIU7LTVNC57TPXRZMZ4.json",
+    "report_candidate_sha256": "c3861f3b0882f5802e8da43cb4a7bef38772559b40dc37437c9ecc3034027c6d",
+    "goss_executions": [
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "STANDARD",
+        "workspace": "readyspec-32dbac4a9c7ce3bf66a1183a",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      },
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-32dbac4a9c7ce3bf66a1183a-privileged",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      }
+    ],
+    "sudo_called": false,
+    "host_login_uid": 0,
+    "cleanup": "CLEAN"
+  },
+  {
+    "case": "M4-SEC-final-root-no-sudo-T05",
+    "report_file": "M4-SEC-final-root-no-sudo-T05-run-NKZE724HSYNR4X64AOWRS4SEFV.json",
+    "report_candidate_sha256": "fda324aa221464ed9301eb9a50fe9565e54d271ae5abd47730f2b25d1969a622",
+    "goss_executions": [
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "STANDARD",
+        "workspace": "readyspec-9e520d0f632fce5da15c3ffc",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      },
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "87dd36cfa1b8b50554e6e2ca29168272e26755b19ba5438341f7c66b36decc19",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-9e520d0f632fce5da15c3ffc-privileged",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      }
+    ],
+    "sudo_called": false,
+    "host_login_uid": 0,
+    "cleanup": "CLEAN"
+  },
+  {
+    "case": "M4-SEC-final-root-no-sudo-T06",
+    "report_file": "M4-SEC-final-root-no-sudo-T06-run-O5QJXS5EJITSUN254PM2SYX55P.json",
+    "report_candidate_sha256": "c3861f3b0882f5802e8da43cb4a7bef38772559b40dc37437c9ecc3034027c6d",
+    "goss_executions": [
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "STANDARD",
+        "workspace": "readyspec-443e34e8e629b872b3dc8818",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      },
+      {
+        "binary_gid": 0,
+        "binary_mode": "0700",
+        "binary_sha256": "14fd24ac08236559f4809e6a627792d1b947ed98654bba1662ef1d6122d77e18",
+        "binary_uid": 0,
+        "effective_uid": 0,
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-443e34e8e629b872b3dc8818-privileged",
+        "workspace_gid": 0,
+        "workspace_mode": "0700",
+        "workspace_uid": 0
+      }
+    ],
+    "sudo_called": false,
+    "host_login_uid": 0,
+    "cleanup": "CLEAN"
+  }
+]

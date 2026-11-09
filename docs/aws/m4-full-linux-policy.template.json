@@ -1,0 +1,205 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CallerAndPublicPriceMetadata",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity", "pricing:GetProducts", "pricing:DescribeServices", "pricing:GetAttributeValues", "aws-marketplace:ViewSubscriptions", "aws-marketplace:SearchAgreements", "aws-marketplace:DescribeAgreement", "aws-marketplace:GetAgreementTerms"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RegionalDiscoveryAndPolicyValidation",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeRegions", "ec2:DescribeAvailabilityZones", "ec2:DescribeImages",
+        "ec2:DescribeInstances", "ec2:DescribeInstanceStatus",
+        "ec2:DescribeInstanceTypes", "ec2:DescribeInstanceTypeOfferings",
+        "ec2:DescribeVpcs", "ec2:DescribeVpcAttribute", "ec2:DescribeSubnets",
+        "ec2:DescribeRouteTables", "ec2:DescribeInternetGateways", "ec2:DescribeNetworkAcls",
+        "ec2:DescribeSecurityGroups", "ec2:DescribeSecurityGroupRules", "ec2:DescribeKeyPairs",
+        "ec2:DescribeVolumes", "ec2:DescribeSnapshots", "ec2:DescribeNetworkInterfaces",
+        "ec2:DescribeTags", "ec2:DescribeAccountAttributes",
+        "ec2:GetEbsEncryptionByDefault", "ec2:GetEbsDefaultKmsKeyId",
+        "servicequotas:GetServiceQuota", "access-analyzer:ValidatePolicy"
+      ],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "REGION" } }
+    },
+    {
+      "Sid": "CreateTaggedNetworkAndPublicKey",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateVpc", "ec2:CreateInternetGateway", "ec2:ImportKeyPair"],
+      "Resource": [
+        "arn:aws:ec2:REGION:ACCOUNT_ID:vpc/*", "arn:aws:ec2:REGION:ACCOUNT_ID:internet-gateway/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:key-pair/*"
+      ],
+      "Condition": { "StringEquals": { "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "CreateTaggedVpcChildren",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateSubnet", "ec2:CreateRouteTable", "ec2:CreateSecurityGroup"],
+      "Resource": ["arn:aws:ec2:REGION:ACCOUNT_ID:subnet/*", "arn:aws:ec2:REGION:ACCOUNT_ID:route-table/*", "arn:aws:ec2:REGION:ACCOUNT_ID:security-group/*"],
+      "Condition": { "StringEquals": { "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "UseOnlyTaggedVpcAsParent",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateSubnet", "ec2:CreateRouteTable", "ec2:CreateSecurityGroup"],
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:vpc/*",
+      "Condition": { "StringEquals": { "ec2:ResourceTag/Project": "readyspec-m4", "ec2:ResourceTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "ManageOnlyTaggedNetwork",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:ModifyVpcAttribute", "ec2:ModifySubnetAttribute",
+        "ec2:AttachInternetGateway", "ec2:DetachInternetGateway",
+        "ec2:CreateRoute", "ec2:DeleteRoute", "ec2:AssociateRouteTable", "ec2:DisassociateRouteTable",
+        "ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress", "ec2:RevokeSecurityGroupEgress",
+        "ec2:DeleteSecurityGroup", "ec2:DeleteSubnet", "ec2:DeleteRouteTable",
+        "ec2:DeleteInternetGateway", "ec2:DeleteVpc", "ec2:DeleteKeyPair"
+      ],
+      "Resource": [
+        "arn:aws:ec2:REGION:ACCOUNT_ID:vpc/*", "arn:aws:ec2:REGION:ACCOUNT_ID:subnet/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:route-table/*", "arn:aws:ec2:REGION:ACCOUNT_ID:internet-gateway/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:security-group/*", "arn:aws:ec2:REGION:ACCOUNT_ID:key-pair/*"
+      ],
+      "Condition": { "StringEquals": { "ec2:ResourceTag/Project": "readyspec-m4", "ec2:ResourceTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "PrepareImagesOnlyFromSessionSources",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateImage", "ec2:CreateSnapshot"],
+      "Resource": ["arn:aws:ec2:REGION:ACCOUNT_ID:instance/*", "arn:aws:ec2:REGION:ACCOUNT_ID:volume/*"],
+      "Condition": { "StringEquals": { "ec2:ResourceTag/Project": "readyspec-m4", "ec2:ResourceTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "CreateTaggedImagesAndSnapshots",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateImage", "ec2:CreateSnapshot"],
+      "Resource": ["arn:aws:ec2:REGION::image/*", "arn:aws:ec2:REGION::snapshot/*"],
+      "Condition": { "StringEquals": { "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "UsePublicPublisherImages",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION::image/*",
+      "Condition": {
+        "StringEquals": { "ec2:Owner": ["099720109477", "136693071363", "792107900819"], "ec2:RootDeviceType": "ebs", "ec2:ImageType": "machine" },
+        "Bool": { "ec2:Public": "true" }
+      }
+    },
+    {
+      "Sid": "OptionalOfficialRockyMarketplaceImages",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": ["arn:aws:ec2:REGION::image/ROCKY_AMD64_MARKETPLACE_AMI", "arn:aws:ec2:REGION::image/ROCKY_ARM64_MARKETPLACE_AMI"]
+    },
+    {
+      "Sid": "OptionalOfficialRockySubscriptions",
+      "Effect": "Allow",
+      "Action": "aws-marketplace:Subscribe",
+      "Resource": "*",
+      "Condition": {
+        "ForAllValues:StringEquals": { "aws-marketplace:ProductId": ["ROCKY_AMD64_MARKETPLACE_PRODUCT_ID", "ROCKY_ARM64_MARKETPLACE_PRODUCT_ID"] },
+        "Null": { "aws-marketplace:ProductId": "false" }
+      }
+    },
+    {
+      "Sid": "UseOwnedSessionImagesAndSnapshots",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": ["arn:aws:ec2:REGION::image/*", "arn:aws:ec2:REGION::snapshot/*"],
+      "Condition": { "StringEquals": { "ec2:Owner": "ACCOUNT_ID", "ec2:ResourceTag/Project": "readyspec-m4", "ec2:ResourceTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "UseSessionLaunchNetworkAndKey",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": ["arn:aws:ec2:REGION:ACCOUNT_ID:subnet/*", "arn:aws:ec2:REGION:ACCOUNT_ID:security-group/*", "arn:aws:ec2:REGION:ACCOUNT_ID:key-pair/*"],
+      "Condition": { "StringEquals": { "ec2:ResourceTag/Project": "readyspec-m4", "ec2:ResourceTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "LaunchSmallSessionInstances",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID",
+          "ec2:InstanceType": ["t3.small", "t4g.small", "t3.medium", "t4g.medium", "t3.xlarge"],
+          "ec2:Tenancy": "default", "ec2:InstanceMarketType": "on-demand",
+          "ec2:MetadataHttpTokens": "required", "ec2:RootDeviceType": "ebs"
+        },
+        "StringEqualsIfExists": { "ec2:ProductCode": ["ROCKY_AMD64_MARKETPLACE_PRODUCT_CODE", "ROCKY_ARM64_MARKETPLACE_PRODUCT_CODE"] }
+      }
+    },
+    {
+      "Sid": "LaunchBoundedEncryptedSessionVolumes",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:volume/*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID", "ec2:VolumeType": "gp3" },
+        "Bool": { "ec2:Encrypted": "true" },
+        "NumericLessThanEquals": { "ec2:VolumeSize": "80", "ec2:VolumeIops": "3000", "ec2:VolumeThroughput": "125" }
+      }
+    },
+    {
+      "Sid": "LaunchPrivateValidationInterfaces",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:network-interface/*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID", "aws:RequestTag/NetworkClass": "private-validation" },
+        "Bool": { "ec2:AssociatePublicIpAddress": "false" }
+      }
+    },
+    {
+      "Sid": "LaunchPublicBootstrapInterfaces",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:network-interface/*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID", "aws:RequestTag/NetworkClass": "public-bootstrap" },
+        "Bool": { "ec2:AssociatePublicIpAddress": "true" }
+      }
+    },
+    {
+      "Sid": "TagOnlyDuringResourceCreation",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": [
+        "arn:aws:ec2:REGION:ACCOUNT_ID:vpc/*", "arn:aws:ec2:REGION:ACCOUNT_ID:subnet/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:route-table/*", "arn:aws:ec2:REGION:ACCOUNT_ID:internet-gateway/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:security-group/*", "arn:aws:ec2:REGION:ACCOUNT_ID:key-pair/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:instance/*", "arn:aws:ec2:REGION:ACCOUNT_ID:volume/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:network-interface/*", "arn:aws:ec2:REGION::image/*", "arn:aws:ec2:REGION::snapshot/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ec2:CreateAction": ["CreateVpc", "CreateSubnet", "CreateRouteTable", "CreateInternetGateway", "CreateSecurityGroup", "ImportKeyPair", "RunInstances", "CreateImage", "CreateSnapshot"],
+          "aws:RequestTag/Project": "readyspec-m4", "aws:RequestTag/Session": "SESSION_ID"
+        },
+        "ForAllValues:StringEquals": { "aws:TagKeys": ["Project", "Session", "Name", "EnvID", "ExpiresAt", "NetworkClass", "Variant"] }
+      }
+    },
+    {
+      "Sid": "ManageOnlySessionCompute",
+      "Effect": "Allow",
+      "Action": ["ec2:StartInstances", "ec2:StopInstances", "ec2:RebootInstances", "ec2:TerminateInstances", "ec2:GetConsoleOutput", "ec2:DescribeInstanceAttribute", "ec2:DeleteVolume", "ec2:DeleteNetworkInterface"],
+      "Resource": ["arn:aws:ec2:REGION:ACCOUNT_ID:instance/*", "arn:aws:ec2:REGION:ACCOUNT_ID:volume/*", "arn:aws:ec2:REGION:ACCOUNT_ID:network-interface/*"],
+      "Condition": { "StringEquals": { "ec2:ResourceTag/Project": "readyspec-m4", "ec2:ResourceTag/Session": "SESSION_ID" } }
+    },
+    {
+      "Sid": "RemoveOwnedSessionImagesAndSnapshots",
+      "Effect": "Allow",
+      "Action": ["ec2:DeregisterImage", "ec2:DeleteSnapshot"],
+      "Resource": ["arn:aws:ec2:REGION::image/*", "arn:aws:ec2:REGION::snapshot/*"],
+      "Condition": { "StringEquals": { "ec2:Owner": "ACCOUNT_ID", "ec2:ResourceTag/Project": "readyspec-m4", "ec2:ResourceTag/Session": "SESSION_ID" } }
+    }
+  ]
+}

@@ -1,0 +1,1502 @@
+[
+  {
+    "case": "M4-I01-T01-ordinary-standard",
+    "exit": 0,
+    "run_id": "run-TBFYQ6HU4VFODEDQCGJHUVJYFY",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 2101,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-I01-T01-ordinary-privileged-denied",
+    "exit": 15,
+    "run_id": "run-ZBA2KGH4YH5LSBIDVP3UGHTVJA",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-I01-T01-nopasswd",
+    "exit": 0,
+    "run_id": "run-PS33RYNWDAMIRLWEYJVDEY3RJN",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-I01-T01-sudo-password",
+    "exit": 0,
+    "run_id": "run-PH56C75P62NY2O4D5WFYWWC2DJ",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 2103,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ]
+  },
+  {
+    "case": "M4-I01-T01-sudo-missing",
+    "exit": 15,
+    "run_id": "run-YFDPFWGA5T37PXOOAAV5PXDT7H",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-I01-T01-sudo-wrong",
+    "exit": 15,
+    "run_id": "run-MHYEVL6WKG4DSHT35U72TUMUFS",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": []
+  },
+  {
+    "case": "M4-I01-T01-restricted-denied",
+    "exit": 15,
+    "run_id": "run-4D6E6YFMSDDBHW52MM6MX4CE67",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T01-restricted-denied-run-4D6E6YFMSDDBHW52MM6MX4CE67.json"
+  },
+  {
+    "case": "M4-I01-T01-root",
+    "exit": 0,
+    "run_id": "run-APCL6LSVL732AF4ABTEH4BIHE2",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T01-root-run-APCL6LSVL732AF4ABTEH4BIHE2.json"
+  },
+  {
+    "case": "M4-I01-T01-uid-zero-alias",
+    "exit": 0,
+    "run_id": "run-WWRYCKKAN2STUI3O54KK4VVEKQ",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T01-uid-zero-alias-run-WWRYCKKAN2STUI3O54KK4VVEKQ.json"
+  },
+  {
+    "case": "M4-I01-T02-ordinary-standard",
+    "exit": 0,
+    "run_id": "run-AJTNQBNAL4AQX6MPAQVMQ67J6F",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 2101,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T02-ordinary-standard-run-AJTNQBNAL4AQX6MPAQVMQ67J6F.json"
+  },
+  {
+    "case": "M4-I01-T02-ordinary-privileged-denied",
+    "exit": 15,
+    "run_id": "run-JPW3CUEQUBC7FP2G2ZALFTR27U",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T02-ordinary-privileged-denied-run-JPW3CUEQUBC7FP2G2ZALFTR27U.json"
+  },
+  {
+    "case": "M4-I01-T02-nopasswd",
+    "exit": 0,
+    "run_id": "run-YN5P46CLTW3LLMVWIWIGDMX53Y",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T02-nopasswd-run-YN5P46CLTW3LLMVWIWIGDMX53Y.json"
+  },
+  {
+    "case": "M4-I01-T02-sudo-password",
+    "exit": 0,
+    "run_id": "run-MRVT4LRVOI4XZC6Q457AWRAHSD",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 2103,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T02-sudo-password-run-MRVT4LRVOI4XZC6Q457AWRAHSD.json"
+  },
+  {
+    "case": "M4-I01-T02-sudo-missing",
+    "exit": 15,
+    "run_id": "run-QZGYECLJ2NMWOQ3WEFUVBPXYH4",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T02-sudo-missing-run-QZGYECLJ2NMWOQ3WEFUVBPXYH4.json"
+  },
+  {
+    "case": "M4-I01-T02-sudo-wrong",
+    "exit": 15,
+    "run_id": "run-KFM2SAYZOV3LJ2OIBFWIRVX56M",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T02-sudo-wrong-run-KFM2SAYZOV3LJ2OIBFWIRVX56M.json"
+  },
+  {
+    "case": "M4-I01-T02-restricted-denied",
+    "exit": 15,
+    "run_id": "run-JY5QV7GFJAQNKJONLCAVJSG6DI",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T02-restricted-denied-run-JY5QV7GFJAQNKJONLCAVJSG6DI.json"
+  },
+  {
+    "case": "M4-I01-T02-root",
+    "exit": 0,
+    "run_id": "run-2JAGWQIAHH2LJI2V5SFU6DMFUU",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T02-root-run-2JAGWQIAHH2LJI2V5SFU6DMFUU.json"
+  },
+  {
+    "case": "M4-I01-T02-uid-zero-alias",
+    "exit": 0,
+    "run_id": "run-B6HOMTIWFM5JCPOBRZLS4LN24L",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T02-uid-zero-alias-run-B6HOMTIWFM5JCPOBRZLS4LN24L.json"
+  },
+  {
+    "case": "M4-I01-T03-ordinary-standard",
+    "exit": 0,
+    "run_id": "run-GLSMHTKL2QZ6N2C3AELUDS37O2",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": 2101,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T03-ordinary-standard-run-GLSMHTKL2QZ6N2C3AELUDS37O2.json"
+  },
+  {
+    "case": "M4-I01-T03-ordinary-privileged-denied",
+    "exit": 15,
+    "run_id": "run-6A2YZKZXN7H632OPUACBSYHR56",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T03-ordinary-privileged-denied-run-6A2YZKZXN7H632OPUACBSYHR56.json"
+  },
+  {
+    "case": "M4-I01-T03-nopasswd",
+    "exit": 0,
+    "run_id": "run-6IKIE4EFDNLBTRC3CPZHCKD5C3",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T03-nopasswd-run-6IKIE4EFDNLBTRC3CPZHCKD5C3.json"
+  },
+  {
+    "case": "M4-I01-T03-sudo-password",
+    "exit": 0,
+    "run_id": "run-XLLUFVKTDNDHU7N5CWBDJZTYQ3",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": 2103,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T03-sudo-password-run-XLLUFVKTDNDHU7N5CWBDJZTYQ3.json"
+  },
+  {
+    "case": "M4-I01-T03-sudo-missing",
+    "exit": 15,
+    "run_id": "run-XRTPLBEAX4ZDHGB4YBQ6BUQFED",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T03-sudo-missing-run-XRTPLBEAX4ZDHGB4YBQ6BUQFED.json"
+  },
+  {
+    "case": "M4-I01-T03-sudo-wrong",
+    "exit": 15,
+    "run_id": "run-SO2US5CZNVY7E5UJHFZQEJOO4E",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T03-sudo-wrong-run-SO2US5CZNVY7E5UJHFZQEJOO4E.json"
+  },
+  {
+    "case": "M4-I01-T03-restricted-denied",
+    "exit": 15,
+    "run_id": "run-WWZINJGWXYPCUUTSIEGMOK4QV3",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T03-restricted-denied-run-WWZINJGWXYPCUUTSIEGMOK4QV3.json"
+  },
+  {
+    "case": "M4-I01-T03-root",
+    "exit": 0,
+    "run_id": "run-OJSE7YAVMUE3BJS5Z5EZW2BU2J",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T03-root-run-OJSE7YAVMUE3BJS5Z5EZW2BU2J.json"
+  },
+  {
+    "case": "M4-I01-T03-uid-zero-alias",
+    "exit": 0,
+    "run_id": "run-UYHHPXJPC4Z5CPB3NTEVXQEDZ4",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t03",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T03-uid-zero-alias-run-UYHHPXJPC4Z5CPB3NTEVXQEDZ4.json"
+  },
+  {
+    "case": "M4-I01-T04-ordinary-standard",
+    "exit": 0,
+    "run_id": "run-V3WAVVNQCKD3ENBPRXQ4YV632I",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": 2101,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T04-ordinary-standard-run-V3WAVVNQCKD3ENBPRXQ4YV632I.json"
+  },
+  {
+    "case": "M4-I01-T04-ordinary-privileged-denied",
+    "exit": 15,
+    "run_id": "run-2ZXCYCVR2BKBOZDSEQ7LFM2Z74",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T04-ordinary-privileged-denied-run-2ZXCYCVR2BKBOZDSEQ7LFM2Z74.json"
+  },
+  {
+    "case": "M4-I01-T04-nopasswd",
+    "exit": 0,
+    "run_id": "run-3TJRKTWL4KUPVH4JE5MMSFFY3B",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T04-nopasswd-run-3TJRKTWL4KUPVH4JE5MMSFFY3B.json"
+  },
+  {
+    "case": "M4-I01-T04-sudo-password",
+    "exit": 0,
+    "run_id": "run-ILVZUNLPXS23UW2AGK52ZQHMUJ",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": 2103,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T04-sudo-password-run-ILVZUNLPXS23UW2AGK52ZQHMUJ.json"
+  },
+  {
+    "case": "M4-I01-T04-sudo-missing",
+    "exit": 15,
+    "run_id": "run-KRQXDF5E4XUILWUPDM4GHP22MO",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T04-sudo-missing-run-KRQXDF5E4XUILWUPDM4GHP22MO.json"
+  },
+  {
+    "case": "M4-I01-T04-sudo-wrong",
+    "exit": 15,
+    "run_id": "run-YSX7ZMR2L4DO6QY5QTCAJ3KZPF",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T04-sudo-wrong-run-YSX7ZMR2L4DO6QY5QTCAJ3KZPF.json"
+  },
+  {
+    "case": "M4-I01-T04-restricted-denied",
+    "exit": 15,
+    "run_id": "run-VUAXDKZSHADUFS2OOYU2NMTNKF",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T04-restricted-denied-run-VUAXDKZSHADUFS2OOYU2NMTNKF.json"
+  },
+  {
+    "case": "M4-I01-T04-root",
+    "exit": 0,
+    "run_id": "run-IFZNXAZDN6OVGDD3YVDL6JJIL6",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T04-root-run-IFZNXAZDN6OVGDD3YVDL6JJIL6.json"
+  },
+  {
+    "case": "M4-I01-T04-uid-zero-alias",
+    "exit": 0,
+    "run_id": "run-ZOZ333KCS7V4TIW36AH43GRSNO",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t04",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T04-uid-zero-alias-run-ZOZ333KCS7V4TIW36AH43GRSNO.json"
+  },
+  {
+    "case": "M4-I01-T05-ordinary-standard",
+    "exit": 0,
+    "run_id": "run-PKJIFNAHVJISQ5MT6IVRRF5RDD",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": 2101,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T05-ordinary-standard-run-PKJIFNAHVJISQ5MT6IVRRF5RDD.json"
+  },
+  {
+    "case": "M4-I01-T05-ordinary-privileged-denied",
+    "exit": 15,
+    "run_id": "run-6PDSNTMX6OZSVMDPN2NCP5FDLR",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T05-ordinary-privileged-denied-run-6PDSNTMX6OZSVMDPN2NCP5FDLR.json"
+  },
+  {
+    "case": "M4-I01-T05-nopasswd",
+    "exit": 0,
+    "run_id": "run-L7BPAZC2SWSPW6UABBVXM3DR73",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T05-nopasswd-run-L7BPAZC2SWSPW6UABBVXM3DR73.json"
+  },
+  {
+    "case": "M4-I01-T05-sudo-password",
+    "exit": 0,
+    "run_id": "run-IEKN2SZKSNOTNTGXCSETIOWI7H",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": 2103,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T05-sudo-password-run-IEKN2SZKSNOTNTGXCSETIOWI7H.json"
+  },
+  {
+    "case": "M4-I01-T05-sudo-missing",
+    "exit": 15,
+    "run_id": "run-C2KV5DVU2JHET7QRWJ5BRSCSTS",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T05-sudo-missing-run-C2KV5DVU2JHET7QRWJ5BRSCSTS.json"
+  },
+  {
+    "case": "M4-I01-T05-sudo-wrong",
+    "exit": 15,
+    "run_id": "run-3JBOIOITCTM6ODUOZZCTSLQJIR",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T05-sudo-wrong-run-3JBOIOITCTM6ODUOZZCTSLQJIR.json"
+  },
+  {
+    "case": "M4-I01-T05-restricted-denied",
+    "exit": 15,
+    "run_id": "run-ROCRGS6FPYJZW7ZLIDFS4UFOMM",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T05-restricted-denied-run-ROCRGS6FPYJZW7ZLIDFS4UFOMM.json"
+  },
+  {
+    "case": "M4-I01-T05-root",
+    "exit": 0,
+    "run_id": "run-BUZ46A2WB336FI43USGBZ72ZPF",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T05-root-run-BUZ46A2WB336FI43USGBZ72ZPF.json"
+  },
+  {
+    "case": "M4-I01-T05-uid-zero-alias",
+    "exit": 0,
+    "run_id": "run-6N7N3LN5GGWLNRFCOIKASC4CEP",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t05",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T05-uid-zero-alias-run-6N7N3LN5GGWLNRFCOIKASC4CEP.json"
+  },
+  {
+    "case": "M4-I01-T06-ordinary-standard",
+    "exit": 0,
+    "run_id": "run-TKGVEDW5QMIFHYTOKC5JWWU4UL",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": 2101,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T06-ordinary-standard-run-TKGVEDW5QMIFHYTOKC5JWWU4UL.json"
+  },
+  {
+    "case": "M4-I01-T06-ordinary-privileged-denied",
+    "exit": 15,
+    "run_id": "run-IUEDTDTGY45FUKKPNVXECBS642",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T06-ordinary-privileged-denied-run-IUEDTDTGY45FUKKPNVXECBS642.json"
+  },
+  {
+    "case": "M4-I01-T06-nopasswd",
+    "exit": 0,
+    "run_id": "run-TJQOTN6WJWDHUORYD6LYZUQB3G",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T06-nopasswd-run-TJQOTN6WJWDHUORYD6LYZUQB3G.json"
+  },
+  {
+    "case": "M4-I01-T06-sudo-password",
+    "exit": 0,
+    "run_id": "run-FTGNGEHJGTEKPD6PGV3ADAV57C",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": 2103,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T06-sudo-password-run-FTGNGEHJGTEKPD6PGV3ADAV57C.json"
+  },
+  {
+    "case": "M4-I01-T06-sudo-missing",
+    "exit": 15,
+    "run_id": "run-EJN3I5SGIIZDNXZTBKY3ZWCPUX",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T06-sudo-missing-run-EJN3I5SGIIZDNXZTBKY3ZWCPUX.json"
+  },
+  {
+    "case": "M4-I01-T06-sudo-wrong",
+    "exit": 15,
+    "run_id": "run-6CB3RXAYQPHNZF7DDSP3QJWMU3",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T06-sudo-wrong-run-6CB3RXAYQPHNZF7DDSP3QJWMU3.json"
+  },
+  {
+    "case": "M4-I01-T06-restricted-denied",
+    "exit": 15,
+    "run_id": "run-25S2ASWABU7SZW76AEECD2VLSC",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-I01-T06-restricted-denied-run-25S2ASWABU7SZW76AEECD2VLSC.json"
+  },
+  {
+    "case": "M4-I01-T06-root",
+    "exit": 0,
+    "run_id": "run-VUX7IISIARVLUIFNFNDLBHWE6C",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T06-root-run-VUX7IISIARVLUIFNFNDLBHWE6C.json"
+  },
+  {
+    "case": "M4-I01-T06-uid-zero-alias",
+    "exit": 0,
+    "run_id": "run-ZPZB4DDM2FZXGDJT4TPL645QT3",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": 0,
+        "high_risk_root_audit": true,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-I01-T06-uid-zero-alias-run-ZPZB4DDM2FZXGDJT4TPL645QT3.json"
+  },
+  {
+    "case": "M4-SEC-global-six-host-barrier",
+    "exit": 15,
+    "run_id": "run-H4OJEHRSVM7GRWTMRRRKES5XBF",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t06",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-SEC-global-six-host-barrier-run-H4OJEHRSVM7GRWTMRRRKES5XBF.json"
+  },
+  {
+    "case": "M4-auth-M01-T01-password-correct",
+    "exit": 0,
+    "run_id": "run-GVYCWOLIIDY6ZQOAUCPCD7GKOB",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M01-T01-password-correct-run-GVYCWOLIIDY6ZQOAUCPCD7GKOB.json"
+  },
+  {
+    "case": "M4-auth-M01-T01-password-wrong",
+    "exit": 15,
+    "run_id": "run-WUDSMKPJ7ZLVZ3GYVK4LTSYBGT",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-auth-M01-T01-password-wrong-run-WUDSMKPJ7ZLVZ3GYVK4LTSYBGT.json"
+  },
+  {
+    "case": "M4-auth-M01-T01-password-missing",
+    "exit": 15,
+    "run_id": null,
+    "run_status": null,
+    "verdict": null,
+    "reason": null,
+    "hosts": [],
+    "cleanup": []
+  },
+  {
+    "case": "M4-auth-M01-T01-agent",
+    "exit": 0,
+    "run_id": "run-FDJZA6L26DTVJCYRESHHC5RZET",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M01-T01-agent-run-FDJZA6L26DTVJCYRESHHC5RZET.json"
+  },
+  {
+    "case": "M4-auth-M01-T02-password-correct",
+    "exit": 0,
+    "run_id": "run-X44JVW2HSCOLDDLCA4QDB7UJDE",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M01-T02-password-correct-run-X44JVW2HSCOLDDLCA4QDB7UJDE.json"
+  },
+  {
+    "case": "M4-auth-M01-T02-password-wrong",
+    "exit": 15,
+    "run_id": "run-NXAP3T5DWOWOOTUNB2ZMVVPOLT",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-auth-M01-T02-password-wrong-run-NXAP3T5DWOWOOTUNB2ZMVVPOLT.json"
+  },
+  {
+    "case": "M4-auth-M01-T02-password-missing",
+    "exit": 15,
+    "run_id": null,
+    "run_status": null,
+    "verdict": null,
+    "reason": null,
+    "hosts": [],
+    "cleanup": []
+  },
+  {
+    "case": "M4-auth-M01-T02-agent",
+    "exit": 0,
+    "run_id": "run-UH2IJZT56FXM2RMXXVVOZXTY2K",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M01-T02-agent-run-UH2IJZT56FXM2RMXXVVOZXTY2K.json"
+  },
+  {
+    "case": "M4-auth-M02-T01-password-correct",
+    "exit": 0,
+    "run_id": "run-CVKC73ERRQLNPRK52TNN755JJW",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M02-T01-password-correct-run-CVKC73ERRQLNPRK52TNN755JJW.json"
+  },
+  {
+    "case": "M4-auth-M02-T01-password-wrong",
+    "exit": 15,
+    "run_id": "run-OK765T7PQWU75IYCOEBQTNCR4O",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-auth-M02-T01-password-wrong-run-OK765T7PQWU75IYCOEBQTNCR4O.json"
+  },
+  {
+    "case": "M4-auth-M02-T01-password-missing",
+    "exit": 15,
+    "run_id": null,
+    "run_status": null,
+    "verdict": null,
+    "reason": null,
+    "hosts": [],
+    "cleanup": []
+  },
+  {
+    "case": "M4-auth-M02-T01-agent",
+    "exit": 0,
+    "run_id": "run-33Y2NYMJTBA3XTJAR7HHVM53FX",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t01",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M02-T01-agent-run-33Y2NYMJTBA3XTJAR7HHVM53FX.json"
+  },
+  {
+    "case": "M4-auth-M02-T02-password-correct",
+    "exit": 0,
+    "run_id": "run-52FD7VIVFO22YCVEKTWPJS7XVY",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M02-T02-password-correct-run-52FD7VIVFO22YCVEKTWPJS7XVY.json"
+  },
+  {
+    "case": "M4-auth-M02-T02-password-wrong",
+    "exit": 15,
+    "run_id": "run-ALB77JVII26WQ4I67D6E7BVCLZ",
+    "run_status": "FAILED",
+    "verdict": "UNKNOWN",
+    "reason": "AUTH_PREFLIGHT_REJECTED",
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": null,
+        "high_risk_root_audit": false,
+        "items": []
+      }
+    ],
+    "cleanup": [],
+    "report_file": "M4-auth-M02-T02-password-wrong-run-ALB77JVII26WQ4I67D6E7BVCLZ.json"
+  },
+  {
+    "case": "M4-auth-M02-T02-password-missing",
+    "exit": 15,
+    "run_id": null,
+    "run_status": null,
+    "verdict": null,
+    "reason": null,
+    "hosts": [],
+    "cleanup": []
+  },
+  {
+    "case": "M4-auth-M02-T02-agent",
+    "exit": 0,
+    "run_id": "run-V7YWWBZWHKDBGB6M4YM2U6CJX3",
+    "run_status": "COMPLETED",
+    "verdict": "READY",
+    "reason": null,
+    "hosts": [
+      {
+        "id": "t02",
+        "login_uid": 2102,
+        "high_risk_root_audit": false,
+        "items": [
+          "PASS",
+          "PASS",
+          "PASS",
+          "PASS"
+        ]
+      }
+    ],
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_file": "M4-auth-M02-T02-agent-run-V7YWWBZWHKDBGB6M4YM2U6CJX3.json"
+  }
+]

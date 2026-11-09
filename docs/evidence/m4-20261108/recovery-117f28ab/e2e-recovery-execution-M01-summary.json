@@ -1,0 +1,38 @@
+{
+  "case": "M4-E2E-05-M01-controller-kill-execution",
+  "candidate_digests": {
+    "amd64": "8e456f446d71f8cbb64c21cdad4f6ae727fed51afed88ad410ebc4732c9ac3b5",
+    "arm64": "552ee82ecef84785e99da4731599e91990bf84f3cd6bd60db989c4c22c3304ec"
+  },
+  "timeline": {
+    "execution_marker": "2026-11-08T23:00:18.603587+00:00",
+    "controller_killed": "2026-11-08T23:00:22.779711+00:00"
+  },
+  "plan_digest": "sha256:cdb0c86513065ce0d03e3c41fd15f0f73fdf12a1a7a276ff6d575a179413c4c1",
+  "run_id": "run-UBG3FCDLLI6URT77VPSZZQVBQL",
+  "controller_kill_exit": 0,
+  "submit_exit": 13,
+  "submit_stderr": "INFRA_ERROR: accepted Run report could not be retrieved\n",
+  "restart_exit": 0,
+  "run_status": "FAILED",
+  "termination_reason": "CONTROLLER_INTERRUPTED",
+  "verdict": "UNKNOWN",
+  "cleanup": [
+    "PENDING"
+  ],
+  "exec_count_before_release": 1,
+  "cleanup_without_confirmation_exit": 0,
+  "cleanup_without_confirmation_stderr": "",
+  "cleanup_without_confirmation": {
+    "cleanup_id": "run-UBG3FCDLLI6URT77VPSZZQVBQL:98eda5905fec",
+    "host_id": "node",
+    "ssh_host_key_fp": "SHA256:ZzGC11LQ4ztP8OkOrD/eaJONTfNu004r+nVVAMO+Nu4",
+    "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+    "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+    "status": "CLEAN",
+    "remote_path": "/tmp/readyspec-8d10c22540afff2543d64d5e"
+  },
+  "cleanup_process_confirmation": "NOT_REQUIRED_NO_ACTIVE_PROCESS",
+  "exec_count_after_release": 1,
+  "assertions_passed": true
+}

@@ -1,0 +1,116 @@
+[
+  {
+    "case": "M4-TMP-T01-privileged-rsm4nopw-noexec-depth-2",
+    "original_assertions_passed": false,
+    "run_id": "run-W243BRBLUVUNQUDB6HGRVUUQTZ",
+    "exit": 11,
+    "reason": "EXECUTION_ERROR",
+    "expected_selected": "/var/tmp",
+    "report_file": "M4-TMP-T01-privileged-rsm4nopw-noexec-depth-2-run-W243BRBLUVUNQUDB6HGRVUUQTZ.json",
+    "report_verdict": "UNKNOWN",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_workspace_names": [
+      "readyspec-9271a54cd0afe7f428d81516",
+      "readyspec-9271a54cd0afe7f428d81516-privileged"
+    ],
+    "observer_events_total": 1,
+    "observer_events_matching_report_workspaces": [
+      {
+        "mode": "STANDARD",
+        "workspace": "readyspec-9271a54cd0afe7f428d81516"
+      }
+    ],
+    "observer_events_unmatched": 0,
+    "actual_standard_path": "/tmp/readyspec-9271a54cd0afe7f428d81516",
+    "actual_privileged_path": "/run/readyspec-9271a54cd0afe7f428d81516-privileged",
+    "analysis": "Mixed Run preserved STANDARD PASS and CLEAN; the failure assertion incorrectly required zero Goss events across both modes. The report and exact-workspace observer show no PRIVILEGED Goss execution. This satisfies the intended privileged rejection predicate; the raw assertion remains unchanged.",
+    "intended_predicate_supported": true
+  },
+  {
+    "case": "M4-TMP-T02-standard-rsm4nopw-ro-depth-4",
+    "original_assertions_passed": false,
+    "run_id": "run-CXYO2KTDJH3YPOOL5K3ALHNFHE",
+    "exit": 11,
+    "reason": "NETWORK_ERROR",
+    "expected_selected": null,
+    "report_file": "M4-TMP-T02-standard-rsm4nopw-ro-depth-4-run-CXYO2KTDJH3YPOOL5K3ALHNFHE.json",
+    "report_verdict": "UNKNOWN",
+    "cleanup": [],
+    "report_workspace_names": [],
+    "observer_events_total": 0,
+    "observer_events_matching_report_workspaces": [],
+    "observer_events_unmatched": 0,
+    "actual_standard_path": null,
+    "actual_privileged_path": null,
+    "analysis": "Read-only all-candidates case ended NETWORK_ERROR with no Goss events; the connection interruption prevents signing the intended EXECUTION_ERROR predicate.",
+    "intended_predicate_supported": false
+  },
+  {
+    "case": "M4-TMP-T03-privileged-rsm4nopw-noexec-depth-1",
+    "original_assertions_passed": false,
+    "run_id": "run-FUOWUPHW4GZ4WI5DRN3P4EPCQT",
+    "exit": 0,
+    "reason": null,
+    "expected_selected": "/run",
+    "report_file": "M4-TMP-T03-privileged-rsm4nopw-noexec-depth-1-run-FUOWUPHW4GZ4WI5DRN3P4EPCQT.json",
+    "report_verdict": "READY",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_workspace_names": [
+      "readyspec-f8cfc8200a85f55ec56b2a63",
+      "readyspec-f8cfc8200a85f55ec56b2a63-privileged"
+    ],
+    "observer_events_total": 2,
+    "observer_events_matching_report_workspaces": [
+      {
+        "mode": "STANDARD",
+        "workspace": "readyspec-f8cfc8200a85f55ec56b2a63"
+      },
+      {
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-f8cfc8200a85f55ec56b2a63-privileged"
+      }
+    ],
+    "observer_events_unmatched": 0,
+    "actual_standard_path": "/tmp/readyspec-f8cfc8200a85f55ec56b2a63",
+    "actual_privileged_path": "/var/tmp/readyspec-f8cfc8200a85f55ec56b2a63-privileged",
+    "analysis": "Run completed READY/CLEAN with one STANDARD and one PRIVILEGED observer event tied to report paths; selected privileged directory differs from expected /run. The run did not capture baseline /run mount options, so this mismatch is unresolved.",
+    "intended_predicate_supported": null
+  },
+  {
+    "case": "M4-TMP-T06-privileged-rsm4nopw-noexec-depth-1",
+    "original_assertions_passed": false,
+    "run_id": "run-Q42DMIW7WI2B4CP5BAQ7QWBCKF",
+    "exit": 0,
+    "reason": null,
+    "expected_selected": "/run",
+    "report_file": "M4-TMP-T06-privileged-rsm4nopw-noexec-depth-1-run-Q42DMIW7WI2B4CP5BAQ7QWBCKF.json",
+    "report_verdict": "READY",
+    "cleanup": [
+      "CLEAN"
+    ],
+    "report_workspace_names": [
+      "readyspec-9ee89453043f636bf50294f5",
+      "readyspec-9ee89453043f636bf50294f5-privileged"
+    ],
+    "observer_events_total": 4,
+    "observer_events_matching_report_workspaces": [
+      {
+        "mode": "STANDARD",
+        "workspace": "readyspec-9ee89453043f636bf50294f5"
+      },
+      {
+        "mode": "PRIVILEGED",
+        "workspace": "readyspec-9ee89453043f636bf50294f5-privileged"
+      }
+    ],
+    "observer_events_unmatched": 2,
+    "actual_standard_path": "/tmp/readyspec-9ee89453043f636bf50294f5",
+    "actual_privileged_path": "/run/readyspec-9ee89453043f636bf50294f5-privileged",
+    "analysis": "Two of four observer events match this report workspace (one STANDARD, one PRIVILEGED); the other two belong to another workspace. The report is READY/CLEAN and selected the expected /run candidate. The original assertion failure is observer-window contamination.",
+    "intended_predicate_supported": true
+  }
+]

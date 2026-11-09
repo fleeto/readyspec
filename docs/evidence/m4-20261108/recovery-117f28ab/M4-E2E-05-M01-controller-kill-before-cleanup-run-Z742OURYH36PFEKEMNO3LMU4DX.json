@@ -1,0 +1,36 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-Z742OURYH36PFEKEMNO3LMU4DX",
+  "plan_digest": "sha256:563ff1ae3400546f0ee58d8fc364533ead6e65f77c7713777c052eef6f58afbe",
+  "run_mode": "TRIAL",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "CONTROLLER_INTERRUPTED",
+  "verdict_reasons": [
+    "CONTROLLER_INTERRUPTED"
+  ],
+  "started_at": "2026-11-08T23:22:59.499344902Z",
+  "finished_at": "2026-11-08T23:23:08.572363992Z",
+  "topology_results": [],
+  "hosts": [],
+  "cleanup_items": [
+    {
+      "cleanup_id": "run-Z742OURYH36PFEKEMNO3LMU4DX:5753072c1b86",
+      "host_id": "node",
+      "ssh_host_key_fp": "SHA256:+bLSKYIWAYv6U/WfBI45PjMo0EEeEwjDJkVIxZlERdY",
+      "machine_id": "ec2428f0c5a5c673e9aff4616865b423",
+      "boot_id": "a62b8eb5-1edc-460e-a743-e9bc8ce07b67",
+      "status": "PENDING",
+      "remote_path": "/tmp/readyspec-2158ee19aac0239c7b440ca1"
+    }
+  ],
+  "failures": [
+    {
+      "code": "CONTROLLER_INTERRUPTED",
+      "phase": "RECOVERY",
+      "message": "Run was interrupted before a final report was committed"
+    }
+  ]
+}

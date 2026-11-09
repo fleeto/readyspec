@@ -63,6 +63,9 @@ func (m *Manager) Submit(request runstore.Request, credentials map[string]execut
 	accepted, created, err := m.store.AcceptWithCommit(request, func(runID string) (func(), error) {
 		rollback, err := installer.InstallRunCredentials(runID, credentials)
 		if err != nil {
+			if errors.Is(err, executor.ErrCredentialUnavailable) {
+				return nil, fmt.Errorf("AUTH_ERROR: selected local credential is unavailable")
+			}
 			return nil, fmt.Errorf("INFRA_ERROR: install task credentials")
 		}
 		return rollback, nil
@@ -150,6 +153,9 @@ func (m *Manager) ResolveCleanup(ctx context.Context, runID, cleanupID string, c
 			expectedHostKey = result.HostKeyFP
 			break
 		}
+	}
+	if expectedHostKey == "" {
+		expectedHostKey = item.HostKeyFP
 	}
 	if expectedHostKey == "" {
 		return report.CleanupItem{}, fmt.Errorf("CLEANUP_IDENTITY_UNAVAILABLE")
@@ -487,6 +493,12 @@ func (m *Manager) execute(ctx, parentCtx context.Context, run *runstore.Run, imp
 		if item.value.Facts.MachineID != "" {
 			uid := item.value.Facts.UID
 			hostResult.LoginUID = &uid
+			hostResult.HighRiskRootAudit = uid == 0
+			for i := range hostResult.ItemResults {
+				for j := range hostResult.ItemResults[i].Evidence {
+					hostResult.ItemResults[i].Evidence[j].HighRiskRootAudit = uid == 0
+				}
+			}
 		}
 		if err := m.store.AppendHostOutcome(run.Acceptance.RunID, hostResult); err != nil {
 			return err

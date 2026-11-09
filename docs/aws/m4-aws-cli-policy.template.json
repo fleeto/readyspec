@@ -1,0 +1,163 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "IdentifyCaller",
+      "Effect": "Allow",
+      "Action": "sts:GetCallerIdentity",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DiscoverApprovedRegion",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeRegions",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeImages",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeInstanceTypes",
+        "ec2:DescribeInstanceTypeOfferings",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeKeyPairs",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeSnapshots",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DescribeTags",
+        "servicequotas:GetServiceQuota",
+        "access-analyzer:ValidatePolicy"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": { "aws:RequestedRegion": "REGION" }
+      }
+    },
+    {
+      "Sid": "UseApprovedLaunchInputs",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": [
+        "arn:aws:ec2:REGION::image/AMI_UBUNTU_AMD64",
+        "arn:aws:ec2:REGION::image/AMI_UBUNTU_ARM64",
+        "arn:aws:ec2:REGION::image/AMI_DEBIAN_AMD64",
+        "arn:aws:ec2:REGION::image/AMI_DEBIAN_ARM64",
+        "arn:aws:ec2:REGION::image/AMI_ROCKY_AMD64",
+        "arn:aws:ec2:REGION::image/AMI_ROCKY_ARM64",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:subnet/SUBNET_ID",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:security-group/SECURITY_GROUP_ID",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:key-pair/KEY_PAIR_NAME"
+      ]
+    },
+    {
+      "Sid": "LaunchSmallTaggedInstances",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "readyspec-m4",
+          "aws:RequestTag/Session": "SESSION_ID",
+          "ec2:InstanceType": ["t3.small", "t4g.small", "t3.medium", "t4g.medium"],
+          "ec2:Tenancy": "default",
+          "ec2:MetadataHttpTokens": "required",
+          "ec2:InstanceMarketType": "on-demand"
+        }
+      }
+    },
+    {
+      "Sid": "LaunchTaggedEncryptedVolumes",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:volume/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "readyspec-m4",
+          "aws:RequestTag/Session": "SESSION_ID",
+          "ec2:VolumeType": "gp3"
+        },
+        "Bool": { "ec2:Encrypted": "true" },
+        "NumericLessThanEquals": { "ec2:VolumeSize": "40" }
+      }
+    },
+    {
+      "Sid": "LaunchTaggedInterfacesInApprovedSubnet",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:network-interface/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "readyspec-m4",
+          "aws:RequestTag/Session": "SESSION_ID"
+        },
+        "ArnEquals": {
+          "ec2:Subnet": "arn:aws:ec2:REGION:ACCOUNT_ID:subnet/SUBNET_ID"
+        },
+        "Bool": { "ec2:AssociatePublicIpAddress": "false" }
+      }
+    },
+    {
+      "Sid": "TagOnlyAtLaunch",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": [
+        "arn:aws:ec2:REGION:ACCOUNT_ID:instance/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:volume/*",
+        "arn:aws:ec2:REGION:ACCOUNT_ID:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ec2:CreateAction": "RunInstances",
+          "aws:RequestTag/Project": "readyspec-m4",
+          "aws:RequestTag/Session": "SESSION_ID"
+        },
+        "ForAllValues:StringEquals": {
+          "aws:TagKeys": ["Project", "Session", "Name", "EnvID", "ExpiresAt"]
+        }
+      }
+    },
+    {
+      "Sid": "OperateOnlyThisSessionInstances",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:StartInstances",
+        "ec2:StopInstances",
+        "ec2:RebootInstances",
+        "ec2:TerminateInstances",
+        "ec2:GetConsoleOutput"
+      ],
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/Project": "readyspec-m4",
+          "ec2:ResourceTag/Session": "SESSION_ID"
+        }
+      }
+    },
+    {
+      "Sid": "RemoveOnlyThisSessionResidualVolumes",
+      "Effect": "Allow",
+      "Action": "ec2:DeleteVolume",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:volume/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/Project": "readyspec-m4",
+          "ec2:ResourceTag/Session": "SESSION_ID"
+        }
+      }
+    },
+    {
+      "Sid": "RemoveOnlyThisSessionResidualInterfaces",
+      "Effect": "Allow",
+      "Action": "ec2:DeleteNetworkInterface",
+      "Resource": "arn:aws:ec2:REGION:ACCOUNT_ID:network-interface/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/Project": "readyspec-m4",
+          "ec2:ResourceTag/Session": "SESSION_ID"
+        }
+      }
+    }
+  ]
+}

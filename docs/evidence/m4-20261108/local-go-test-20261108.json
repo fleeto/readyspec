@@ -1,0 +1,29 @@
+{
+  "command": "go test ./...",
+  "status": "PASS",
+  "packages": {
+    "github.com/fleeto/readyspec/internal/cli": "PASS",
+    "github.com/fleeto/readyspec/internal/compiler": "PASS (161.893s)",
+    "github.com/fleeto/readyspec/internal/executor": "PASS",
+    "github.com/fleeto/readyspec/internal/inventory": "PASS",
+    "github.com/fleeto/readyspec/internal/plan": "PASS",
+    "github.com/fleeto/readyspec/internal/planstore": "PASS",
+    "github.com/fleeto/readyspec/internal/preview": "PASS",
+    "github.com/fleeto/readyspec/internal/report": "PASS",
+    "github.com/fleeto/readyspec/internal/runmanager": "PASS",
+    "github.com/fleeto/readyspec/internal/runstore": "PASS",
+    "github.com/fleeto/readyspec/internal/safeyaml": "PASS",
+    "github.com/fleeto/readyspec/internal/semantic": "PASS",
+    "github.com/fleeto/readyspec/internal/shellassert": "PASS",
+    "github.com/fleeto/readyspec/internal/template": "PASS",
+    "github.com/fleeto/readyspec/internal/topology": "PASS",
+    "github.com/fleeto/readyspec/internal/webui": "PASS",
+    "github.com/fleeto/readyspec/internal/workspace": "PASS"
+  },
+  "packages_without_tests": [
+    "github.com/fleeto/readyspec/cmd/readyspec",
+    "github.com/fleeto/readyspec/internal/buildinfo",
+    "github.com/fleeto/readyspec/internal/goss",
+    "github.com/fleeto/readyspec/web/e2e"
+  ]
+}

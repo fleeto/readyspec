@@ -59,6 +59,7 @@ interface RunReport {
     host_id: string
     status: string
     login_uid?: number
+    high_risk_root_audit?: boolean
     arch?: string
     roles: string[]
     item_results: ItemResult[]
@@ -325,6 +326,15 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
                   ? '此任务属于试跑、局部范围或模拟执行，不能作为正式全量门禁放行依据。'
                   : `归档结论：${report.verdict} · ${report.run_status}`}
               </Notice>
+              {report.hosts.some((host) => host.login_uid === 0 || host.high_risk_root_audit) && (
+                <Notice tone="warning">
+                  以下主机使用 root（UID 0）身份执行检查，请重点审计执行范围与结果：
+                  {report.hosts
+                    .filter((host) => host.login_uid === 0 || host.high_risk_root_audit)
+                    .map((host) => host.host_id)
+                    .join('、')}
+                </Notice>
+              )}
               {(report.verdict_reasons ?? []).length > 0 && (
                 <ul className="verdict-reasons">
                   {(report.verdict_reasons ?? []).map((reason, index) => (

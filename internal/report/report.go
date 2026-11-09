@@ -27,28 +27,31 @@ type Failure struct {
 }
 
 type HostResult struct {
-	HostID      string                `json:"host_id"`
-	Status      string                `json:"status"`
-	MachineID   string                `json:"machine_id,omitempty"`
-	BootID      string                `json:"boot_id,omitempty"`
-	HostKeyFP   string                `json:"ssh_host_key_fp,omitempty"`
-	Arch        string                `json:"arch,omitempty"`
-	LoginUID    *int                  `json:"login_uid,omitempty"`
-	Roles       []string              `json:"roles"`
-	ItemResults []compiler.ItemResult `json:"item_results"`
-	Failures    []Failure             `json:"failures"`
+	HostID            string                `json:"host_id"`
+	Status            string                `json:"status"`
+	MachineID         string                `json:"machine_id,omitempty"`
+	BootID            string                `json:"boot_id,omitempty"`
+	HostKeyFP         string                `json:"ssh_host_key_fp,omitempty"`
+	Arch              string                `json:"arch,omitempty"`
+	LoginUID          *int                  `json:"login_uid,omitempty"`
+	HighRiskRootAudit bool                  `json:"high_risk_root_audit,omitempty"`
+	Roles             []string              `json:"roles"`
+	ItemResults       []compiler.ItemResult `json:"item_results"`
+	Failures          []Failure             `json:"failures"`
 }
 
 type CleanupItem struct {
-	CleanupID   string `json:"cleanup_id"`
-	HostID      string `json:"host_id"`
-	MachineID   string `json:"machine_id,omitempty"`
-	BootID      string `json:"boot_id,omitempty"`
-	Status      string `json:"status"`
-	RemotePath  string `json:"remote_path,omitempty"`
-	OwnerToken  string `json:"owner_token,omitempty"`
-	Reason      string `json:"reason,omitempty"`
-	AuditReason string `json:"audit_reason,omitempty"`
+	CleanupID      string `json:"cleanup_id"`
+	HostID         string `json:"host_id"`
+	HostKeyFP      string `json:"ssh_host_key_fp,omitempty"`
+	MachineID      string `json:"machine_id,omitempty"`
+	BootID         string `json:"boot_id,omitempty"`
+	Status         string `json:"status"`
+	RemotePath     string `json:"remote_path,omitempty"`
+	PrivilegedPath string `json:"privileged_path,omitempty"`
+	OwnerToken     string `json:"owner_token,omitempty"`
+	Reason         string `json:"reason,omitempty"`
+	AuditReason    string `json:"audit_reason,omitempty"`
 }
 
 type RunReport struct {

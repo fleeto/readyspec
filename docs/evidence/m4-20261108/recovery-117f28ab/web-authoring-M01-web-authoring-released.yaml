@@ -1,0 +1,59 @@
+description: ""
+digest: sha256:f0470cc78ab1af6e72e9df9cc99a23fb5adf7827af4a014c347c052951daba4f
+embedded_templates:
+  - digest: sha256:ddedf63d7ca34ea520c3938bddf5014900dc94e8e34db458beaadf4cf935db53
+    domain: R
+    evidence_mode: ACTIVE_PROBE
+    execution_mode: STANDARD
+    implementation:
+      command: test -f /etc/passwd
+      expect_exit_code: 0
+      kind: CUSTOM_SHELL
+    name: 自定义 Shell
+    params_schema:
+      properties: {}
+      type: object
+    schema_version: readyspec.template/v1
+    source: PLAN_LOCAL
+    template_id: shell-e4dd5d88
+    version: 1.0.0
+name: M4 M02 native Web author delivery
+plan_id: m4-m02-native-web-final
+release_manifest:
+  compiler_version: 0.2.0-dev
+  goss_version: v0.4.9
+  plan_id: m4-m02-native-web-final
+  released_plan_digest: sha256:f0470cc78ab1af6e72e9df9cc99a23fb5adf7827af4a014c347c052951daba4f
+  schema_version: readyspec.release-manifest/v1
+  template_lock:
+    shell-e4dd5d88@1.0.0: sha256:ddedf63d7ca34ea520c3938bddf5014900dc94e8e34db458beaadf4cf935db53
+  version: 1.0.0
+roles:
+  - allow_colocation: false
+    items:
+      - enabled: true
+        explicit_null_params: []
+        importance: REQUIRED
+        item_id: check-e4dd5d88
+        name: Verify passwd exists
+        overridable_params: []
+        params: {}
+        template_digest: sha256:ddedf63d7ca34ea520c3938bddf5014900dc94e8e34db458beaadf4cf935db53
+        template_id: shell-e4dd5d88
+        template_version: 1.0.0
+    max_nodes: null
+    min_nodes: 1
+    name: 应用节点
+    role_id: app
+schema_version: readyspec.plan/v1
+software_name: my-application
+software_version: 1.0.0
+state: RELEASED
+template_lock:
+  shell-e4dd5d88@1.0.0: sha256:ddedf63d7ca34ea520c3938bddf5014900dc94e8e34db458beaadf4cf935db53
+topology_policy:
+  allowed_arch:
+    - x86_64
+    - aarch64
+updated_at: 2026-11-08T23:45:50Z
+version: 1.0.0

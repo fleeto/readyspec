@@ -1,0 +1,83 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-FXJW2MPO3VZABYRTK5PU6KA4UM",
+  "plan_digest": "sha256:55387bfcbced5ef9664bc86cc46cdf6fbf796da45122370e073c1c9927d0ecd4",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "EXECUTION_ERROR",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T17:51:33.001444218Z",
+  "finished_at": "2026-11-08T17:51:33.08127819Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "t04",
+      "status": "PASS"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "t04",
+      "status": "PASS"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t04",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t04",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t04",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "t04",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "t04",
+      "status": "FAILED",
+      "roles": [
+        "app"
+      ],
+      "item_results": [],
+      "failures": [
+        {
+          "code": "EXECUTION_ERROR",
+          "phase": "REMOTE_WORKSPACE",
+          "host_id": "t04",
+          "message": "a safe remote execution directory is unavailable"
+        }
+      ]
+    }
+  ],
+  "cleanup_items": [],
+  "failures": [
+    {
+      "code": "EXECUTION_ERROR",
+      "phase": "REMOTE_WORKSPACE",
+      "host_id": "t04",
+      "message": "a safe remote execution directory is unavailable"
+    }
+  ]
+}

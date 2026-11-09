@@ -1,0 +1,71 @@
+{
+  "schema_version": "readyspec.report/v1",
+  "run_id": "run-MEWD26ASA4K5CNZGGI6UIF3NEF",
+  "plan_digest": "sha256:873434f412b9f3165fb7786b8c87b009162a1c25741b0387a273996686bcb0e3",
+  "run_mode": "GATE",
+  "run_scope": "FULL",
+  "executor_backend": "native_ssh",
+  "auth_method": "private_key",
+  "run_status": "FAILED",
+  "verdict": "UNKNOWN",
+  "termination_reason": "IDENTITY_ERROR",
+  "verdict_reasons": [],
+  "started_at": "2026-11-08T18:49:07.819498341Z",
+  "finished_at": "2026-11-08T18:49:07.970931807Z",
+  "topology_results": [
+    {
+      "code": "ARCH",
+      "host_id": "node",
+      "status": "ERROR"
+    },
+    {
+      "code": "IDENTITY",
+      "host_id": "node",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "COVERAGE",
+      "host_id": "node",
+      "role_id": "app",
+      "status": "ERROR"
+    },
+    {
+      "code": "ROLE_COUNT",
+      "role_id": "app",
+      "status": "PASS"
+    }
+  ],
+  "hosts": [
+    {
+      "host_id": "node",
+      "status": "FAILED",
+      "roles": [
+        "app"
+      ],
+      "item_results": [],
+      "failures": [
+        {
+          "code": "IDENTITY_ERROR",
+          "phase": "DISCOVERY",
+          "host_id": "node",
+          "message": "target identity facts could not be verified"
+        }
+      ]
+    }
+  ],
+  "cleanup_items": [],
+  "failures": [
+    {
+      "code": "IDENTITY_ERROR",
+      "phase": "DISCOVERY",
+      "host_id": "node",
+      "message": "target identity facts could not be verified"
+    }
+  ]
+}

@@ -454,7 +454,7 @@ func emitReport(out io.Writer, destination string, value *report.RunReport) erro
 }
 
 func delegatedSubmission(p *plan.Plan, config runstore.RunConfig, inventorySource, inventoryFormat, key string, credentials map[string]executor.Credential, password, sudoPassword, privateKey, passphrase []byte, simulator executor.Profiles) ([]byte, error) {
-	planBytes, err := json.Marshal(p)
+	planBytes, err := plan.DocumentJSON(p)
 	if err != nil {
 		return nil, fmt.Errorf("PLAN_ERROR: cannot serialize validated plan")
 	}

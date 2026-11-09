@@ -1,0 +1,32 @@
+{
+  "case": "M4-E2E-05-M02-controller-kill-after-delivery",
+  "candidate_digests": {
+    "amd64": "8e456f446d71f8cbb64c21cdad4f6ae727fed51afed88ad410ebc4732c9ac3b5",
+    "arm64": "552ee82ecef84785e99da4731599e91990bf84f3cd6bd60db989c4c22c3304ec"
+  },
+  "phase": "after-delivery",
+  "phase_marker_observed": true,
+  "run_id": "run-WEP7GSUX3P36XWESHDCODKPOTI",
+  "controller_kill_exit": 0,
+  "submit_exit": 13,
+  "restart_exit": 0,
+  "run_status": "FAILED",
+  "termination_reason": "CONTROLLER_INTERRUPTED",
+  "verdict": "UNKNOWN",
+  "cleanup": [
+    "PENDING"
+  ],
+  "exec_count_after_recovery": 0,
+  "cleanup_exit": 0,
+  "cleanup_stderr": "",
+  "cleanup_result": {
+    "cleanup_id": "run-WEP7GSUX3P36XWESHDCODKPOTI:0a56fcbbaa80",
+    "host_id": "node",
+    "ssh_host_key_fp": "SHA256:ztpQpSAzxtFu8OvjZo2IdFWSFcM8JAMs3zU4v8wMoR4",
+    "machine_id": "ec2d84fa8e6b4e27b7f7fc2098e4d3af",
+    "boot_id": "50b2eb28-08f1-45e6-a329-bca78a09ed9b",
+    "status": "CLEAN",
+    "remote_path": "/tmp/readyspec-ea03373010e36ada17f0bc9a"
+  },
+  "assertions_passed": true
+}
