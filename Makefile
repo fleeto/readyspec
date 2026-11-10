@@ -1,5 +1,10 @@
 .PHONY: test test-collection vet web-install web web-test verify-goss build build-all
 
+# Optional release version, e.g. make build-all VERSION=1.2.3. Empty keeps the
+# development identifier from internal/buildinfo.
+VERSION ?=
+GO_LDFLAGS := $(if $(VERSION),-ldflags "-X github.com/fleeto/readyspec/internal/buildinfo.Version=$(VERSION)")
+
 test: web-test
 	go test -race ./...
 
@@ -24,9 +29,9 @@ verify-goss:
 	go run ./cmd/readyspec --version
 
 build: web verify-goss
-	CGO_ENABLED=0 go build -trimpath -o dist/readyspec ./cmd/readyspec
+	CGO_ENABLED=0 go build -trimpath $(GO_LDFLAGS) -o dist/readyspec ./cmd/readyspec
 
 build-all: web verify-goss
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o dist/readyspec-linux-amd64 ./cmd/readyspec
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -o dist/readyspec-linux-arm64 ./cmd/readyspec
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o dist/readyspec-windows-amd64.exe ./cmd/readyspec
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath $(GO_LDFLAGS) -o dist/readyspec-linux-amd64 ./cmd/readyspec
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath $(GO_LDFLAGS) -o dist/readyspec-linux-arm64 ./cmd/readyspec
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath $(GO_LDFLAGS) -o dist/readyspec-windows-amd64.exe ./cmd/readyspec

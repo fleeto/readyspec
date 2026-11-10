@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web run format:check
+      - run: npm --prefix web test
+      - run: npm --prefix web run build
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go test -race ./...
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm --prefix web run test:e2e
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Require an exact vX.Y.Z tag
+        run: |
+          [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "Tag must be vX.Y.Z with numeric components, got: ${GITHUB_REF_NAME}"
+            exit 1
+          }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - name: Build embedded-UI binaries with the tag version
+        run: make build-all VERSION="${GITHUB_REF_NAME#v}"
+      - name: Smoke test the Linux binary and injected version
+        run: |
+          dist/readyspec-linux-amd64 --version | tee version.txt
+          grep -F " ${GITHUB_REF_NAME#v}" version.txt
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum readyspec-linux-amd64 readyspec-linux-arm64 readyspec-windows-amd64.exe > SHA256SUMS
+      - name: Create or update the GitHub Release
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" \
+              dist/readyspec-linux-amd64 dist/readyspec-linux-arm64 \
+              dist/readyspec-windows-amd64.exe dist/SHA256SUMS --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              dist/readyspec-linux-amd64 dist/readyspec-linux-arm64 \
+              dist/readyspec-windows-amd64.exe dist/SHA256SUMS \
+              --title "${GITHUB_REF_NAME}" --generate-notes
+          fi

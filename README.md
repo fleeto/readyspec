@@ -34,6 +34,15 @@ make build
 make build-all
 ```
 
+### 标签触发 Release
+
+推送严格符合 `vX.Y.Z`（三段数字）的标签后，`.github/workflows/release.yml` 会先运行前端格式与测试、Go 测试、`go vet`、竞态检查和浏览器端到端测试，全部通过后构建三个平台的内嵌前端程序，并创建或更新同名 GitHub Release，附上二进制和 `SHA256SUMS`。发布版本通过 `make build-all VERSION=X.Y.Z` 注入，程序 `--version` 显示标签版本；`v1.2`、`v1.2.3-rc.1` 等不匹配的标签不会发布。重复运行同一标签只覆盖附件，不重复创建 Release。
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
 服务的结构化日志可用 `--log-level debug|info|warn|error`、`--log-format text|json` 和 `--log-file PATH` 配置，也可分别通过 `READYSPEC_LOG_LEVEL`、`READYSPEC_LOG_FORMAT`、`READYSPEC_LOG_FILE` 设置；命令行值优先。默认级别为 `info`，默认格式为 `text`，默认输出 stderr。Linux 日志文件要求位于当前用户拥有且权限为 0700 的目录；Windows 要求日志目录的受保护 DACL 仅授予当前用户、SYSTEM 和 Administrators。两平台文件均按 10 MiB 上限轮转并保留 3 份备份；Windows 目前只有交叉编译覆盖，原生权限与轮转验收仍待执行。
 
 当前 Web UI 提供总览、方案工作台、检查与报告、模板与清理四个视图，支持深浅主题、响应式导航、草稿编辑与保存、YAML/JSON 导入、静态校验和 YAML 导出。方案工作台可配置环境拓扑、节点角色、自定义 Shell 检查项、检查参数及现场可调范围，支持检查项独立复制、删除确认与仅恢复被删对象的撤销。方案级 `TopologyPolicy` 只声明 CPU 架构与节点拓扑，不再包含 `allowed_os`；发行版与版本要求通过具体检查项表达。含 `allowed_os` 的旧方案须先移除该字段，再按当前 Schema 重新校验和导出。未完成草稿也可保存在持锁工作区的 `plans/drafts/web-index.json`，刷新或重启后可重新打开；保存不代表校验通过，严格校验/导出还会核对参数类型、范围、枚举与语义摘要。

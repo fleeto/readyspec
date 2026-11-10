@@ -24,10 +24,12 @@ import (
 
 const (
 	ManifestSchema    = "readyspec.release-manifest/v1"
-	CompilerVersion   = buildinfo.Version
 	releaseDir        = "plans/releases"
 	publicTemplateDir = "templates/public"
 )
+
+// CompilerVersion follows the injected release version of the running binary.
+var CompilerVersion = buildinfo.Version
 
 var (
 	ErrNotFound = errors.New("PLAN_RECORD_NOT_FOUND")
