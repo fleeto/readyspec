@@ -34,6 +34,7 @@ type serveOptions struct {
 	listen, workspace, token, cert, key string
 	logLevel, logFormat                 string
 	logFile                             string
+	hostKeyPolicy                       string
 	allowedHosts                        []string
 	noBrowser                           bool
 }
@@ -98,7 +99,12 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		return fmt.Errorf("recover Run store: %w", err)
 	}
 	logRunRecovery(logger, runs.List())
-	manager, err := runmanager.New(runs, executor.NewNativeSSH())
+	native := executor.NewNativeSSH()
+	native.HostKeyPolicy, err = executor.ParseHostKeyPolicy(options.hostKeyPolicy)
+	if err != nil {
+		return err
+	}
+	manager, err := runmanager.New(runs, native)
 	if err != nil {
 		return err
 	}
@@ -124,7 +130,7 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		localHost = "127.0.0.1"
 	}
 	localAddress := net.JoinHostPort(localHost, localPort)
-	handler, err := webui.New(webui.Options{Address: listener.Addr().String(), Token: token, OneTimeToken: generatedToken, Secure: secure, AllowedHosts: options.allowedHosts, Version: Version, WorkspaceLabel: filepath.Base(dir), Store: store, Runs: manager, LocalToken: localToken, ServerID: serverID})
+	handler, err := webui.New(webui.Options{Address: listener.Addr().String(), Token: token, OneTimeToken: generatedToken, Secure: secure, AllowedHosts: options.allowedHosts, Version: Version, WorkspaceLabel: filepath.Base(dir), Store: store, Runs: manager, LocalToken: localToken, ServerID: serverID, HostKeyPolicy: string(native.HostKeyPolicy)})
 	if err != nil {
 		return err
 	}
@@ -190,7 +196,7 @@ func serve(ctx context.Context, options serveOptions, explicitAddress bool, out 
 		scheme = "https"
 	}
 	url := scheme + "://" + net.JoinHostPort(host, port) + "/"
-	logger.Info("service started", "event", "service.started", "version", Version, "listen_port", port, "backend", "native_ssh", "worker_state", "running")
+	logger.Info("service started", "event", "service.started", "version", Version, "listen_port", port, "backend", "native_ssh", "worker_state", "running", "ssh_host_key_policy", native.HostKeyPolicy)
 	if generatedToken {
 		url += "#token=" + token
 	}

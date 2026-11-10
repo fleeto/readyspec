@@ -263,6 +263,24 @@ func (s *Store) AcceptWithCommit(req Request, beforeCommit func(string) (func(),
 		copy := cloneRun(run)
 		return &copy, false, nil
 	}
+	// Apply new-acceptance rules only after resolving historical idempotent
+	// submissions, and before installing credentials or writing durable records.
+	bound := map[string]bool{}
+	for _, targets := range req.Config.RoleMap {
+		for _, hostID := range targets {
+			bound[hostID] = true
+		}
+	}
+	if len(bound) == 0 {
+		return nil, false, fmt.Errorf("PLAN_ERROR: NO_TARGETS")
+	}
+	if req.Config.Backend == "native_ssh" {
+		for _, host := range req.Config.Inventory {
+			if bound[host.ID] && strings.TrimSpace(host.Username) == "" {
+				return nil, false, &plan.ParameterError{Code: "SSH_USER_REQUIRED", Field: "/inventory"}
+			}
+		}
+	}
 	if len(s.queue) >= maxWaitingRuns {
 		return nil, false, ErrQueueFull
 	}

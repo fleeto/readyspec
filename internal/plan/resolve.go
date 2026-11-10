@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 type ResolvedParam struct {
@@ -79,17 +80,39 @@ func ResolveParameters(definition map[string]any, item CheckItem, groups map[str
 		effective[name] = value.Value
 	}
 	if err := p.schema.Validate(effective); err != nil {
-		return nil, fmt.Errorf("PLAN_PARAMETER_ERROR: item %s violates template parameter constraints", item.ItemID)
+		required, _ := definition["required"].([]any)
+		if names, ok := definition["required"].([]string); ok {
+			for _, name := range names {
+				required = append(required, name)
+			}
+		}
+		for _, key := range required {
+			if name, ok := key.(string); ok {
+				if _, exists := effective[name]; !exists {
+					return nil, parameterError("REQUIRED", name, item)
+				}
+			}
+		}
+		return nil, parameterError("PARAMETER_CONSTRAINT", "", item)
 	}
 	for name, value := range values {
 		normalized, err := normalizeParam(definition, name, value.Value)
 		if err != nil {
-			return nil, fmt.Errorf("PLAN_PARAMETER_ERROR: item %s invalid domain parameter %s", item.ItemID, name)
+			code := "PARAMETER_FORMAT"
+			properties, _ := definition["properties"].(map[string]any)
+			property, _ := properties[name].(map[string]any)
+			if property["x-readyspec-type"] == "capacity" {
+				code = "CAPACITY_FORMAT"
+				if text, ok := value.Value.(string); ok && capacityPattern.MatchString(strings.TrimSpace(text)) {
+					code = "CAPACITY_RANGE"
+				}
+			}
+			return nil, parameterError(code, name, item)
 		}
 		values[name] = ResolvedParam{normalized, value.Source}
 	}
 	if err := validateOrderedParameters(definition, values); err != nil {
-		return nil, fmt.Errorf("PLAN_PARAMETER_ERROR: item %s has invalid range constraints", item.ItemID)
+		return nil, parameterError("PARAMETER_RANGE", "", item)
 	}
 	return values, nil
 }

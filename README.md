@@ -110,6 +110,49 @@ S02/S03 会保留未声明为业务要求的文件身份与挂载元数据，并
 
 前端开发与浏览器验证见 [`web/README.md`](./web/README.md)。`internal/webui/dist/` 保存可直接嵌入 Go 的构建产物，修改前端源码后须重新运行 `make web` 或 `make build`。
 
+### 主机清单、参数填写与报告阅读
+
+快速主机表使用 `node-a=192.0.2.10,node-b=192.0.2.11:2222`，多个主机用英文逗号分隔；也可使用管理端能解析的主机名。该格式不支持用户名，需要指定 SSH 登录用户时切换为 Ansible INI/YAML，例如：
+
+```ini
+[all:vars]
+ansible_user=operator
+
+[all]
+node-a ansible_host=192.0.2.10
+node-b ansible_host=192.0.2.11
+```
+
+清单中的主机还须绑定到方案的节点角色。角色绑定填写主机标识（例如 `node-a,node-b`），不是 IP 或用户名；静态预览不会连接 SSH。新提交没有任何绑定目标时直接拒绝。局部复测仍沿用来源任务的范围校验，不因原方案最少节点数而误拒绝子集。
+
+表单明确标识必填项，并显示格式错误。容量填写数字和单位，例如 `4 GiB`、`100 GB`，单位区分大小写；`GB` 为十亿字节，`GiB` 为 2^30 字节。前端提示常见格式问题，服务端负责精确字节、溢出和条件约束校验。尚未填写完整的草稿仍可保存，保存不代表校验或发布通过。
+
+报告分别显示任务执行状态与检查结论：`COMPLETED` 表示执行完成，检查项仍可能 `FAIL`；`FAILED` 表示执行失败，`UNKNOWN` 表示不能给出完整门禁结论。“页面与服务连接正常”只描述浏览器的进度连接。报告优先显示冻结方案中的检查项名称，并保留 ID；名称信息不可用时回退 ID，不改变归档结论。内存、CPU 和目录可用空间显示最低要求及实际测量，容量显示的舍入值不参与判定。
+
+### SSH 主机身份核验
+
+默认策略为 `record-only`：首次连接只记录 SSH 主机指纹，不读取、不要求也不修改 `known_hosts`；文件缺失、未知密钥或文件内容不会阻止默认连接。所记录的指纹是本次连接的观测值，不代表经过可信来源认证。后续执行重连和人工清理必须在握手阶段匹配该任务已记录的指纹，再核对机器身份及清理归属。
+
+如需使用**运行服务的管理端账户**的 `known_hosts` 严格认证，可显式启用：
+
+```sh
+./dist/readyspec serve --ssh-host-key-policy strict --no-browser
+# 默认无需指定；也可显式选择
+./dist/readyspec serve --ssh-host-key-policy record-only --no-browser
+```
+
+也可设置 `READYSPEC_SSH_HOST_KEY_POLICY=record-only|strict`，命令行优先；无效值会报配置错误，不会静默切换策略。直接 CLI 执行和清理使用本进程策略，委托 CLI 使用活动服务的策略。`/api/v1/system/info` 的 `ssh_host_key_policy` 描述当前服务配置；历史报告中的指纹不据此追溯为已认证。
+
+以下登记流程仅用于可选的 `strict` 模式。`HOST_KEY_UNKNOWN` 表示尚未登记可信密钥，并不表示密码错误。请先通过可信控制台或可信管理员核对目标指纹；例如在目标可信控制台查看公钥指纹：
+
+```sh
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+再由操作者在管理端以运行 ReadySpec 的同一账户连接占位目标，显式使用同一信任文件并禁用连接复用，例如 `ssh -o UserKnownHostsFile=~/.ssh/known_hosts -o StrictHostKeyChecking=ask -o ControlPath=none operator@node-a`。核对实际端点、密钥类型和指纹与可信来源一致后才登记，非默认端口须指定相同端口。`ssh-keyscan` 的扫描结果本身不能证明身份；不要直接把扫描结果加入信任记录。
+
+`strict` 模式的 `HOST_KEY_REVOKED` 应停止连接并调查吊销，`KNOWN_HOSTS_UNREADABLE` 需检查管理端运行账户和文件权限。两种策略下任务重连或清理的 `HOST_KEY_CHANGED` 都表示与任务指纹或严格信任记录不一致。程序不会自动登记、删除或覆盖信任记录；策略由服务/CLI 配置控制，浏览器不能改变正在运行的服务策略。
+
 ---
 
 ## 核心定位
@@ -128,7 +171,7 @@ ReadySpec 解决企业级软件交付中的高频协作断层：**软件研发�
   - 无参启动或 `readyspec serve` 默认在 `127.0.0.1:18480` 启动受保护的本地 Web 控制台（亦支持显式指定内网监听并强制访问令牌鉴权）。
   - 非交互 CLI 在检测到同工作区运行中的 `readyspec serve` 时自动通过本地受控 API 委托执行（Web UI 可实时同步观察进度）；未启动服务时直接获取跨平台文件锁（Linux `flock` / Windows `LockFileEx`）在进程内独立完成任务。
 - **双执行器与严苛安全边界**：
-  - 同时内置基于 `golang.org/x/crypto/ssh` 的真实原生 SSH 执行器与供无目标机预演使用的离线仿真执行器（`mock_simulator`）。原生 SSH 使用管理端 `~/.ssh/known_hosts` 校验主机身份；目标提供多种主机密钥时优先协商该端点已信任的密钥类型，未知或变更密钥仍被拒绝。
+  - 同时内置基于 `golang.org/x/crypto/ssh` 的真实原生 SSH 执行器与供无目标机预演使用的离线仿真执行器（`mock_simulator`）。原生 SSH 默认记录首次指纹，不依赖 `known_hosts`；可选 `strict` 策略使用管理端信任记录并优先协商已信任的密钥类型。执行重连和清理始终匹配任务指纹。
   - 区分 **正式门禁（`GateRun`）** 与 **草稿试跑（`TrialRun`）**、**全量检查（`FullRun`）** 与 **局部复测（`PartialRun`）**；仅 `RELEASED` 方案在真实目标主机上完成的全量正式门禁检查可产出放行级 `READY`（退出码 `0`）。
   - 短期 SSH/Sudo 密码仅驻留内存并在任务终态立即覆写销毁，绝不落盘；异常中断遗留的临时目录纳入 **远端残留清理（`RemoteCleanup`）** 归属核验与处置。
   - 实际登录 UID 为 `0` 时，归档主机记录及每条观测证据写入 `high_risk_root_audit=true`，覆盖其他用户名映射到 UID 0 的情形；不以用户名猜测实际权限。

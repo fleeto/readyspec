@@ -78,6 +78,7 @@ export interface SystemInfo {
   version: string
   executor_available: boolean
   workspace_label?: string
+  ssh_host_key_policy?: 'record-only' | 'strict'
 }
 
 export function randomSuffix(length: number) {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/fleeto/readyspec/internal/buildinfo"
 	"github.com/fleeto/readyspec/internal/compiler"
+	"github.com/fleeto/readyspec/internal/executor"
 	"github.com/fleeto/readyspec/internal/goss"
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/planstore"
@@ -18,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = buildinfo.Version
+var Version = buildinfo.Version
 
 func Execute(args []string, out, stderr io.Writer) int {
 	if err := goss.Verify(); err != nil {
@@ -33,6 +34,15 @@ func Execute(args []string, out, stderr io.Writer) int {
 	root.SetOut(out)
 	root.SetErr(stderr)
 	options := serveOptions{}
+	policyDefault := os.Getenv("READYSPEC_SSH_HOST_KEY_POLICY")
+	if policyDefault == "" {
+		policyDefault = string(executor.HostKeyRecordOnly)
+	}
+	root.PersistentFlags().StringVar(&options.hostKeyPolicy, "ssh-host-key-policy", policyDefault, "SSH host key policy: record-only (default) or strict (READYSPEC_SSH_HOST_KEY_POLICY)")
+	root.PersistentPreRunE = func(*cobra.Command, []string) error {
+		_, err := executor.ParseHostKeyPolicy(options.hostKeyPolicy)
+		return err
+	}
 	root.PersistentFlags().StringVar(&options.listen, "listen", "127.0.0.1:18480", "Web console listener address")
 	root.PersistentFlags().StringVar(&options.workspace, "workspace", "", "Workspace directory (READYSPEC_WORKSPACE takes precedence)")
 	root.PersistentFlags().StringVar(&options.token, "auth-token", "", "Access token (prefer READYSPEC_AUTH_TOKEN)")

@@ -1,0 +1,5 @@
+{
+  "quick": "node-a=192.0.2.10,node-b=192.0.2.11:2222,node-c=192.0.2.12",
+  "ini": "[all:vars]\nansible_user=operator\n\n[all]\nnode-a ansible_host=192.0.2.10\nnode-b ansible_host=192.0.2.11\nnode-c ansible_host=192.0.2.12",
+  "yaml": "all:\n  vars:\n    ansible_user: operator\n  hosts:\n    node-a:\n      ansible_host: 192.0.2.10\n    node-b:\n      ansible_host: 192.0.2.11\n    node-c:\n      ansible_host: 192.0.2.12"
+}

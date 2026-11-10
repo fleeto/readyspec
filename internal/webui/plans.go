@@ -113,7 +113,7 @@ func (s *Server) validatePlan(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := validateSource(body)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeValidationError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -127,7 +127,7 @@ func (s *Server) compilePlan(w http.ResponseWriter, r *http.Request) {
 	}
 	validated, err := validateSource(body)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeValidationError(w, err)
 		return
 	}
 	raw, err := json.Marshal(validated.Document)

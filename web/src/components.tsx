@@ -86,22 +86,47 @@ export function Field({
   label,
   children,
   hint,
+  required = false,
+  error,
+  onBlur,
 }: {
   label: string
   children: ReactNode
   hint?: string
+  required?: boolean
+  error?: string
+  onBlur?: () => void
 }) {
   const id = useId()
   return (
-    <div className="field">
+    <div className="field" onBlur={onBlur}>
       <label htmlFor={id}>{label}</label>
+      {required && <span className="required-label">必填</span>}
       {isValidElement(children)
-        ? cloneElement(children as ReactElement<{ id: string; 'aria-describedby'?: string }>, {
-            id,
-            ...(hint ? { 'aria-describedby': `${id}-hint` } : {}),
-          })
+        ? cloneElement(
+            children as ReactElement<{
+              id: string
+              required?: boolean
+              'aria-required'?: boolean
+              'aria-invalid'?: boolean
+              'aria-describedby'?: string
+            }>,
+            {
+              id,
+              ...(required ? { required: true, 'aria-required': true } : {}),
+              'aria-invalid': !!error,
+              'aria-describedby':
+                [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') ||
+                undefined,
+            },
+          )
         : children}
       {hint && <small id={`${id}-hint`}>{hint}</small>}
+      {error && (
+        <small id={`${id}-error`} role="alert" className="field-error">
+          {error}
+        </small>
+      )}
     </div>
   )
 }

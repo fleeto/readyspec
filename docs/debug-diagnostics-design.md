@@ -2,6 +2,8 @@
 
 日期：2026-11-09。状态：经 Pi / Kimi 3.1 Pro 三轮技术复核收敛，当前无未关闭 P1/P2 设计意见，可按 D1–D5 分批实施；本文描述目标行为，不代表功能已实现。结论与取舍见[技术复核记录](debug-diagnostics-technical-review.md)。
 
+2026-11-10 用户明确变更主机密钥要求：默认 `record-only`，去除强制 `known_hosts` 依赖；原文中信任库拒绝行为仅适用于可选 `strict` 模式。执行重连和清理仍在握手阶段匹配本任务已记录的指纹，既有机器身份/OwnerToken/秘密边界不变。此后续变更不冒充上述历史 Pi 评审已审核的新结论。
+
 问题依据：[诊断能力调查](logging-and-debug-review.md)。已有的[文档 Review](logging-and-debug-review_review.md)主要检查呈现形式，不替代本文的技术复核。现有 `safeRunError` 三条固定错误文本改动只改善局部提示，不等于完成此设计。
 
 ## 1. 目标、边界与优先级
@@ -25,7 +27,7 @@
 - `internal/webui/runs.go:submitRun` 在 Manager 接受前可能拒绝方案、清单、凭据。`safeRunError` 的字符串映射丢失原因；此时没有 Run，不应在 Run 历史里伪造检查失败。
 - `internal/runmanager/manager.go:Submit` 区分凭据缺失、方法不匹配、密码为空及本机 Agent 不可用；这些分支不说明远端 SSH 密码是否正确。
 - 具体可触发路径：`internal/preview/preview.go:Build` 只把角色绑定中的主机加入 `Result.Hosts`；`web/src/RunPreview.tsx:submit` 只为这些主机附带凭据，但 Manager.Submit 遍历完整 Inventory 校验凭据。因此“3 台清单、1 台绑定、非空密码”仍可因未绑定主机返回 AUTH_ERROR。这是代码路径证据，不是已经取得用户实际表单或确认本次故障根因。
-- `internal/executor/native_ssh.go:connect/Preflight/Execute` 严格使用管理端 `known_hosts`，密码方式使用 `ssh.Password`，不借用 OpenSSH 客户端配置、ControlMaster 或其他认证方式。
+- `internal/executor/native_ssh.go:connect/Preflight/Execute` 默认记录指纹；可选 strict 使用管理端 `known_hosts`。密码方式使用 `ssh.Password`，不借用 OpenSSH 客户端配置、ControlMaster 或其他认证方式。
 - `internal/webui/server.go:writeError/ServeHTTP` 没有关联 ID；`web/src/api.ts:ApiError` 尚不保存请求 ID 或提交接受状态。
 - `internal/cli/serve.go` 在 worker 返回错误后只输出固定文本；`internal/runstore/store.go:replay` 忽略尾部恢复标记，且先读 Journal 后读报告，可能使损坏 Journal 遮蔽有效报告；实施须恢复 SPEC §8.3 的有效报告优先约束。
 - `internal/webui/runs.go:resolveCleanup` 把目标 SSH 认证错误映射为 HTTP 401；`web/src/api.ts:request` 会把它当作 Web 会话过期。两种认证域必须分离，清理失败也不能丢成 `RUN_SUBMISSION_REJECTED`。
@@ -118,7 +120,7 @@ UI 显示“任务未接受；node-a 的凭据为空；诊断 ID …”。这不
 | 提交凭据 | `CREDENTIAL_HOST_MISSING`、`CREDENTIAL_METHOD_MISMATCH`、`CREDENTIAL_PASSWORD_EMPTY`、`PRIVATE_KEY_PARSE_FAILED`、`AGENT_ENDPOINT_UNAVAILABLE` | 保持 AUTH_ERROR/15；只输出已验证 host_id、认证方式和字段定位，不输出密码长度/片段 |
 | 方案/清单 | `PLAN_SCHEMA_INVALID`、`INVENTORY_HOST_INVALID`、`INVENTORY_VARIABLE_UNSUPPORTED`、`RELEASE_MANIFEST_MISSING`、`RELEASE_MANIFEST_DIGEST_MISMATCH`、`RELEASE_COMPILER_INCOMPATIBLE` | 保留既有分类/退出码；给出行列、字段、固定原因，不回显清单整行或脚本 |
 | 连接 | `DNS_LOOKUP_FAILED`、`TCP_CONNECT_REFUSED`、`TCP_CONNECT_TIMEOUT`、`SSH_NEGOTIATION_FAILED` | 用 `net.DNSError/net.OpError/context` 等类型分类；未能可靠细分则使用固定未知原因 |
-| 主机身份 | `KNOWN_HOSTS_UNREADABLE`、`HOST_KEY_UNKNOWN`、`HOST_KEY_CHANGED`、`HOST_KEY_REVOKED` | 保持现有身份/网络归类及退出码，通过 typed cause 增加细分；核验可信来源，不建议关闭校验或盲删 known_hosts |
+| 主机身份 | `KNOWN_HOSTS_UNREADABLE`、`HOST_KEY_UNKNOWN`、`HOST_KEY_CHANGED`、`HOST_KEY_REVOKED` | strict 模式核验信任库；默认 record-only 不依赖该文件，重连/清理仍匹配任务指纹。保持身份/网络归类和安全诊断，不自动改写信任记录 |
 | SSH 认证 | `SSH_AUTH_REJECTED`、`AGENT_SELECTED_KEY_MISSING` | AUTH_ERROR；认证拒绝可能由服务端方法/账户策略造成，不命名为 PASSWORD_WRONG，不把 keyboard-interactive 当 password 自动回退 |
 | 发现/提权 | `FACT_MACHINE_ID_MISSING`、`FACT_BOOT_ID_INVALID`、`CHECKSUM_TOOL_UNAVAILABLE`、`SUDO_CREDENTIAL_MISSING`、`SUDO_POLICY_DENIED`、`SUDO_RESULT_UNVERIFIABLE` | 只在明确 sudo 策略拒绝时归 AUTH_ERROR；解析异常不能伪称认证拒绝 |
 | 目录/投递 | `REMOTE_TEMP_CANDIDATES_EXHAUSTED`、`UPLOAD_FAILED`、`PAYLOAD_DIGEST_MISMATCH` | 允许枚举候选索引及 `missing/readonly/noexec/symlink/permission/unverified` 原因；不输出任意路径/目录列表 |

@@ -3,6 +3,16 @@ import { stringify } from 'yaml'
 import { ApiError, api } from './api'
 import { Field, Notice } from './components'
 import { randomSuffix, type Plan, type SavedPlan } from './model'
+import { focusInvalidField, inventoryExamples } from './inputGuidance'
+import {
+  CheckSummary,
+  FailureSummary,
+  executionLabel,
+  verdictLabel,
+  useDisplayMetadata,
+  type DisplayResult,
+} from './reportPresentation'
+import type { Diagnostic } from './api'
 
 interface PreviewResult {
   host_count: number
@@ -13,7 +23,10 @@ interface PreviewResult {
   configured_root_hosts: string[]
   identity_unverified_hosts: string[]
   validated_plan: Plan
-  hosts: { host: { id: string; address: string; port: number }; roles: string[] }[]
+  hosts: {
+    host: { id: string; address: string; port: number; username?: string }
+    roles: string[]
+  }[]
 }
 
 interface RunReport {
@@ -21,7 +34,12 @@ interface RunReport {
   run_status: string
   verdict: string
   termination_reason?: string
-  hosts: { host_id: string; status: string; item_results: { item_id: string; status: string }[] }[]
+  hosts: {
+    host_id: string
+    status: string
+    item_results: DisplayResult[]
+    failures?: { code: string; diagnostics?: Diagnostic[] }[]
+  }[]
 }
 interface StageTransition {
   sequence: number
@@ -41,6 +59,7 @@ interface ParsedInventory {
 
 export function RunPreview({
   document,
+  sshHostKeyPolicy,
   planRecordKey,
   rerunConfig,
   selectedPlanKey,
@@ -49,6 +68,7 @@ export function RunPreview({
   onSubmissionUncertain,
 }: {
   document: Plan
+  sshHostKeyPolicy?: 'record-only' | 'strict'
   planRecordKey?: string | null
   rerunConfig?: Record<string, unknown> | null
   selectedPlanKey?: string
@@ -92,6 +112,61 @@ export function RunPreview({
   const [submissionDiagnostic, setSubmissionDiagnostic] = useState<ApiError | null>(null)
   const [report, setReport] = useState<RunReport | null>(null)
   const [step, setStep] = useState(1)
+  const revision = useRef(0)
+  const documentRef = useRef(document)
+  if (documentRef.current !== document) {
+    documentRef.current = document
+    revision.current++
+  }
+  const [bindingAttempted, setBindingAttempted] = useState(false)
+  const [credentialAttempted, setCredentialAttempted] = useState(false)
+  const { metadata, error: metadataError } = useDisplayMetadata(runId)
+  const roleMap = Object.fromEntries(
+    document.roles.map((role) => [
+      role.role_id,
+      (bindings[role.role_id] ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ]),
+  )
+  const knownIDs =
+    parsedInventory?.hosts.map((host) => host.id) ??
+    (format === 'quick'
+      ? source
+          .split(',')
+          .map((entry) => entry.trim().split('=')[0])
+          .filter(Boolean)
+      : null)
+  const unknownIDs = knownIDs
+    ? [
+        ...new Set(
+          Object.values(roleMap)
+            .flat()
+            .filter((id) => !knownIDs.includes(id)),
+        ),
+      ]
+    : []
+  const bindingError =
+    Object.values(roleMap).flat().length === 0
+      ? '请至少绑定一台目标主机；清单存在主机不等于已绑定角色。'
+      : unknownIDs.length
+        ? `角色引用了清单中不存在的主机：${unknownIDs.join('、')}。请同时检查主机清单和角色绑定。`
+        : ''
+  const missingUser =
+    backend === 'native_ssh' && result?.hosts.some(({ host }) => !host.username?.trim())
+  const credentialError =
+    backend !== 'native_ssh'
+      ? ''
+      : missingUser
+        ? '目标主机缺少 SSH 登录用户名，请返回主机清单，在 Ansible INI/YAML 中填写 ansible_user。'
+        : auth === 'password' && !password
+          ? '请填写 SSH 密码。'
+          : auth === 'private_key' && !privateKey.trim()
+            ? '请填写 SSH 私钥内容。'
+            : auth === 'agent' && (!agentSocket.trim() || !keyFingerprint.trim())
+              ? '请填写 Agent socket 和选定公钥指纹。'
+              : ''
   const eventsController = useRef<AbortController | null>(null)
   const eventCursor = useRef('')
   const reconnectEvents = useRef<() => void>(() => undefined)
@@ -119,11 +194,10 @@ export function RunPreview({
     const fetchReport = async () => {
       for (let attempt = 0; attempt < 4 && !controller.signal.aborted; attempt++) {
         try {
-          setReport(
-            await api.request<RunReport>(`/runs/${id}/report`, undefined, {
-              signal: controller.signal,
-            }),
-          )
+          const loaded = await api.request<RunReport>(`/runs/${id}/report`, undefined, {
+            signal: controller.signal,
+          })
+          if (!controller.signal.aborted) setReport(loaded)
           return
         } catch (cause) {
           if (controller.signal.aborted) return
@@ -215,7 +289,11 @@ export function RunPreview({
     if (document.state === 'DRAFT') setMode('TRIAL')
   }, [document.state])
   useEffect(() => {
+    setResult(null)
+  }, [document])
+  useEffect(() => {
     if (!rerunConfig) return
+    revision.current++
     const inventoryInput = rerunConfig.inventory_input as
       { source?: string; format?: string } | undefined
     if (inventoryInput?.source !== undefined) {
@@ -277,6 +355,7 @@ export function RunPreview({
   function changed(update: () => void) {
     if (submissionUncertain) return
     update()
+    revision.current++
     setResult(null)
     setError('')
     pendingIdempotencyKey.current = ''
@@ -287,6 +366,13 @@ export function RunPreview({
     }
   }
   async function preview() {
+    setBindingAttempted(true)
+    if (bindingError) {
+      setError(bindingError)
+      window.setTimeout(focusInvalidField, 0)
+      return
+    }
+    const requestRevision = revision.current
     setResult(null)
     setError('')
     setBusy(true)
@@ -313,29 +399,49 @@ export function RunPreview({
         field_overrides: fields,
         ...(scope === 'PARTIAL' ? { partial_host_ids: partialHostIDs } : {}),
       })
+      if (revision.current !== requestRevision) return
+      if (validated.host_count === 0) throw new Error('请至少绑定一台目标主机。')
       setResult(validated)
       setStep(4)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '静态预览失败')
+      if (revision.current === requestRevision)
+        setError(
+          err instanceof ApiError && err.diagnostics.length
+            ? err.diagnostics.map((item) => `${item.item_id ?? ''} ${item.message}`).join('；')
+            : err instanceof Error
+              ? err.message
+              : '静态预览失败',
+        )
     } finally {
       setBusy(false)
     }
   }
   async function parseInventory() {
+    const requestRevision = revision.current
     setBusy(true)
     setError('')
     try {
       const parsed = await api.request<ParsedInventory>('/inventory/parse', { source, format })
+      if (revision.current !== requestRevision) return
       setParsedInventory(parsed)
     } catch (cause) {
-      setParsedInventory(null)
-      setError(cause instanceof Error ? cause.message : '主机清单解析失败')
+      if (revision.current === requestRevision) {
+        setParsedInventory(null)
+        setError(cause instanceof Error ? cause.message : '主机清单解析失败')
+      }
     } finally {
       setBusy(false)
     }
   }
   async function submit() {
     if (!result) return
+    setCredentialAttempted(true)
+    if (credentialError || bindingError) {
+      setError(credentialError || bindingError)
+      setStep(missingUser ? 2 : 3)
+      window.setTimeout(focusInvalidField, 0)
+      return
+    }
     setBusy(true)
     setError('')
     setReport(null)
@@ -548,7 +654,22 @@ export function RunPreview({
                 <option value="yaml">Ansible YAML</option>
               </select>
             </Field>
-            <Field label="主机清单" hint="快速格式：node=192.0.2.1；多个主机以逗号分隔。">
+            <Field
+              label="主机清单"
+              required
+              hint={
+                format === 'quick'
+                  ? '每台填写 主机标识=地址[:端口]，以英文逗号分隔。快速主机表不支持用户名，请使用 Ansible INI/YAML。主机名须能从管理端解析。'
+                  : '主机名用作角色绑定标识；ansible_host 为地址，ansible_user 为 SSH 登录用户，ansible_port 默认 22。'
+              }
+              error={
+                credentialAttempted && missingUser
+                  ? credentialError
+                  : bindingAttempted && unknownIDs.length
+                    ? bindingError
+                    : ''
+              }
+            >
               <textarea
                 rows={5}
                 value={source}
@@ -560,6 +681,17 @@ export function RunPreview({
                 }
               />
             </Field>
+            <details className="inventory-example">
+              <summary>填写示例（{format}）</summary>
+              <pre>{inventoryExamples[format]}</pre>
+              <button
+                type="button"
+                className="button"
+                onClick={() => void navigator.clipboard?.writeText(inventoryExamples[format])}
+              >
+                复制示例
+              </button>
+            </details>
             <button
               className="button"
               disabled={!source.trim() || busy}
@@ -574,6 +706,14 @@ export function RunPreview({
                   {Object.entries(parsedInventory.groups).map(([group, hosts]) => (
                     <li key={group}>
                       {group}: {hosts.join(', ')}
+                    </li>
+                  ))}
+                </ul>
+                <ul>
+                  {parsedInventory.hosts.map((host) => (
+                    <li key={host.id}>
+                      {host.id} · {host.address}:{host.port} · SSH 用户：
+                      {host.username || '未设置，请用 INI/YAML 配置'}
                     </li>
                   ))}
                 </ul>
@@ -604,14 +744,24 @@ export function RunPreview({
           </div>
           <div hidden={step !== 3}>
             <h3>角色绑定、现场参数与认证</h3>
+            <Notice>
+              {sshHostKeyPolicy === 'record-only'
+                ? '当前服务仅记录首次连接的 SSH 主机指纹，不依赖 known_hosts。该指纹不是可信身份认证；执行重连和清理仍须匹配已记录的指纹。'
+                : sshHostKeyPolicy === 'strict'
+                  ? '当前服务启用严格模式：使用管理端账户的 known_hosts 校验主机密钥，与浏览器所在电脑无关。未知密钥需核对后登记，变化或吊销时停止并调查。'
+                  : '服务未声明主机密钥策略，连接采用服务端配置；页面与服务连接正常不代表目标身份已验证。'}
+            </Notice>
             {document.roles.map((role) => (
               <Field
                 key={role.role_id}
                 label={`绑定主机 · ${role.role_id}`}
-                hint="填写清单中的主机标识，以逗号分隔。"
+                required={scope === 'FULL' && role.min_nodes > 0}
+                hint={`填写清单中的主机标识，以英文逗号分隔。方案最少节点 ${role.min_nodes}；局部复测不受原最少数量限制。`}
+                error={bindingAttempted ? bindingError : ''}
               >
                 <input
                   value={bindings[role.role_id] ?? ''}
+                  list="parsed-hosts"
                   onChange={(e) =>
                     changed(() =>
                       setBindings((previous) => ({ ...previous, [role.role_id]: e.target.value })),
@@ -620,6 +770,11 @@ export function RunPreview({
                 />
               </Field>
             ))}
+            <datalist id="parsed-hosts">
+              {knownIDs?.map((id) => (
+                <option key={id} value={id} />
+              ))}
+            </datalist>
             <Field
               label="现场参数值（JSON）"
               hint='仅支持检查项已开放的参数。例如：[{"scope":"host","target":"node","item_id":"data","parameter":"path","value":"/data"}]'
@@ -704,7 +859,11 @@ export function RunPreview({
                   </select>
                 </Field>
                 {auth === 'password' && (
-                  <Field label="SSH 密码">
+                  <Field
+                    label="SSH 密码"
+                    required
+                    error={credentialAttempted && !password ? '请填写 SSH 密码。' : ''}
+                  >
                     <input
                       type="password"
                       autoComplete="new-password"
@@ -715,7 +874,13 @@ export function RunPreview({
                 )}
                 {auth === 'private_key' && (
                   <>
-                    <Field label="SSH 私钥内容">
+                    <Field
+                      label="SSH 私钥内容"
+                      required
+                      error={
+                        credentialAttempted && !privateKey.trim() ? '请填写 SSH 私钥内容。' : ''
+                      }
+                    >
                       <textarea
                         rows={5}
                         autoComplete="off"
@@ -745,10 +910,22 @@ export function RunPreview({
                 )}
                 {auth === 'agent' && (
                   <>
-                    <Field label="本机 Agent socket">
+                    <Field
+                      label="本机 Agent socket"
+                      required
+                      error={
+                        credentialAttempted && !agentSocket.trim() ? '请填写 Agent socket。' : ''
+                      }
+                    >
                       <input value={agentSocket} onChange={(e) => setAgentSocket(e.target.value)} />
                     </Field>
-                    <Field label="选定公钥指纹">
+                    <Field
+                      label="选定公钥指纹"
+                      required
+                      error={
+                        credentialAttempted && !keyFingerprint.trim() ? '请填写公钥指纹。' : ''
+                      }
+                    >
                       <input
                         value={keyFingerprint}
                         onChange={(e) => changed(() => setKeyFingerprint(e.target.value))}
@@ -877,11 +1054,13 @@ export function RunPreview({
         {runId && (
           <>
             <Notice>
-              任务 {runId} · {runStatus || '等待事件'}
-              {report ? ` · ${report.run_status} / ${report.verdict}` : ''}
+              任务 {runId} · {executionLabel(runStatus) || '等待事件'}
+              {report
+                ? ` · ${report.run_status} / ${report.verdict} · ${verdictLabel(report.verdict)}`
+                : ''}
               {' · '}
               {eventConnection === 'live'
-                ? '实时连接正常'
+                ? '页面与服务连接正常'
                 : eventConnection === 'stale'
                   ? '连接已中断'
                   : eventConnection === 'reconnecting'
@@ -936,6 +1115,11 @@ export function RunPreview({
         )}
         {report && (
           <div className="table-scroll">
+            {metadataError && <Notice tone="warning">{metadataError}</Notice>}
+            <p>
+              任务执行：{executionLabel(report.run_status)} · 检查结论：
+              {verdictLabel(report.verdict)}。执行完成不等于检查通过。
+            </p>
             <table>
               <thead>
                 <tr>
@@ -948,11 +1132,21 @@ export function RunPreview({
                 {report.hosts.map((host) => (
                   <tr key={host.host_id}>
                     <td>{host.host_id}</td>
-                    <td>{host.status}</td>
                     <td>
-                      {host.item_results
-                        .map((item) => `${item.item_id}: ${item.status}`)
-                        .join(' · ')}
+                      {executionLabel(host.status)}（{host.status}）
+                      <FailureSummary
+                        failures={host.failures}
+                        empty={host.item_results.length === 0}
+                      />
+                    </td>
+                    <td>
+                      {host.item_results.map((item) => (
+                        <CheckSummary
+                          key={`${item.role_id}/${item.item_id}`}
+                          item={item}
+                          metadata={metadata}
+                        />
+                      ))}
                     </td>
                   </tr>
                 ))}

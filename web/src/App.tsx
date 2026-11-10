@@ -285,6 +285,8 @@ export default function App() {
   }, [dirty])
 
   function mutate(edit: (p: Plan) => void) {
+    setSelectedIssue(null)
+    setDiagnostics([])
     const next = structuredClone(document)
     edit(next)
     delete next.digest
@@ -329,6 +331,7 @@ export default function App() {
     try {
       if (action === 'compile') {
         await api.request('/plans/compile', { source: stringify(document), normalize_draft: true })
+        if (revision.current !== current || editorIdentity.current !== instance) return
         setNotice('静态编译通过。未连接目标主机，不代表目标环境已经就绪。')
         return
       }
@@ -373,6 +376,7 @@ export default function App() {
         setNotice('方案已校验并导出。')
       } else setNotice('静态校验通过。此结果仅验证方案文件，不代表目标环境已经就绪。')
     } catch (err) {
+      if (revision.current !== current || editorIdentity.current !== instance) return
       setError(message(err))
       if (err instanceof ApiError) setDiagnostics(err.diagnostics)
     } finally {
@@ -706,6 +710,7 @@ export default function App() {
                       </button>
                     )}
                     {diagnostic.property && <span> · 属性 {diagnostic.property}</span>}
+                    <span> {diagnostic.message}</span>
                   </div>
                 ))}
               </Notice>
@@ -775,6 +780,7 @@ export default function App() {
                 任务由本机服务持续管理。静态预览不会连接目标主机；接受任务后，服务会先完成全部目标的身份与权限预检。
               </Notice>
               <RunPreview
+                sshHostKeyPolicy={info?.ssh_host_key_policy}
                 key={`${JSON.stringify(runPlan?.document ?? document)}:${rerunConfig ? JSON.stringify(rerunConfig) : ''}`}
                 document={runPlan?.document ?? document}
                 planRecordKey={runPlan ? runPlan.recordKey : recordKey}

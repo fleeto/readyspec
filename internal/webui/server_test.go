@@ -20,6 +20,7 @@ import (
 	"github.com/fleeto/readyspec/internal/report"
 	"github.com/fleeto/readyspec/internal/runmanager"
 	"github.com/fleeto/readyspec/internal/runstore"
+	"github.com/fleeto/readyspec/internal/template"
 	"github.com/fleeto/readyspec/internal/webui"
 	"github.com/fleeto/readyspec/internal/workspace"
 	"golang.org/x/crypto/ssh"
@@ -100,6 +101,25 @@ func TestEveryHTTPRejectionHasRequestID(t *testing.T) {
 	}
 	if body["request_id"] != id {
 		t.Fatalf("response request_id=%v, header=%q", body["request_id"], id)
+	}
+}
+
+func TestSystemInfoReportsActiveSSHHostKeyPolicy(t *testing.T) {
+	_, ws := newServerWithStore(t)
+	for _, policy := range []string{"", "strict"} {
+		s, err := webui.New(webui.Options{Address: address, Token: token, Store: ws, HostKeyPolicy: policy})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cookie, csrf := login(t, s)
+		response := request(s, "GET", "/api/v1/system/info", "", cookie, csrf)
+		want := policy
+		if want == "" {
+			want = "record-only"
+		}
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"ssh_host_key_policy":"`+want+`"`) {
+			t.Fatalf("policy not exposed: %s", response.Body.String())
+		}
 	}
 }
 
@@ -202,6 +222,14 @@ template_lock: {}
 		t.Fatalf("idempotent retry did not report this attempt and original Run: status=%d body=%s", retryAccepted.Code, retryAccepted.Body.String())
 	}
 	statusBody, _ := json.Marshal(map[string]string{"idempotency_key": "web-api-test"})
+	metadata := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/display-metadata", "", cookie, csrf)
+	if metadata.Code != http.StatusOK || !strings.Contains(metadata.Body.String(), `"run_id":"`+accepted.RunID+`"`) || !strings.Contains(metadata.Body.String(), `"items":[]`) || strings.Contains(metadata.Body.String(), "idempotency") {
+		t.Fatalf("display metadata: %d %s", metadata.Code, metadata.Body.String())
+	}
+	unauthorized := request(serverWithRuns, "GET", "/api/v1/runs/"+accepted.RunID+"/display-metadata", "", nil, "")
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("metadata exposed without session: %d", unauthorized.Code)
+	}
 	statusResponse := request(serverWithRuns, "POST", "/api/v1/runs/submission-status", string(statusBody), cookie, csrf)
 	var statusResult struct {
 		Acceptance string `json:"acceptance"`
@@ -535,6 +563,25 @@ func TestStaticRunPreviewDoesNotConnectAndReportsConfiguredRoot(t *testing.T) {
 	w := request(s, "POST", "/api/v1/runs/preview", string(body), cookie, csrf)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"network_accessed":false`) || !strings.Contains(w.Body.String(), `"configured_root_hosts":["node"]`) {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestValidationAPIProvidesSafeCapacityFieldAndUnknownHostDiagnostics(t *testing.T) {
+	s := newServer(t)
+	cookie, csrf := login(t, s)
+	snapshot, _ := template.Lookup("H03", "1.0.0")
+	raw, _ := json.Marshal([]any{snapshot})
+	source := strings.Replace(draftSource, "embedded_templates: []", "embedded_templates: "+string(raw), 1)
+	source = strings.Replace(source, "items: []", `items: [{item_id: memory, name: Memory, template_id: H03, template_version: '1.0.0', template_digest: '', importance: REQUIRED, enabled: true, params: {min_memory: 4G-private-value}, explicit_null_params: [], overridable_params: []}]`, 1)
+	body, _ := json.Marshal(map[string]any{"source": source, "normalize_draft": true})
+	w := request(s, "POST", "/api/v1/plans/validate", string(body), cookie, csrf)
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), `"code":"CAPACITY_FORMAT"`) || !strings.Contains(w.Body.String(), `"field":"/roles/0/items/0/params/min_memory"`) || strings.Contains(w.Body.String(), "4G-private-value") {
+		t.Fatalf("unsafe or unlocated capacity response: %d %s", w.Code, w.Body.String())
+	}
+	body, _ = json.Marshal(map[string]any{"source": draftSource, "inventory": map[string]any{"format": "quick", "source": "node=192.0.2.1"}, "role_map": map[string][]string{"app": {"missing"}}})
+	w = request(s, "POST", "/api/v1/runs/preview", string(body), cookie, csrf)
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), `"code":"UNKNOWN_HOST"`) || !strings.Contains(w.Body.String(), `"field":"/role_map"`) {
+		t.Fatalf("unknown host response: %d %s", w.Code, w.Body.String())
 	}
 }
 

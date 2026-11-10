@@ -343,7 +343,7 @@ SSH 密钥、系统 Agent 或密码均可满足 SSH 认证；实际 UID 为 `0` 
 
 管理端通过 `golang.org/x/crypto/ssh` 直连 Linux 目标主机（Windows 与 Linux 管理端行为完全一致）：
 
-1. **连接与主机身份核验（`CONNECTING`）**：默认开启 `known_hosts` 主机公钥校验；支持私钥文件、系统 SSH Agent（Linux `SSH_AUTH_SOCK` / Windows `\\.\pipe\openssh-ssh-agent`）及来自内存保险箱的短期密码。仅在尚未进入执行阶段的瞬时连接/传输故障允许有限重试。
+1. **连接与主机身份核验（`CONNECTING`）**：默认 `record-only` 策略仅记录首次 SSH 主机指纹，不依赖 `known_hosts`；可通过 `--ssh-host-key-policy strict` 或 `READYSPEC_SSH_HOST_KEY_POLICY=strict` 选择管理端信任库校验，命令行优先。默认记录不等于可信身份认证，执行重连和清理在握手阶段匹配任务已记录的指纹，之后继续核对机器身份与归属。支持私钥文件、系统 SSH Agent（Linux `SSH_AUTH_SOCK` / Windows `\\.\pipe\openssh-ssh-agent`）及来自内存保险箱的短期密码。仅在尚未进入执行阶段的瞬时连接/传输故障允许有限重试。
 2. **能力发现（`DISCOVERING`）**：采集发行版、内核、CPU 架构（`x86_64` / `aarch64`）、`machine-id`、`boot_id`、登录 UID、`sudo` 能力、SHA-256 校验工具（`sha256sum` → `openssl dgst -sha256`）及安全临时目录。`READYSPEC_REMOTE_TEMP_DIR` 可指定首选远端目录；未指定时 `STANDARD` 按 `/tmp → /var/tmp → $HOME/.cache` 选择，`PRIVILEGED` 按 `/run → /var/tmp → /tmp` 选择。两种执行方式分别发现目录，并依据 `/proc/self/mountinfo` 排除 `ro`、`noexec` 挂载、符号链接及不可用目录；没有安全候选时在全主机执行屏障前失败关闭。
 3. **分方式编译与残留预登记（`PREPARING`）**：生成目标主机专属 Goss 工件；在远端创建目录前先在本地持久化 `CleanupItem(PENDING)`（记录 STANDARD `remote_dir`、独立 PRIVILEGED `privileged_path`、128-bit `owner_token`、`machine_id`、`boot_id` 与已核验的 `ssh_host_key_fp`）。主机指纹供崩溃后无 HostResult 的恢复清理重新核验；公开归档报告不得包含 `owner_token`，该令牌仅保留在私有 Journal 中。
 4. **流式投递与远端摘要验真**：远端执行 `umask 0077 && mkdir <unique_dir>`（严禁 `-p` 防符号链接抢占），写入 `.readyspec_owner` 归属令牌，按发现的 CPU 架构从单二进制内嵌镜像流式解压写入原装 `Goss v0.4.9` 与 `standard-goss.yaml`，并在远端校验 SHA-256 一致（缺少校验工具或摘要不符立即 fail closed 中止）。
@@ -595,7 +595,7 @@ ReadySpec 严格保持**三套状态模型相互独立**，绝不混用：
 | REQ-SEC-04 | 按可信模板与实际UID选择root或按需sudo，无额外批准；全主机屏障先于投递，明确缺凭据/认证拒绝/权限不足整次拒绝并返15；sudo无法核验同样整次零投递/检查，报告有效且无更高优先级结果时返11；root、免密sudo及无需提权不多要求密码 | Service/Security | F10 | TC-SEC-04 |
 | REQ-SEC-05 | 特权执行创建 `root:root 0700` 隔离区、`root` 态二次校验 SHA-256 并以 `env -i` 清洗环境；非 root 经单次 sudo 执行并 `sudo -k` 销票据，root 直接执行同等闭环 | Execution | F10 | TC-SEC-05 |
 | REQ-SEC-06 | 严禁修改目标主机 `sudoers` 或安装常驻提权程序 | Execution | F10 | TC-SEC-06 |
-| REQ-SEC-07 | 默认开启 SSH `known_hosts` 主机身份校验；检测不同主机名指向同一实机指纹时报错拦截 | Execution/Normalizer | F10 | TC-SEC-07 |
+| REQ-SEC-07 | 默认记录 SSH 主机指纹且不依赖 `known_hosts`，可选 strict 信任库校验；重连/清理在握手阶段匹配任务指纹；检测不同主机名指向同一实机指纹时报错拦截 | Execution/Normalizer | F10 | TC-SEC-07 |
 | REQ-SEC-08 | 自定义 Shell 参数仅通过安全单引号转义的只读环境变量 `$RS_PARAM_<KEY>` 传递 | Compiler | F10 | TC-SEC-08 |
 | REQ-SEC-09 | SSH/Sudo 密码仅驻留进程内存 `EphemeralVault` 并在终态立即覆写清零，绝不落盘或进入日志 | Service/Security | F10/F13 | TC-SEC-09 |
 | REQ-SEC-10 | Web 服务默认仅绑定 `127.0.0.1` 并校验会话 Cookie、CSRF 令牌与 `Origin`/`Host`；非回环监听强制访问令牌鉴权 | Server | F10 | TC-SEC-10 |

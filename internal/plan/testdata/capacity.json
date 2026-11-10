@@ -1,0 +1,11 @@
+[
+  { "value": "4 GiB", "bytes": 4294967296, "code": "", "local_error": false },
+  { "value": "4GB", "bytes": 4000000000, "code": "", "local_error": false },
+  { "value": "0 B", "bytes": 0, "code": "", "local_error": false },
+  { "value": "0.5 KiB", "bytes": 512, "code": "", "local_error": false },
+  { "value": "4G", "code": "CAPACITY_FORMAT", "local_error": true },
+  { "value": "4 gb", "code": "CAPACITY_FORMAT", "local_error": true },
+  { "value": "-1 GB", "code": "CAPACITY_FORMAT", "local_error": true },
+  { "value": "0.1 B", "code": "CAPACITY_RANGE", "local_error": false },
+  { "value": "9223372036854775808 B", "code": "CAPACITY_RANGE", "local_error": false }
+]

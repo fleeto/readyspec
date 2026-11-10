@@ -118,6 +118,9 @@ func ForCode(code, hostID string) Item {
 	case "KNOWN_HOSTS_UNREADABLE":
 		item.Category, item.Code = "IDENTITY_ERROR", code
 		item.Message, item.Action = "无法读取本机受信任的 SSH 主机密钥记录。", "CHECK_KNOWN_HOSTS_ACCESS"
+	case "SSH_HOST_KEY_POLICY_INVALID":
+		item.Category, item.Code = "PLAN_ERROR", code
+		item.Message, item.Action = "SSH 主机密钥策略配置无效。", "CHECK_SSH_HOST_KEY_POLICY"
 	case "HOST_KEY_UNKNOWN":
 		item.Category, item.Code = "IDENTITY_ERROR", code
 		item.Message, item.Action = "目标 SSH 主机密钥尚未在受信任记录中登记。", "VERIFY_HOST_KEY_FROM_TRUSTED_SOURCE"

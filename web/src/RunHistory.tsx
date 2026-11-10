@@ -1,8 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Download, RefreshCw, XCircle } from 'lucide-react'
 import { ApiError, api } from './api'
 import { Badge, Empty, Notice, Spinner } from './components'
 import { formatTime } from './model'
+import {
+  CheckSummary,
+  FailureSummary,
+  checkName,
+  executionLabel,
+  verdictLabel,
+  useDisplayMetadata,
+} from './reportPresentation'
+import type { Diagnostic } from './api'
+import {
+  cleanupLabel,
+  itemCounts,
+  stageLabels,
+  stageStatus,
+  verdictReasonTexts,
+} from './reportDetails'
 
 interface RunSummary {
   run_id: string
@@ -15,6 +31,7 @@ interface RunSummary {
   run_scope: string
   executor_backend: string
   verdict?: string
+  plan_digest?: string
 }
 
 interface RunState {
@@ -34,8 +51,11 @@ interface RunState {
     phase: string
     status?: string
     attempt?: number
+    execution_mode?: string
     started_at?: string
     ended_at?: string
+    omitted?: boolean
+    reason?: string
   }[]
   recovery_error?: string
   recovery_warning?: string
@@ -78,7 +98,13 @@ interface RunReport {
   verdict_reasons?: string[]
   started_at: string
   finished_at: string
-  topology_results: { code: string; status: string; message?: string }[]
+  topology_results: {
+    code: string
+    status: string
+    host_id?: string
+    role_id?: string
+    message?: string
+  }[]
   hosts: {
     host_id: string
     status: string
@@ -87,7 +113,7 @@ interface RunReport {
     arch?: string
     roles: string[]
     item_results: ItemResult[]
-    failures: { code: string; phase: string; message: string }[]
+    failures: { code: string; phase: string; message: string; diagnostics?: Diagnostic[] }[]
   }[]
   cleanup_items: {
     cleanup_id: string
@@ -98,6 +124,30 @@ interface RunReport {
     audit_reason?: string
   }[]
   failures: { code: string; phase: string; host_id?: string; message: string }[]
+}
+
+function ReportRegion({
+  title,
+  count,
+  initiallyOpen = false,
+  children,
+}: {
+  title: string
+  count?: number
+  initiallyOpen?: boolean
+  children: ReactNode
+}) {
+  return (
+    <section className="report-region" aria-label={title}>
+      <details open={initiallyOpen}>
+        <summary>
+          <h4>{title}</h4>
+          {count !== undefined && <span className="count">{count}</span>}
+        </summary>
+        <div className="report-region-body">{children}</div>
+      </details>
+    </section>
+  )
 }
 
 export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unknown>) => void }) {
@@ -113,6 +163,11 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
   const [view, setView] = useState<'host' | 'check'>('host')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const selection = useRef(0)
+  const { metadata, error: metadataError } = useDisplayMetadata(
+    selected?.run_id ?? '',
+    selected?.plan_digest,
+  )
 
   const refresh = useCallback(async () => {
     setError('')
@@ -141,6 +196,7 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
   }
 
   async function openRun(run: RunSummary) {
+    const revision = ++selection.current
     setSelected(run)
     setReport(null)
     setRunState(null)
@@ -148,6 +204,7 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
     setError('')
     try {
       const state = await api.request<RunState>(`/runs/${encodeURIComponent(run.run_id)}`)
+      if (selection.current !== revision) return
       setRunState(state)
       if (state.recovery_error) {
         setError(`任务存储恢复异常：${state.recovery_error}`)
@@ -155,18 +212,20 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
       }
       if (state.recovery_warning) setError(`任务记录已恢复：${state.recovery_warning}`)
       try {
-        setReport(await loadReport(run.run_id))
+        const loaded = await loadReport(run.run_id)
+        if (selection.current === revision) setReport(loaded)
       } catch (cause) {
         if (!(cause instanceof ApiError) || cause.status !== 409) throw cause
         // Accepted Runs may still be executing; their durable state and phases
         // remain useful while the authoritative report is not ready.
       }
     } catch (cause) {
+      if (selection.current !== revision) return
       if (cause instanceof ApiError && cause.status === 409)
         setError('归档报告暂不可读，请稍后刷新。')
       else setError(cause instanceof Error ? cause.message : '报告读取失败')
     } finally {
-      setBusy(false)
+      if (selection.current === revision) setBusy(false)
     }
   }
 
@@ -219,7 +278,8 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
     )
   }, [report])
   const filteredRows = rows.filter(({ host_id, role_id, item }) => {
-    const text = `${host_id} ${role_id} ${item.item_id} ${item.template_id}`.toLowerCase()
+    const text =
+      `${host_id} ${role_id} ${item.item_id} ${item.template_id} ${checkName(item, metadata)}`.toLowerCase()
     return (
       (!query || text.includes(query.toLowerCase())) &&
       (!statusFilter || item.status === statusFilter) &&
@@ -242,7 +302,11 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
             const matching = filteredRows.filter(
               (row) => `${row.role_id}/${row.item.item_id}` === key,
             )
-            return { key, title: key, rows: matching }
+            return {
+              key,
+              title: `${checkName(matching[0].item, metadata)} · ${key}`,
+              rows: matching,
+            }
           })
 
   return (
@@ -287,34 +351,50 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
                     {run.run_mode} / {run.run_scope}
                   </td>
                   <td>{run.executor_backend}</td>
-                  <td>{run.status}</td>
-                  <td>{run.verdict ?? '尚无归档报告'}</td>
-                  <td>{formatTime(run.accepted_at)}</td>
                   <td>
-                    <button className="text-button" onClick={() => void openRun(run)}>
-                      查看报告
-                    </button>
-                    <button className="text-button" disabled={busy} onClick={() => void rerun(run)}>
-                      <RefreshCw size={14} />
-                      使用最近配置重跑
-                    </button>
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => void rerun(run, true)}
-                    >
-                      复测异常主机
-                    </button>
-                    {['PENDING', 'RUNNING', 'CANCELLING'].includes(run.status) && (
+                    {executionLabel(run.status)} <small>{run.status}</small>
+                  </td>
+                  <td>{run.verdict ? verdictLabel(run.verdict) : '尚无归档报告'}</td>
+                  <td>{formatTime(run.accepted_at)}</td>
+                  <td className="run-actions-cell">
+                    <div className="run-actions">
                       <button
-                        className="text-button"
+                        type="button"
+                        className="button"
                         disabled={busy}
-                        onClick={() => void cancelRun(run)}
+                        onClick={() => void openRun(run)}
                       >
-                        <XCircle size={14} />
-                        请求取消
+                        查看报告
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        className="button"
+                        disabled={busy}
+                        onClick={() => void rerun(run)}
+                      >
+                        <RefreshCw size={14} />
+                        使用最近配置重跑
+                      </button>
+                      <button
+                        type="button"
+                        className="button"
+                        disabled={busy}
+                        onClick={() => void rerun(run, true)}
+                      >
+                        复测异常主机
+                      </button>
+                      {['PENDING', 'RUNNING', 'CANCELLING'].includes(run.status) && (
+                        <button
+                          type="button"
+                          className="button danger"
+                          disabled={busy}
+                          onClick={() => void cancelRun(run)}
+                        >
+                          <XCircle size={14} />
+                          请求取消
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -351,7 +431,8 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
           {runState && (
             <>
               <p>
-                当前状态：{runState.run.status} · 已记录阶段 {runState.sequence}
+                任务状态：{executionLabel(runState.run.status)}（{runState.run.status}） ·
+                已记录阶段 {runState.sequence}
               </p>
               {!report && !runState.recovery_error && (
                 <Notice tone="info">报告尚未归档；以下显示已持久化的运行状态与阶段。</Notice>
@@ -362,36 +443,15 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
               {runState.recovery_warning && (
                 <Notice tone="warning">恢复提示：{runState.recovery_warning}</Notice>
               )}
-              {runState.stage_transitions.length > 0 && (
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>主机</th>
-                        <th>阶段</th>
-                        <th>状态</th>
-                        <th>开始</th>
-                        <th>结束</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {runState.stage_transitions.map((stage) => (
-                        <tr key={`${stage.sequence}/${stage.host_id}/${stage.phase}`}>
-                          <td>{stage.host_id}</td>
-                          <td>{stage.phase}</td>
-                          <td>{stage.status ?? '进行中/未知'}</td>
-                          <td>{stage.started_at ? formatTime(stage.started_at) : '未记录'}</td>
-                          <td>{stage.ended_at ? formatTime(stage.ended_at) : '进行中/未知'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </>
           )}
           {report && (
             <>
+              {metadataError && <Notice tone="warning">{metadataError}</Notice>}
+              <p>
+                任务执行：{executionLabel(report.run_status)}（{report.run_status}） · 检查结论：
+                {verdictLabel(report.verdict)}（{report.verdict}）
+              </p>
               <Notice
                 tone={
                   report.run_mode !== 'GATE' ||
@@ -405,7 +465,7 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
                 report.run_scope !== 'FULL' ||
                 report.executor_backend !== 'native_ssh'
                   ? '此任务属于试跑、局部范围或模拟执行，不能作为正式全量门禁放行依据。'
-                  : `归档结论：${report.verdict} · ${report.run_status}`}
+                  : `归档结论：${verdictLabel(report.verdict)}（${report.verdict}） · ${executionLabel(report.run_status)}`}
               </Notice>
               {report.hosts.some((host) => host.login_uid === 0 || host.high_risk_root_audit) && (
                 <Notice tone="warning">
@@ -416,13 +476,13 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
                     .join('、')}
                 </Notice>
               )}
-              {(report.verdict_reasons ?? []).length > 0 && (
-                <ul className="verdict-reasons">
-                  {(report.verdict_reasons ?? []).map((reason, index) => (
+              <ul className="verdict-reasons">
+                {verdictReasonTexts(report.verdict_reasons, report.verdict, metadata).map(
+                  (reason, index) => (
                     <li key={`${index}/${reason}`}>{reason}</li>
-                  ))}
-                </ul>
-              )}
+                  ),
+                )}
+              </ul>
               <p>
                 方案摘要：<code>{report.plan_digest}</code> · 开始 {formatTime(report.started_at)} ·
                 完成 {formatTime(report.finished_at)}
@@ -430,213 +490,333 @@ export function RunHistory({ onRerun }: { onRerun?: (config: Record<string, unkn
               {report.termination_reason && (
                 <Notice tone="warning">终止原因：{report.termination_reason}</Notice>
               )}
-              <div className="table-scroll">
+              <ReportRegion
+                title="主机检查汇总"
+                count={report.hosts.filter((host) => host.status === 'COMPLETED').length}
+                initiallyOpen
+              >
+                <p>
+                  {report.hosts.filter((host) => host.status === 'COMPLETED').length} /{' '}
+                  {report.hosts.length} 台主机完成检查执行。完成执行不代表全部检查通过。
+                </p>
+                <div className="table-scroll" tabIndex={0} aria-label="主机检查汇总，可横向滚动">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>主机</th>
+                        <th>执行状态</th>
+                        <th>必要项 通过/已检查</th>
+                        <th>非必要项 通过/已检查</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.hosts.map((host) => {
+                        const required = itemCounts(host.item_results, metadata, true)
+                        const optional = itemCounts(host.item_results, metadata, false)
+                        return (
+                          <tr key={host.host_id}>
+                            <td>{host.host_id}</td>
+                            <td>{executionLabel(host.status)}</td>
+                            <td>{required ? `${required.passed}/${required.checked}` : ''}</td>
+                            <td>{optional ? `${optional.passed}/${optional.checked}` : ''}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </ReportRegion>
+              <ReportRegion title="拓扑核验" count={report.topology_results.length}>
+                <div className="table-scroll" tabIndex={0} aria-label="拓扑核验，可横向滚动">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>核验项</th>
+                        <th>状态</th>
+                        <th>主机或角色</th>
+                        <th>详情</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.topology_results.map((item, index) => (
+                        <tr key={`${item.code}-${index}`}>
+                          <td>{item.code}</td>
+                          <td>{item.status}</td>
+                          <td>{item.host_id || item.role_id || ''}</td>
+                          <td>{item.message ?? ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </ReportRegion>
+              <ReportRegion title="检查项明细" count={rows.length}>
+                <div className="toolbar">
+                  <button
+                    className={`button ${view === 'host' ? 'primary' : ''}`}
+                    onClick={() => setView('host')}
+                  >
+                    按主机查看
+                  </button>
+                  <button
+                    className={`button ${view === 'check' ? 'primary' : ''}`}
+                    onClick={() => setView('check')}
+                  >
+                    按检查项查看
+                  </button>
+                  <input
+                    aria-label="搜索主机或检查项"
+                    placeholder="筛选…"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                  <select
+                    aria-label="按状态筛选"
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                  >
+                    <option value="">全部状态</option>
+                    {['PASS', 'FAIL', 'ERROR', 'UNSUPPORTED', 'SKIP'].map((status) => (
+                      <option key={status}>{status}</option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="按角色筛选"
+                    value={roleFilter}
+                    onChange={(event) => setRoleFilter(event.target.value)}
+                  >
+                    <option value="">全部角色</option>
+                    {roles.map((role) => (
+                      <option key={role}>{role}</option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="按检查领域筛选"
+                    value={domainFilter}
+                    onChange={(event) => setDomainFilter(event.target.value)}
+                  >
+                    <option value="">全部领域</option>
+                    {['H', 'O', 'S', 'N', 'R', 'A', 'D', 'L'].map((domain) => (
+                      <option key={domain}>{domain}</option>
+                    ))}
+                  </select>
+                  {(query || statusFilter || roleFilter || domainFilter || onlyProblems) && (
+                    <button
+                      className="text-button"
+                      onClick={() => {
+                        setQuery('')
+                        setStatusFilter('')
+                        setRoleFilter('')
+                        setDomainFilter('')
+                        setOnlyProblems(false)
+                      }}
+                    >
+                      清除筛选
+                    </button>
+                  )}
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={onlyProblems}
+                      onChange={(event) => setOnlyProblems(event.target.checked)}
+                    />
+                    仅看异常
+                  </label>
+                </div>
+                {grouped.map((group) => (
+                  <section key={group.key} className="report-group">
+                    <h4>{group.title}</h4>
+                    {view === 'host' && (
+                      <FailureSummary
+                        failures={report.hosts.find((host) => host.host_id === group.key)?.failures}
+                        empty={
+                          report.hosts.find((host) => host.host_id === group.key)?.item_results
+                            .length === 0
+                        }
+                      />
+                    )}
+                    {view === 'host' && report.hosts.find((host) => host.host_id === group.key) && (
+                      <p>
+                        执行身份：登录 UID{' '}
+                        {report.hosts.find((host) => host.host_id === group.key)?.login_uid ??
+                          '未记录'}
+                        {' · 架构 '}
+                        {report.hosts.find((host) => host.host_id === group.key)?.arch ?? '未记录'}
+                        {' · 认证方式 '}
+                        {report.auth_method ?? '未记录'}
+                      </p>
+                    )}
+                    <div className="table-scroll" tabIndex={0} aria-label="检查项结果，可横向滚动">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>主机</th>
+                            <th>角色</th>
+                            <th>检查项</th>
+                            <th>状态</th>
+                            <th>证据</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.rows.map(({ host_id, role_id, item }) => (
+                            <tr key={`${host_id}/${role_id}/${item.item_id}`}>
+                              <td>{host_id}</td>
+                              <td>{role_id}</td>
+                              <td>
+                                <CheckSummary item={item} metadata={metadata} />
+                                <small>
+                                  {item.template_id}@{item.template_version}
+                                </small>
+                                <small className="cell-secondary">
+                                  {item.evidence_mode} · {item.execution_mode}
+                                </small>
+                                {item.parameter_sources &&
+                                  Object.keys(item.parameter_sources).length > 0 && (
+                                    <small className="cell-secondary">
+                                      参数来源：
+                                      {Object.entries(item.parameter_sources)
+                                        .sort(([left], [right]) => left.localeCompare(right))
+                                        .map(([name, source]) => `${name}=${source}`)
+                                        .join(' · ')}
+                                    </small>
+                                  )}
+                              </td>
+                              <td>
+                                <Badge status={item.status as never} />
+                              </td>
+                              <td>
+                                {item.evidence?.length
+                                  ? item.evidence.map((evidence, index) => (
+                                      <details key={`${evidence.resource}/${index}`}>
+                                        <summary>
+                                          {evidence.property} ·{' '}
+                                          {evidence.error
+                                            ? '取证错误'
+                                            : evidence.observation_only
+                                              ? '观测值'
+                                              : '判定证据'}
+                                        </summary>
+                                        <dl>
+                                          <dt>资源 / 来源</dt>
+                                          <dd>
+                                            {evidence.resource} · {evidence.source ?? '未记录'}
+                                          </dd>
+                                          <dt>期望值</dt>
+                                          <dd>
+                                            <pre>
+                                              {evidence.expected === undefined
+                                                ? '未记录'
+                                                : JSON.stringify(evidence.expected, null, 2)}
+                                            </pre>
+                                          </dd>
+                                          <dt>观测值</dt>
+                                          <dd>
+                                            <pre>
+                                              {evidence.actual === undefined
+                                                ? '未记录'
+                                                : JSON.stringify(evidence.actual, null, 2)}
+                                            </pre>
+                                          </dd>
+                                          <dt>采集时间</dt>
+                                          <dd>
+                                            {evidence.start_time ?? '未记录'} –{' '}
+                                            {evidence.end_time ?? '未记录'}
+                                          </dd>
+                                        </dl>
+                                      </details>
+                                    ))
+                                  : '未记录'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ))}
+              </ReportRegion>
+              {report.failures.length > 0 && (
+                <ReportRegion title="执行失败" count={report.failures.length} initiallyOpen>
+                  {report.failures.map((failure, index) => (
+                    <Notice key={`${failure.code}-${index}`} tone="danger">
+                      {failure.host_id ? `${failure.host_id} · ` : ''}
+                      {failure.phase} · {failure.code} · {failure.message}
+                    </Notice>
+                  ))}
+                </ReportRegion>
+              )}
+            </>
+          )}
+          {runState && (
+            <ReportRegion title="执行阶段" count={runState.stage_transitions.length}>
+              <p>阶段表示程序在每台主机上执行的步骤，不代表检查项是否通过。</p>
+              <div className="table-scroll" tabIndex={0} aria-label="执行阶段，可横向滚动">
                 <table>
                   <thead>
                     <tr>
-                      <th>拓扑核验</th>
+                      <th>主机</th>
+                      <th>阶段</th>
+                      <th>执行方式</th>
                       <th>状态</th>
-                      <th>详情</th>
+                      <th>开始</th>
+                      <th>结束</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {report.topology_results.map((item, index) => (
-                      <tr key={`${item.code}-${index}`}>
-                        <td>{item.code}</td>
-                        <td>{item.status}</td>
-                        <td>{item.message ?? '未记录'}</td>
+                    {runState.stage_transitions.map((stage) => (
+                      <tr
+                        key={`${stage.sequence}/${stage.host_id}/${stage.execution_mode ?? ''}/${stage.phase}`}
+                      >
+                        <td>{stage.host_id}</td>
+                        <td>
+                          {stageLabels[stage.phase] ?? stage.phase}
+                          {stageLabels[stage.phase] && (
+                            <small className="cell-secondary">{stage.phase}</small>
+                          )}
+                        </td>
+                        <td>
+                          {{ STANDARD: '普通执行', PRIVILEGED: '特权执行' }[
+                            stage.execution_mode ?? ''
+                          ] ?? stage.execution_mode}
+                        </td>
+                        <td>{stageStatus(stage)}</td>
+                        <td>{stage.started_at ? formatTime(stage.started_at) : ''}</td>
+                        <td>{stage.ended_at ? formatTime(stage.ended_at) : ''}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {report.failures.map((failure, index) => (
-                <Notice key={`${failure.code}-${index}`} tone="danger">
-                  {failure.host_id ? `${failure.host_id} · ` : ''}
-                  {failure.phase} · {failure.code} · {failure.message}
-                </Notice>
-              ))}
-              <div className="toolbar">
-                <button
-                  className={`button ${view === 'host' ? 'primary' : ''}`}
-                  onClick={() => setView('host')}
-                >
-                  按主机查看
-                </button>
-                <button
-                  className={`button ${view === 'check' ? 'primary' : ''}`}
-                  onClick={() => setView('check')}
-                >
-                  按检查项查看
-                </button>
-                <input
-                  aria-label="搜索主机或检查项"
-                  placeholder="筛选…"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-                <select
-                  aria-label="按状态筛选"
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                >
-                  <option value="">全部状态</option>
-                  {['PASS', 'FAIL', 'ERROR', 'UNSUPPORTED', 'SKIP'].map((status) => (
-                    <option key={status}>{status}</option>
-                  ))}
-                </select>
-                <select
-                  aria-label="按角色筛选"
-                  value={roleFilter}
-                  onChange={(event) => setRoleFilter(event.target.value)}
-                >
-                  <option value="">全部角色</option>
-                  {roles.map((role) => (
-                    <option key={role}>{role}</option>
-                  ))}
-                </select>
-                <select
-                  aria-label="按检查领域筛选"
-                  value={domainFilter}
-                  onChange={(event) => setDomainFilter(event.target.value)}
-                >
-                  <option value="">全部领域</option>
-                  {['H', 'O', 'S', 'N', 'R', 'A', 'D', 'L'].map((domain) => (
-                    <option key={domain}>{domain}</option>
-                  ))}
-                </select>
-                {(query || statusFilter || roleFilter || domainFilter || onlyProblems) && (
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      setQuery('')
-                      setStatusFilter('')
-                      setRoleFilter('')
-                      setDomainFilter('')
-                      setOnlyProblems(false)
-                    }}
-                  >
-                    清除筛选
-                  </button>
-                )}
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={onlyProblems}
-                    onChange={(event) => setOnlyProblems(event.target.checked)}
-                  />
-                  仅看异常
-                </label>
+            </ReportRegion>
+          )}
+          {report && (
+            <ReportRegion title="远端清理审计" count={report.cleanup_items.length}>
+              <p>这里记录检查期间使用的临时目录是否已删除，不是检查项结论。</p>
+              <div className="table-scroll" tabIndex={0} aria-label="远端清理审计，可横向滚动">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>主机</th>
+                      <th>清理结果</th>
+                      <th>临时目录</th>
+                      <th>异常说明</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.cleanup_items.map((item) => (
+                      <tr key={item.cleanup_id}>
+                        <td>{item.host_id}</td>
+                        <td>{cleanupLabel(item.status)}</td>
+                        <td>
+                          <code>{item.remote_path ?? ''}</code>
+                        </td>
+                        <td>{item.audit_reason ?? item.reason ?? ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              {grouped.map((group) => (
-                <section key={group.key} className="report-group">
-                  <h4>{group.title}</h4>
-                  {view === 'host' && report.hosts.find((host) => host.host_id === group.key) && (
-                    <p>
-                      执行身份：登录 UID{' '}
-                      {report.hosts.find((host) => host.host_id === group.key)?.login_uid ??
-                        '未记录'}
-                      {' · 架构 '}
-                      {report.hosts.find((host) => host.host_id === group.key)?.arch ?? '未记录'}
-                      {' · 认证方式 '}
-                      {report.auth_method ?? '未记录'}
-                    </p>
-                  )}
-                  <div className="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>主机</th>
-                          <th>角色</th>
-                          <th>检查项</th>
-                          <th>状态</th>
-                          <th>证据</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.rows.map(({ host_id, role_id, item }) => (
-                          <tr key={`${host_id}/${role_id}/${item.item_id}`}>
-                            <td>{host_id}</td>
-                            <td>{role_id}</td>
-                            <td>
-                              {item.item_id} · {item.template_id}@{item.template_version}
-                              <small className="cell-secondary">
-                                {item.evidence_mode} · {item.execution_mode}
-                              </small>
-                              {item.parameter_sources &&
-                                Object.keys(item.parameter_sources).length > 0 && (
-                                  <small className="cell-secondary">
-                                    参数来源：
-                                    {Object.entries(item.parameter_sources)
-                                      .sort(([left], [right]) => left.localeCompare(right))
-                                      .map(([name, source]) => `${name}=${source}`)
-                                      .join(' · ')}
-                                  </small>
-                                )}
-                            </td>
-                            <td>
-                              <Badge status={item.status as never} />
-                            </td>
-                            <td>
-                              {item.evidence?.length
-                                ? item.evidence.map((evidence, index) => (
-                                    <details key={`${evidence.resource}/${index}`}>
-                                      <summary>
-                                        {evidence.property} ·{' '}
-                                        {evidence.error
-                                          ? '取证错误'
-                                          : evidence.observation_only
-                                            ? '观测值'
-                                            : '判定证据'}
-                                      </summary>
-                                      <dl>
-                                        <dt>资源 / 来源</dt>
-                                        <dd>
-                                          {evidence.resource} · {evidence.source ?? '未记录'}
-                                        </dd>
-                                        <dt>期望值</dt>
-                                        <dd>
-                                          <pre>
-                                            {evidence.expected === undefined
-                                              ? '未记录'
-                                              : JSON.stringify(evidence.expected, null, 2)}
-                                          </pre>
-                                        </dd>
-                                        <dt>观测值</dt>
-                                        <dd>
-                                          <pre>
-                                            {evidence.actual === undefined
-                                              ? '未记录'
-                                              : JSON.stringify(evidence.actual, null, 2)}
-                                          </pre>
-                                        </dd>
-                                        <dt>采集时间</dt>
-                                        <dd>
-                                          {evidence.start_time ?? '未记录'} –{' '}
-                                          {evidence.end_time ?? '未记录'}
-                                        </dd>
-                                      </dl>
-                                    </details>
-                                  ))
-                                : '未记录'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              ))}
-              <section>
-                <h4>远端清理审计</h4>
-                {report.cleanup_items.map((item) => (
-                  <p key={item.cleanup_id}>
-                    {item.host_id} · {item.status} · {item.remote_path ?? '路径未记录'} ·{' '}
-                    {item.audit_reason ?? item.reason ?? '未记录'}
-                  </p>
-                ))}
-              </section>
-            </>
+            </ReportRegion>
           )}
         </div>
       )}

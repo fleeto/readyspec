@@ -75,7 +75,7 @@ func Build(p *plan.Plan, input Input) (Result, error) {
 		seen := map[string]bool{}
 		for _, target := range targets {
 			if _, exists := hosts[target]; !exists {
-				return result, fmt.Errorf("PLAN_ERROR: role references unknown host")
+				return result, &plan.ParameterError{Code: "UNKNOWN_HOST", Field: "/role_map", RoleID: roleID}
 			}
 			if seen[target] {
 				return result, fmt.Errorf("PLAN_ERROR: duplicate host binding")

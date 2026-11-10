@@ -3,6 +3,61 @@ import { expect, test, vi } from 'vitest'
 import { RunPreview } from './RunPreview'
 import { newPlan } from './model'
 
+for (const policy of ['record-only', 'strict'] as const) {
+  test(`wizard explains the active ${policy} host key policy`, () => {
+    render(<RunPreview document={newPlan()} sshHostKeyPolicy={policy} />)
+    fireEvent.click(screen.getByRole('button', { name: '下一步：主机清单' }))
+    fireEvent.change(screen.getByLabelText('主机清单'), { target: { value: 'node=192.0.2.1' } })
+    fireEvent.click(screen.getByRole('button', { name: '下一步：角色与认证' }))
+    expect(
+      screen.getByText(policy === 'record-only' ? /不依赖 known_hosts/ : /当前服务启用严格模式/),
+    ).toBeVisible()
+  })
+}
+
+test('inventory parse ignores an old response after the source changes', async () => {
+  let resolve!: (response: Response) => void
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done
+        }),
+    ),
+  )
+  render(<RunPreview document={newPlan()} />)
+  fireEvent.click(screen.getByRole('button', { name: '下一步：主机清单' }))
+  fireEvent.change(screen.getByLabelText('主机清单'), { target: { value: 'old=192.0.2.1' } })
+  fireEvent.click(screen.getByRole('button', { name: '解析并预览分组' }))
+  fireEvent.change(screen.getByLabelText('主机清单'), { target: { value: 'new=192.0.2.2' } })
+  resolve(
+    new Response(
+      JSON.stringify({
+        hosts: [{ id: 'old', address: '192.0.2.1', port: 22 }],
+        groups: { all: ['old'] },
+      }),
+    ),
+  )
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: '解析并预览分组' })).not.toBeDisabled(),
+  )
+  expect(screen.queryByText('all: old')).not.toBeInTheDocument()
+})
+
+test('empty bindings cannot advance to execution and inventory formats have examples', async () => {
+  const request = vi.fn()
+  vi.stubGlobal('fetch', request)
+  render(<RunPreview document={newPlan()} />)
+  fireEvent.click(screen.getByRole('button', { name: '下一步：主机清单' }))
+  expect(screen.getByText(/快速主机表不支持用户名/)).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('主机清单'), { target: { value: 'node=192.0.2.1' } })
+  fireEvent.click(screen.getByRole('button', { name: '下一步：角色与认证' }))
+  fireEvent.click(screen.getByRole('button', { name: '生成静态预览' }))
+  expect((await screen.findAllByText(/清单存在主机不等于已绑定角色/)).length).toBeGreaterThan(0)
+  expect(request).not.toHaveBeenCalled()
+})
+
 test('static preview submits role bindings and clears stale results when input changes', async () => {
   const request = vi.fn().mockResolvedValue(
     new Response(

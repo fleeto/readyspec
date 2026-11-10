@@ -4,6 +4,144 @@ import { parse } from 'yaml'
 
 const nonLoopbackRequests = new WeakMap<object, string[]>()
 
+for (const width of [1366, 768, 375])
+  for (const theme of ['dark', 'light']) {
+    test(`report actions and readable results at ${width}px ${theme}`, async ({
+      page,
+    }, testInfo) => {
+      const run = {
+        run_id: 'layout-fixture',
+        plan_id: 'fixture',
+        plan_name: '中文长方案名称与报告操作布局验证',
+        plan_version: '1',
+        status: 'PARTIAL',
+        accepted_at: '2026-11-10T00:00:00Z',
+        run_mode: 'GATE',
+        run_scope: 'FULL',
+        executor_backend: 'native_ssh',
+        verdict: 'UNKNOWN',
+      }
+      await page.route('**/api/v1/runs', (route) =>
+        route.fulfill({
+          json: {
+            items: [
+              run,
+              { ...run, run_id: 'active-fixture', status: 'RUNNING', verdict: undefined },
+            ],
+          },
+        }),
+      )
+      await page.route('**/api/v1/runs/layout-fixture', (route) =>
+        route.fulfill({ json: { run, sequence: 1, stage_transitions: [] } }),
+      )
+      await page.route('**/api/v1/runs/layout-fixture/display-metadata', (route) =>
+        route.fulfill({
+          json: {
+            run_id: run.run_id,
+            items: [
+              {
+                role_id: 'app',
+                item_id: 'memory',
+                item_name: '主机最低内存',
+                template_name: '总内存',
+                importance: 'REQUIRED',
+                enabled: true,
+              },
+            ],
+          },
+        }),
+      )
+      await page.route('**/api/v1/runs/layout-fixture/report', (route) =>
+        route.fulfill({
+          json: {
+            ...run,
+            run_status: 'PARTIAL',
+            started_at: run.accepted_at,
+            finished_at: run.accepted_at,
+            topology_results: [],
+            cleanup_items: [],
+            failures: [],
+            hosts: [
+              {
+                host_id: 'node-a',
+                roles: ['app'],
+                status: 'COMPLETED',
+                failures: [],
+                item_results: [
+                  {
+                    role_id: 'app',
+                    item_id: 'memory',
+                    status: 'FAIL',
+                    template_id: 'H03',
+                    template_version: '1',
+                    execution_mode: 'STANDARD',
+                    evidence_mode: 'METADATA',
+                    evidence: [
+                      {
+                        resource: 'memory',
+                        property: 'stdout',
+                        expected: { min_memory: 16000000000 },
+                        actual: { mem_total_bytes: 15959113728 },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      )
+      await page.goto('/')
+      await page.getByLabel('访问令牌').fill('readyspec-browser-test-token-only-000000000000000000')
+      await page.getByRole('button', { name: '连接工作区' }).click()
+      await page
+        .locator('.sidebar')
+        .getByRole('button', { name: /检查与报告/ })
+        .click()
+      if (theme === 'light') await page.getByRole('button', { name: '切换浅色主题' }).click()
+      await page.setViewportSize({ width, height: 1000 })
+      const actions = page.locator('.run-actions').first()
+      const buttons = actions.getByRole('button')
+      await expect(buttons).toHaveCount(3)
+      await expect(page.locator('.run-actions').nth(1).getByRole('button')).toHaveCount(4)
+      await actions.scrollIntoViewIfNeeded()
+      const boxes = await buttons.evaluateAll((elements) =>
+        elements.map((element) => {
+          const b = element.getBoundingClientRect()
+          return { x: b.x, y: b.y, right: b.right, bottom: b.bottom }
+        }),
+      )
+      for (let a = 0; a < boxes.length; a++)
+        for (let b = a + 1; b < boxes.length; b++)
+          expect(
+            boxes[a].right <= boxes[b].x ||
+              boxes[b].right <= boxes[a].x ||
+              boxes[a].bottom <= boxes[b].y ||
+              boxes[b].bottom <= boxes[a].y,
+          ).toBeTruthy()
+      await buttons.first().focus()
+      await expect(buttons.first()).toBeFocused()
+      await buttons.first().click()
+      const summary = page.getByRole('region', { name: '主机检查汇总', exact: true })
+      await expect(summary.locator('details')).toHaveAttribute('open', '')
+      await expect(summary.getByText('0/1', { exact: true })).toBeVisible()
+      await expect(summary.getByText('0/0', { exact: true })).toBeVisible()
+      for (const title of ['拓扑核验', '检查项明细', '执行阶段', '远端清理审计']) {
+        const region = page.getByRole('region', { name: title, exact: true })
+        const details = region.locator(':scope > details')
+        await expect(details).not.toHaveAttribute('open', '')
+        await details.locator(':scope > summary').click()
+        await expect(details).toHaveAttribute('open', '')
+      }
+      await expect(page.getByText('主机最低内存', { exact: true })).toBeVisible()
+      await expect(page.getByText(/实际可见内存：15.96 GB/)).toBeVisible()
+      await page.screenshot({
+        path: testInfo.outputPath(`report-${width}-${theme}.png`),
+        fullPage: true,
+      })
+    })
+  }
+
 test.beforeEach(async ({ page }) => {
   const externalRequests: string[] = []
   nonLoopbackRequests.set(page, externalRequests)
@@ -33,8 +171,8 @@ test('builtin path check can be authored, compiled and exported without executio
   await page.getByRole('button', { name: '新建检查方案', exact: true }).click()
   await page.getByRole('button', { name: /浏览模板/ }).click()
   await page.getByRole('button', { name: '添加 路径存在与类型' }).click()
-  await page.getByLabel('path', { exact: true }).fill('/data/orders')
-  await page.getByLabel('filetype', { exact: true }).selectOption('directory')
+  await page.getByLabel('目标路径', { exact: true }).fill('/data/orders')
+  await page.getByLabel('路径类型', { exact: true }).selectOption('directory')
   await page.getByRole('button', { name: '静态编译', exact: true }).click()
   await expect(
     page.getByText('静态编译通过。未连接目标主机，不代表目标环境已经就绪。'),
@@ -159,9 +297,9 @@ test('incomplete draft can be saved and reopened but cannot be exported as valid
   await savedPlans.selectOption((await savedDraft.getAttribute('value')) ?? '')
   await expect(page.getByLabel('方案名称', { exact: true })).toHaveValue('')
   await page.getByRole('button', { name: '校验草稿' }).click()
-  await expect(
-    page.getByText('PLAN_SCHEMA_ERROR: document does not match readyspec.plan/v1'),
-  ).toBeVisible()
+  await expect(page.getByText('请填写方案名称。', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('方案名称', { exact: true })).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.getByLabel('方案名称', { exact: true })).toBeFocused()
   await expect(page.locator('.digest-line')).not.toBeVisible()
   await expect(page.getByLabel('方案标识', { exact: true })).toHaveValue('incomplete-draft')
 })
@@ -235,7 +373,12 @@ test('offline simulator run streams progress and archives the profile result', a
   await page.getByRole('button', { name: '生成静态预览' }).click()
   await expect(page.getByText('候选检查项：1', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '接受并执行任务' }).click()
-  await expect(page.getByText(`${itemID}: FAIL`, { exact: true })).toBeVisible({ timeout: 15_000 })
+  const wizard = page
+    .locator('section.panel')
+    .filter({ has: page.getByRole('heading', { name: '四步检查向导' }) })
+  const check = wizard.locator('.check-summary').filter({ hasText: itemID })
+  await expect(check).toContainText('Profile result', { timeout: 15000 })
+  await expect(check).toContainText('FAIL')
   await expect(page.getByText(/COMPLETED \/ NOT_READY/)).toBeVisible()
   await expect(page.getByText(/SIMULATING/).first()).toBeVisible()
   await expect(page.getByText(/尝试 1 · 开始 .*结束 .*用时/).first()).toBeVisible()
@@ -261,6 +404,10 @@ test('offline simulator run streams progress and archives the profile result', a
   ).toBe(true)
   expect(pageErrors).toEqual([])
   await expect(page.getByRole('button', { name: '下载 JSON' })).toBeVisible()
+  await page
+    .getByRole('region', { name: '检查项明细', exact: true })
+    .locator(':scope > details > summary')
+    .click()
   await expect(page.getByText(/登录 UID 1000 · 架构 x86_64 · 认证方式 offline/)).toBeVisible()
   await expect(page.getByRole('cell').filter({ hasText: itemID }).first()).toBeVisible()
 
@@ -303,7 +450,12 @@ test('offline simulator run streams progress and archives the profile result', a
   const partialAccepted = await partialSubmitResponse
   expect(partialAccepted.request().postDataJSON().partial_source_run_id).toBe(archivedReport.run_id)
   expect(partialAccepted.status(), await partialAccepted.text()).toBe(202)
-  await expect(page.getByText(`${itemID}: PASS`, { exact: true })).toBeVisible({ timeout: 15_000 })
+  const passedCheck = wizard
+    .locator('.check-summary')
+    .filter({ hasText: itemID })
+    .filter({ hasText: 'PASS' })
+  await expect(passedCheck).toContainText('Profile result', { timeout: 15000 })
+  await expect(passedCheck).toHaveCount(1)
   await expect(page.getByText(/COMPLETED \/ UNKNOWN/)).toBeVisible()
 
   await page.getByRole('button', { name: '刷新' }).click()
@@ -318,7 +470,8 @@ test('offline simulator run streams progress and archives the profile result', a
   await page.getByRole('button', { name: '生成静态预览' }).click()
   await expect(page.getByText('候选检查项：1', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '接受并执行任务' }).click()
-  await expect(page.getByText(`${itemID}: FAIL`, { exact: true })).toBeVisible({ timeout: 15_000 })
+  await expect(check).toContainText('Profile result', { timeout: 15000 })
+  await expect(check).toContainText('FAIL')
 })
 
 test('cleanup process confirmation can be cancelled and IGNORE is recorded in the live audit', async ({

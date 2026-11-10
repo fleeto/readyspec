@@ -42,6 +42,7 @@ type Options struct {
 	Runs           *runmanager.Manager
 	LocalToken     string
 	ServerID       string
+	HostKeyPolicy  string
 }
 
 type session struct {
@@ -71,6 +72,9 @@ func New(options Options) (*Server, error) {
 	if options.Store == nil {
 		return nil, fmt.Errorf("workspace store is required")
 	}
+	if options.HostKeyPolicy == "" {
+		options.HostKeyPolicy = "record-only"
+	}
 	plans, err := planstore.New(options.Store)
 	if err != nil {
 		return nil, err
@@ -79,7 +83,7 @@ func New(options Options) (*Server, error) {
 	s.mux.HandleFunc("POST /api/v1/auth/session", s.authenticate)
 	s.mux.HandleFunc("GET /api/v1/system/info", s.authorize(func(w http.ResponseWriter, r *http.Request) {
 		commit, dirty, goVersion := processBuildInfo()
-		writeJSON(w, http.StatusOK, map[string]any{"version": options.Version, "build_commit": commit, "build_dirty": dirty, "go_version": goVersion, "workspace_label": options.WorkspaceLabel, "executor_available": s.runs != nil, "accepting_runs": s.AcceptingRuns(), "worker_state": workerState(s.runs != nil, s.AcceptingRuns()), "server_id": options.ServerID})
+		writeJSON(w, http.StatusOK, map[string]any{"version": options.Version, "build_commit": commit, "build_dirty": dirty, "go_version": goVersion, "workspace_label": options.WorkspaceLabel, "executor_available": s.runs != nil, "accepting_runs": s.AcceptingRuns(), "worker_state": workerState(s.runs != nil, s.AcceptingRuns()), "server_id": options.ServerID, "ssh_host_key_policy": options.HostKeyPolicy})
 	}))
 	s.mux.HandleFunc("GET /api/v1/plans", s.authorize(s.listPlans))
 	s.mux.HandleFunc("GET /api/v1/plans/{key}", s.authorize(s.getPlan))
@@ -135,6 +139,7 @@ func New(options Options) (*Server, error) {
 	s.mux.HandleFunc("GET /api/v1/cleanups", s.authorize(s.listCleanup))
 	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.authorize(s.getRun))
 	s.mux.HandleFunc("GET /api/v1/runs/{id}/report", s.authorize(s.getRunReport))
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/display-metadata", s.authorize(s.getRunDisplayMetadata))
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/cleanup/{cleanupID}", s.authorize(s.resolveCleanup))
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/cancel", s.authorize(s.cancelRun))
 	s.mux.HandleFunc("GET /api/v1/runs/{id}/rerun-config", s.authorize(s.rerunConfig))

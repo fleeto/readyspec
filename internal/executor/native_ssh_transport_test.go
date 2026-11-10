@@ -272,6 +272,7 @@ func TestLoopbackHostKeyTrustDiagnostics(t *testing.T) {
 			}
 			native := NewNativeSSH()
 			native.KnownHostsPath = knownHostsPath
+			native.HostKeyPolicy = HostKeyStrict
 			native.Credentials = CredentialMap{"run": {"node": {Method: "password", Password: []byte("fixture-password")}}}
 			host, portText, _ := net.SplitHostPort(endpoint)
 			port, _ := strconv.Atoi(portText)

@@ -2,12 +2,29 @@ package publicview
 
 import (
 	"encoding/json"
+	"github.com/fleeto/readyspec/internal/plan"
 	"strings"
 	"testing"
 
 	"github.com/fleeto/readyspec/internal/report"
 	"github.com/fleeto/readyspec/internal/runstore"
 )
+
+func TestDisplayMetadataUsesFrozenNamesAndOnlyWhitelistedFields(t *testing.T) {
+	run := runstore.Run{Acceptance: runstore.Acceptance{RunID: "run-test", PlanDigest: "digest"}, Plan: &plan.Plan{
+		Roles:             []plan.Role{{RoleID: "app", Items: []plan.CheckItem{{ItemID: "memory", Name: "Frozen memory", Importance: "WARNING", Enabled: true, TemplateID: "H03", TemplateVersion: "1", TemplateDigest: "snapshot", Params: map[string]any{"secret": "private-fixture"}}}}},
+		EmbeddedTemplates: []plan.CheckTemplate{{TemplateID: "H03", Version: "1", Digest: "snapshot", Name: "Memory template"}},
+	}}
+	view := DisplayMetadataValue(run)
+	encoded, _ := json.Marshal(view)
+	if len(view.Items) != 1 || view.Items[0].ItemName != "Frozen memory" || view.Items[0].TemplateName != "Memory template" || view.Items[0].Importance != "WARNING" || !view.Items[0].Enabled || strings.Contains(string(encoded), "private-fixture") {
+		t.Fatalf("incorrect display metadata: %s", encoded)
+	}
+	run.Plan.EmbeddedTemplates[0].Digest = "other"
+	if DisplayMetadataValue(run).Items[0].TemplateName != "" {
+		t.Fatal("used mismatched template")
+	}
+}
 
 func TestRunValueRedactsPrivateCleanupMaterialWithoutMutatingSource(t *testing.T) {
 	secret := "owner-token-fixture"

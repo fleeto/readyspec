@@ -161,16 +161,17 @@ func (m CredentialMap) DestroyRun(runID string) {
 	delete(m, runID)
 }
 
-// NativeSSH uses the system known_hosts database and task-owned in-memory
-// credentials. It never opens a path supplied by a RunConfig.
+// NativeSSH records host fingerprints by default; strict mode additionally
+// verifies the operator's known_hosts. Paths never come from a RunConfig.
 type NativeSSH struct {
 	Credentials    CredentialProvider
 	KnownHostsPath string
+	HostKeyPolicy  HostKeyPolicy
 	RemoteTempDir  string
 }
 
 func NewNativeSSH() *NativeSSH {
-	return &NativeSSH{Credentials: NewCredentialVault(), RemoteTempDir: os.Getenv("READYSPEC_REMOTE_TEMP_DIR")}
+	return &NativeSSH{Credentials: NewCredentialVault(), RemoteTempDir: os.Getenv("READYSPEC_REMOTE_TEMP_DIR"), HostKeyPolicy: HostKeyRecordOnly}
 }
 
 func (e *NativeSSH) InstallRunCredentials(runID string, credentials map[string]Credential) (func(), error) {
@@ -219,6 +220,14 @@ func connectFailure(err error, hostID string) *Failure {
 }
 
 func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address string, port int, username, expectedMethod, expectedFingerprint string) (*connection, error) {
+	return e.connectPinned(ctx, runID, hostID, address, port, username, expectedMethod, expectedFingerprint, "")
+}
+
+func (e *NativeSSH) connectPinned(ctx context.Context, runID string, hostID, address string, port int, username, expectedMethod, expectedFingerprint, expectedHostKey string) (*connection, error) {
+	policy, policyErr := ParseHostKeyPolicy(string(e.HostKeyPolicy))
+	if policyErr != nil {
+		return nil, classifiedConnectError(policyErr, "SSH_HOST_KEY_POLICY_INVALID", FailureExecution)
+	}
 	if e.Credentials == nil {
 		return nil, classifiedConnectError(errors.New("credential provider unavailable"), "SSH_AUTH_REJECTED", FailureAuth)
 	}
@@ -275,36 +284,48 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 	default:
 		return nil, classifiedConnectError(errors.New("unsupported SSH authentication method"), "SSH_AUTH_REJECTED", FailureAuth)
 	}
-	knownHostsFile := e.KnownHostsPath
-	if knownHostsFile == "" {
-		knownHostsFile = filepath.Join(userHomeDir(), ".ssh", "known_hosts")
-	}
-	knownHostCallback, err := knownhosts.New(knownHostsFile)
-	if err != nil {
-		return nil, classifiedConnectError(err, "KNOWN_HOSTS_UNREADABLE", FailureIdentity)
+	var knownHostCallback ssh.HostKeyCallback
+	knownHostsFile := ""
+	if policy == HostKeyStrict {
+		knownHostsFile = e.KnownHostsPath
+		if knownHostsFile == "" {
+			knownHostsFile = filepath.Join(userHomeDir(), ".ssh", "known_hosts")
+		}
+		knownHostCallback, err = knownhosts.New(knownHostsFile)
+		if err != nil {
+			return nil, classifiedConnectError(err, "KNOWN_HOSTS_UNREADABLE", FailureIdentity)
+		}
 	}
 	var hostKeyFingerprint string
 	var hostKeyFailureCode string
 	callback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		if err := knownHostCallback(hostname, remote, key); err != nil {
-			var revoked *knownhosts.RevokedError
-			var keyErr *knownhosts.KeyError
-			switch {
-			case errors.As(err, &revoked):
-				hostKeyFailureCode = "HOST_KEY_REVOKED"
-				return classifiedConnectError(err, "HOST_KEY_REVOKED", FailureIdentity)
-			case errors.As(err, &keyErr) && len(keyErr.Want) == 0:
-				hostKeyFailureCode = "HOST_KEY_UNKNOWN"
-				return classifiedConnectError(err, "HOST_KEY_UNKNOWN", FailureIdentity)
-			case errors.As(err, &keyErr):
-				hostKeyFailureCode = "HOST_KEY_CHANGED"
-				return classifiedConnectError(err, "HOST_KEY_CHANGED", FailureIdentity)
-			default:
-				hostKeyFailureCode = "SSH_HANDSHAKE_UNVERIFIABLE"
-				return classifiedConnectError(err, "SSH_HANDSHAKE_UNVERIFIABLE", FailureIdentity)
+		hostKeyFingerprint = ssh.FingerprintSHA256(key)
+		// A Run/cleanup pin is checked during the handshake, before user
+		// authentication and before any command can reach a changed host.
+		if expectedHostKey != "" && hostKeyFingerprint != expectedHostKey {
+			hostKeyFailureCode = "HOST_KEY_CHANGED"
+			return classifiedConnectError(nil, hostKeyFailureCode, FailureIdentity)
+		}
+		if knownHostCallback != nil {
+			if err := knownHostCallback(hostname, remote, key); err != nil {
+				var revoked *knownhosts.RevokedError
+				var keyErr *knownhosts.KeyError
+				switch {
+				case errors.As(err, &revoked):
+					hostKeyFailureCode = "HOST_KEY_REVOKED"
+					return classifiedConnectError(err, "HOST_KEY_REVOKED", FailureIdentity)
+				case errors.As(err, &keyErr) && len(keyErr.Want) == 0:
+					hostKeyFailureCode = "HOST_KEY_UNKNOWN"
+					return classifiedConnectError(err, "HOST_KEY_UNKNOWN", FailureIdentity)
+				case errors.As(err, &keyErr):
+					hostKeyFailureCode = "HOST_KEY_CHANGED"
+					return classifiedConnectError(err, "HOST_KEY_CHANGED", FailureIdentity)
+				default:
+					hostKeyFailureCode = "SSH_HANDSHAKE_UNVERIFIABLE"
+					return classifiedConnectError(err, "SSH_HANDSHAKE_UNVERIFIABLE", FailureIdentity)
+				}
 			}
 		}
-		hostKeyFingerprint = ssh.FingerprintSHA256(key)
 		return nil
 	}
 	config := &ssh.ClientConfig{User: username, Auth: auth, HostKeyCallback: callback, Timeout: 8 * time.Second}
@@ -331,7 +352,9 @@ func (e *NativeSSH) connect(ctx context.Context, runID string, hostID, address s
 	}
 	// Prefer a key already trusted for this endpoint when the server offers
 	// multiple key types. The callback still verifies the negotiated key.
-	config.HostKeyAlgorithms = trustedHostKeyAlgorithms(knownHostsFile, remote, transport.RemoteAddr(), knownHostCallback)
+	if knownHostCallback != nil {
+		config.HostKeyAlgorithms = trustedHostKeyAlgorithms(knownHostsFile, remote, transport.RemoteAddr(), knownHostCallback)
+	}
 	clientConn, channels, requests, err := ssh.NewClientConn(transport, remote, config)
 	if err != nil {
 		_ = transport.Close()
@@ -530,10 +553,13 @@ func failureWithDiagnostic(class FailureClass, phase, message, code, hostID stri
 }
 
 func (e *NativeSSH) Execute(ctx context.Context, req ExecuteRequest, journal Journal) (outcome HostOutcome) {
+	if req.Facts.HostKey == "" {
+		return HostOutcome{Failure: failureWithDiagnostic(FailureIdentity, "REVALIDATE", "preflight host fingerprint is missing", "SSH_HOST_IDENTITY_UNVERIFIABLE", req.Host.Inventory.ID), Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
+	}
 	if err := journal.Phase(ctx, req.RunID, req.Host.Inventory.ID, "CONNECTING"); err != nil {
 		return HostOutcome{Failure: &Failure{Class: FailureExecution, Phase: "JOURNAL", Message: "cannot persist connection phase"}, Results: []compiler.ItemResult{}, Cleanup: []report.CleanupItem{}, Modes: map[string]bool{}}
 	}
-	conn, err := e.connect(ctx, req.RunID, req.Host.Inventory.ID, req.Host.Inventory.Address, req.Host.Inventory.Port, req.Host.Inventory.Username, req.Host.AuthMethod, req.Host.PublicKeyFingerprint)
+	conn, err := e.connectPinned(ctx, req.RunID, req.Host.Inventory.ID, req.Host.Inventory.Address, req.Host.Inventory.Port, req.Host.Inventory.Username, req.Host.AuthMethod, req.Host.PublicKeyFingerprint, req.Facts.HostKey)
 	if err != nil {
 		failure := connectFailure(err, req.Host.Inventory.ID)
 		phase := "RECONNECT"
@@ -776,6 +802,9 @@ func remoteCleanupFailed(err error) bool {
 // ResolveCleanup uses fresh, operation-scoped credentials and never reuses the
 // completed Run's credential vault entry.
 func (e *NativeSSH) ResolveCleanup(ctx context.Context, expectedHostKey string, host HostInput, authFingerprint string, item report.CleanupItem, credential Credential, confirmTerminate bool) (report.CleanupItem, error) {
+	if expectedHostKey == "" {
+		return item, fmt.Errorf("CLEANUP_IDENTITY_MISMATCH")
+	}
 	operationNonce := make([]byte, 16)
 	if _, err := rand.Read(operationNonce); err != nil {
 		return item, fmt.Errorf("INFRA_ERROR: cannot create cleanup operation identity")
@@ -786,7 +815,7 @@ func (e *NativeSSH) ResolveCleanup(ctx context.Context, expectedHostKey string, 
 		return item, fmt.Errorf("AUTH_ERROR: fresh cleanup credential is unavailable")
 	}
 	defer destroy()
-	conn, err := e.connect(ctx, operationID, host.Inventory.ID, host.Inventory.Address, host.Inventory.Port, host.Inventory.Username, credential.Method, authFingerprint)
+	conn, err := e.connectPinned(ctx, operationID, host.Inventory.ID, host.Inventory.Address, host.Inventory.Port, host.Inventory.Username, credential.Method, authFingerprint, expectedHostKey)
 	if err != nil {
 		return item, fmt.Errorf("AUTH_ERROR: cleanup SSH identity could not be verified")
 	}

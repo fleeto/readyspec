@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -594,6 +595,12 @@ func TestMixedHostOutcomesMapToRunStatusVerdictAndExitCode(t *testing.T) {
 			}
 			if run.Report == nil || run.Report.RunStatus != tc.wantStatus || run.Report.Verdict != tc.wantVerdict {
 				t.Fatalf("report status/verdict=(%v,%v), want=(%v,%v): %+v", run.Report.RunStatus, run.Report.Verdict, tc.wantStatus, tc.wantVerdict, run.Report)
+			}
+			if slices.Contains(run.Report.VerdictReasons, "") || slices.Contains(run.Report.VerdictReasons, "COMPLETED") {
+				t.Fatalf("termination reason was stored as a verdict reason: %#v", run.Report.VerdictReasons)
+			}
+			if tc.name == "all hosts and modes complete" && !slices.Contains(run.Report.VerdictReasons, "NO_REQUIRED_CHECKS") {
+				t.Fatalf("missing domain verdict reason: %#v", run.Report.VerdictReasons)
 			}
 			if got := report.ExitCode(report.ExitConditions{Report: run.Report}); got != tc.wantExit {
 				t.Fatalf("exit code=%d want=%d", got, tc.wantExit)

@@ -1728,3 +1728,92 @@ legend {
     animation-iteration-count: 1 !important;
   }
 }
+:root {
+  --field-error-color: var(--danger);
+}
+.required-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.field-error {
+  color: var(--field-error-color);
+}
+[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.inventory-example {
+  margin-block: 12px;
+}
+.inventory-example pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.run-actions-cell {
+  vertical-align: middle;
+}
+.run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 200px;
+  max-width: 340px;
+  align-items: center;
+}
+.run-actions .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+}
+.check-summary {
+  min-width: 240px;
+  max-width: 60ch;
+  overflow-wrap: anywhere;
+}
+.check-summary p {
+  margin-block: 6px;
+}
+.report-group table {
+  min-width: 760px;
+}
+.report-region {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.report-region > details > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+.report-region > details > summary::marker {
+  color: var(--muted);
+}
+.report-region > details > summary h4 {
+  flex: 1;
+  margin: 0;
+  font-size: 1rem;
+}
+.report-region-body {
+  padding: 0 0 8px;
+}
+.report-region-body > p:first-child {
+  margin-top: 0;
+  color: var(--muted);
+}
+.run-report .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-block: 12px;
+}
+.run-report .toolbar input,
+.run-report .toolbar select {
+  width: auto;
+  max-width: 100%;
+  flex: 1 1 140px;
+}

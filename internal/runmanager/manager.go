@@ -601,12 +601,10 @@ func (m *Manager) finalizeFailure(run *runstore.Run, code, phase, message, verdi
 
 func (m *Manager) archive(run *runstore.Run, status, reason, verdict string, hosts []report.HostResult, topologyResults []topology.Result, failures []report.Failure) error {
 	now := time.Now().UTC()
-	reasons := []string{}
-	if verdict == "" {
-		verdict, reasons = report.EvaluateVerdictWithReasons(run.Plan, run.Config.Mode, run.Config.Scope, run.Config.Backend, status, hosts, topologyResults)
-	} else {
-		reasons = []string{reason}
-	}
+	// Termination explains why execution ended; it is not the domain reason
+	// for the verdict. In particular, normal completion has an empty termination
+	// reason but can still have NO_REQUIRED_CHECKS and other uncertainty causes.
+	verdict, reasons := report.EvaluateVerdictWithReasons(run.Plan, run.Config.Mode, run.Config.Scope, run.Config.Backend, status, hosts, topologyResults)
 	if status == "CANCELLED" && verdict == "" {
 		verdict = "UNKNOWN"
 	}

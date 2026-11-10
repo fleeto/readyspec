@@ -97,7 +97,11 @@ func newSubmitCommand(workspacePath func() string, setExitCode func(int)) *cobra
 			auth := runstore.AuthIdentity{Method: authMethod}
 			switch backend {
 			case "native_ssh":
-				native := executor.NewNativeSSH()
+				native, err := nativeSSHForCommand(cmd)
+				if err != nil {
+					setExitCode(12)
+					return err
+				}
 				implementation = native
 				switch authMethod {
 				case "password":

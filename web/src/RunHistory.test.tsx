@@ -1,10 +1,26 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import { RunHistory } from './RunHistory'
 
 test('report details show parameter source categories without parameter values', async () => {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input)
+    if (path.endsWith('/display-metadata'))
+      return new Response(
+        JSON.stringify({
+          run_id: 'run-1',
+          items: [
+            {
+              role_id: 'app',
+              item_id: 'disk',
+              item_name: '冻结的磁盘检查',
+              template_name: '路径检查',
+              importance: 'WARNING',
+              enabled: true,
+            },
+          ],
+        }),
+      )
     if (path.endsWith('/runs')) {
       return new Response(
         JSON.stringify({
@@ -40,7 +56,7 @@ test('report details show parameter source categories without parameter values',
         executor_backend: 'mock_simulator',
         run_status: 'COMPLETED',
         verdict: 'UNKNOWN',
-        verdict_reasons: [],
+        verdict_reasons: [''],
         started_at: '2026-11-06T12:00:00Z',
         finished_at: '2026-11-06T12:00:01Z',
         topology_results: [],
@@ -73,6 +89,12 @@ test('report details show parameter source categories without parameter values',
             remote_path: '/tmp/readyspec-run',
             audit_reason: 'operator verified no cleanup was needed',
           },
+          {
+            cleanup_id: 'cleanup-2',
+            host_id: 'node-b',
+            status: 'CLEAN',
+            remote_path: '/tmp/readyspec-clean',
+          },
         ],
         failures: [],
       }),
@@ -82,13 +104,29 @@ test('report details show parameter source categories without parameter values',
   vi.stubGlobal('fetch', fetchMock)
   render(<RunHistory />)
   fireEvent.click(await screen.findByRole('button', { name: '查看报告' }))
-  expect(await screen.findByText(/参数来源：filetype=template · path=host/)).toBeInTheDocument()
   expect(
-    screen.getByText(
-      'node-a · IGNORED · /tmp/readyspec-run · operator verified no cleanup was needed',
-    ),
+    await screen.findByText('方案没有必检项，因此不能判断为满足放行要求。'),
   ).toBeInTheDocument()
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+  const summary = within(screen.getByRole('region', { name: '主机检查汇总' }))
+  const summaryRow = summary.getByText('node-a').closest('tr')
+  expect(summaryRow?.querySelectorAll('td')[2]).toHaveTextContent('0/0')
+  expect(summaryRow?.querySelectorAll('td')[3]).toHaveTextContent('1/1')
+  const topology = screen.getByRole('heading', { name: '拓扑核验' }).closest('details')
+  const cleanup = screen.getByRole('heading', { name: '远端清理审计' }).closest('details')
+  expect(topology).not.toHaveAttribute('open')
+  expect(cleanup).not.toHaveAttribute('open')
+  fireEvent.click(screen.getByRole('heading', { name: '检查项明细' }))
+  expect(await screen.findByText(/参数来源：filetype=template · path=host/)).toBeInTheDocument()
+  expect(await screen.findByText('冻结的磁盘检查')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('heading', { name: '远端清理审计' }))
+  expect(screen.getByRole('columnheader', { name: '异常说明' })).toBeInTheDocument()
+  expect(screen.getByText('已忽略')).toBeInTheDocument()
+  expect(screen.getByText('operator verified no cleanup was needed')).toBeInTheDocument()
+  const cleanRow = screen.getByText('/tmp/readyspec-clean').closest('tr')
+  expect(cleanRow?.querySelectorAll('td')[1]).toHaveTextContent('已核对并删除')
+  expect(cleanRow?.querySelectorAll('td')[3]).toHaveTextContent('')
+  expect(screen.queryByText(/node-a · IGNORED/)).not.toBeInTheDocument()
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4))
 })
 
 test('report warns about verified UID zero independently of the login name', async () => {
@@ -190,8 +228,13 @@ test('history shows persisted stages while an accepted run has no archived repor
   vi.stubGlobal('fetch', fetchMock)
   render(<RunHistory />)
   fireEvent.click(await screen.findByRole('button', { name: '查看报告' }))
-  expect(await screen.findByText('当前状态：RUNNING · 已记录阶段 3')).toBeInTheDocument()
+  expect(
+    await screen.findByText('任务状态：正在执行（RUNNING） · 已记录阶段 3'),
+  ).toBeInTheDocument()
   expect(screen.getByText('报告尚未归档；以下显示已持久化的运行状态与阶段。')).toBeInTheDocument()
   expect(screen.getByText('SSH_CONNECT')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('heading', { name: '执行阶段' }))
+  expect(screen.getByText('进行中')).toBeInTheDocument()
+  expect(screen.queryByText('进行中/未知')).not.toBeInTheDocument()
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6), { timeout: 5000 })
 })

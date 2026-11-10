@@ -178,7 +178,7 @@ func Load(r io.Reader) (*Plan, error) {
 	}
 	roleIDs := make(map[string]bool)
 	itemIDs := make(map[string]bool)
-	for _, role := range p.Roles {
+	for roleIndex, role := range p.Roles {
 		if roleIDs[role.RoleID] {
 			return nil, fmt.Errorf("PLAN_ERROR: duplicate role_id")
 		}
@@ -186,7 +186,7 @@ func Load(r io.Reader) (*Plan, error) {
 		if role.MaxNodes != nil && role.MinNodes > *role.MaxNodes {
 			return nil, fmt.Errorf("PLAN_ERROR: min_nodes exceeds max_nodes")
 		}
-		for _, item := range role.Items {
+		for itemIndex, item := range role.Items {
 			if itemIDs[item.ItemID] {
 				return nil, fmt.Errorf("PLAN_ERROR: duplicate item_id")
 			}
@@ -200,6 +200,10 @@ func Load(r io.Reader) (*Plan, error) {
 				}
 			}
 			if _, err := ResolveParameters(parameters[item.TemplateID+"@"+item.TemplateVersion], item, nil, nil); err != nil {
+				if issue, ok := err.(*ParameterError); ok {
+					issue.RoleID = role.RoleID
+					issue.Field = fmt.Sprintf("/roles/%d/items/%d", roleIndex, itemIndex) + issue.Field
+				}
 				return nil, err
 			}
 		}

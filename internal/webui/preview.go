@@ -28,7 +28,7 @@ func (s *Server) previewRun(w http.ResponseWriter, r *http.Request) {
 	}
 	validated, err := validateSource(planRequest{Source: body.Source, NormalizeDraft: body.NormalizeDraft})
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeValidationError(w, err)
 		return
 	}
 	raw, err := json.Marshal(validated.Document)
@@ -73,7 +73,7 @@ func (s *Server) previewRun(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := preview.Build(&previewPlan, preview.Input{Hosts: hosts, RoleMap: body.RoleMap, Overrides: body.Overrides})
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeValidationError(w, err)
 		return
 	}
 	var response map[string]any

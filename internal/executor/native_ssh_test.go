@@ -193,6 +193,7 @@ func TestNativeSSHLoopbackStandardAndPrivilegedVerticalSlice(t *testing.T) {
 	}
 	native := executor.NewNativeSSH()
 	native.KnownHostsPath = knownHosts
+	native.HostKeyPolicy = executor.HostKeyStrict
 	native.RemoteTempDir = dir
 	manager, err := runmanager.New(store, native)
 	if err != nil {

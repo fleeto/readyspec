@@ -146,7 +146,12 @@ func newCleanupCommand(workspacePath func() string, setExitCode func(int)) *cobr
 				setExitCode(13)
 				return err
 			}
-			manager, err := runmanager.New(store, executor.NewNativeSSH())
+			native, err := nativeSSHForCommand(cmd)
+			if err != nil {
+				setExitCode(12)
+				return err
+			}
+			manager, err := runmanager.New(store, native)
 			if err != nil {
 				setExitCode(13)
 				return err

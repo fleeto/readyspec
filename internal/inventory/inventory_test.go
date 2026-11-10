@@ -1,10 +1,34 @@
 package inventory_test
 
 import (
+	"encoding/json"
 	"github.com/fleeto/readyspec/internal/inventory"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestWebInventoryExamplesUseRealParser(t *testing.T) {
+	raw, err := os.ReadFile("../../web/src/inventoryExamples.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var examples map[string]string
+	if err := json.Unmarshal(raw, &examples); err != nil {
+		t.Fatal(err)
+	}
+	for format, source := range examples {
+		hosts, err := inventory.Parse(source, format)
+		if err != nil || len(hosts) != 3 {
+			t.Fatalf("%s examples: %+v %v", format, hosts, err)
+		}
+		for _, host := range hosts {
+			if format != "quick" && host.Username != "operator" {
+				t.Fatalf("%s user=%q", format, host.Username)
+			}
+		}
+	}
+}
 
 func TestQuickInventoryRejectsDuplicateEndpoints(t *testing.T) {
 	hosts, err := inventory.Parse("web=10.0.0.1,db=[2001:db8::1]:2222", "quick")

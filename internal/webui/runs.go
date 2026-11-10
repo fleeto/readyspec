@@ -98,7 +98,7 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := plan.Load(strings.NewReader(body.Plan))
 	if err != nil {
-		writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "PLAN_ERROR", diagnostic.Item{})
+		writeSubmissionError(w, http.StatusUnprocessableEntity, submissionID, "PLAN_ERROR", parameterDiagnostic(err))
 		return
 	}
 	if p.State == "ARCHIVED" || body.Mode == "GATE" && p.State != "RELEASED" {
@@ -284,6 +284,12 @@ func (s *Server) submitRun(w http.ResponseWriter, r *http.Request) {
 		var diagnosticErr *diagnostic.Error
 		if errors.As(err, &diagnosticErr) {
 			writeSubmissionError(w, status, submissionID, "AUTH_ERROR", diagnostic.ForCode(diagnosticErr.Code, diagnosticErr.HostID))
+		} else if item := parameterDiagnostic(err); item.Code != "" {
+			writeSubmissionError(w, status, submissionID, "PLAN_ERROR", item)
+		} else if strings.Contains(err.Error(), "NO_TARGETS") {
+			item := diagnostic.ForCode("NO_TARGETS", "")
+			item.Field = "/role_map"
+			writeSubmissionError(w, status, submissionID, "PLAN_ERROR", item)
 		} else {
 			writeSubmissionError(w, status, submissionID, safeRunError(err), diagnostic.Item{})
 		}

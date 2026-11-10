@@ -16,6 +16,7 @@ import (
 	"github.com/fleeto/readyspec/internal/plan"
 	"github.com/fleeto/readyspec/internal/report"
 	"github.com/fleeto/readyspec/internal/runstore"
+	"github.com/fleeto/readyspec/internal/semantic"
 	"github.com/fleeto/readyspec/internal/topology"
 	"github.com/fleeto/readyspec/internal/workspace"
 )
@@ -93,6 +94,88 @@ func TestAcceptIdempotencyAndConflict(t *testing.T) {
 	changed.Scope = "FULL"
 	if _, _, err := store.Accept(runstore.Request{IdempotencyKey: "same", Plan: p, Config: changed}); !errors.Is(err, runstore.ErrIdempotencyConflict) {
 		t.Fatalf("changed duplicate error = %v", err)
+	}
+}
+
+func TestAcceptRejectsNewZeroTargetsBeforeInstallingCredentials(t *testing.T) {
+	_, _, lease, store, p, cfg := newHarness(t)
+	defer lease.Close()
+	for _, scope := range []string{"FULL", "PARTIAL"} {
+		cfg.Scope = scope
+		cfg.RoleMap = map[string][]string{}
+		installed := false
+		_, created, err := store.AcceptWithCommit(runstore.Request{IdempotencyKey: "empty-" + scope, Plan: p, Config: cfg}, func(string) (func(), error) {
+			installed = true
+			return nil, nil
+		})
+		if err == nil || !strings.Contains(err.Error(), "NO_TARGETS") || created || installed || len(store.List()) != 0 {
+			t.Fatalf("empty %s accepted: created=%v installed=%v err=%v", scope, created, installed, err)
+		}
+		if _, found, err := store.LookupIdempotency("empty-" + scope); err != nil || found {
+			t.Fatalf("rejected submission persisted: found=%v err=%v", found, err)
+		}
+	}
+}
+
+func TestHistoricalZeroTargetRetryStillReturnsOriginalAcceptance(t *testing.T) {
+	dir, ws, lease, store, p, cfg := newHarness(t)
+	run, _, err := store.Accept(runstore.Request{IdempotencyKey: "legacy-empty", Plan: p, Config: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Construct a durable record produced by the previous version, which
+	// accepted an inventory with no role bindings.
+	cfg.RoleMap = map[string][]string{}
+	rawPlan, _ := plan.DocumentJSON(p)
+	acceptance := run.Acceptance
+	acceptance.SemanticDigest, err = semantic.Digest(struct {
+		Plan   json.RawMessage    `json:"plan"`
+		Config runstore.RunConfig `json:"config"`
+	}{rawPlan, cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.WriteJSON(acceptance.ConfigPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.WriteJSON("runs/"+acceptance.RunID+"/accepted.json", acceptance); err != nil {
+		t.Fatal(err)
+	}
+	_ = lease.Close()
+	_ = ws.Close()
+	reopened, err := workspace.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	lock, err := reopened.TryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	recovered, err := runstore.Open(reopened)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, created, err := recovered.AcceptWithCommit(runstore.Request{IdempotencyKey: "legacy-empty", Plan: p, Config: cfg}, func(string) (func(), error) { t.Fatal("historical retry installed credentials"); return nil, nil })
+	if err != nil || created || got.Acceptance.RunID != run.Acceptance.RunID {
+		t.Fatalf("legacy retry: created=%v err=%v", created, err)
+	}
+	cfg.Scope = "FULL"
+	if _, _, err := recovered.Accept(runstore.Request{IdempotencyKey: "legacy-empty", Plan: p, Config: cfg}); !errors.Is(err, runstore.ErrIdempotencyConflict) {
+		t.Fatalf("changed legacy retry: %v", err)
+	}
+}
+
+func TestNativeSubmissionRequiresLoginUserBeforeCredentialInstallation(t *testing.T) {
+	_, _, lease, store, p, cfg := newHarness(t)
+	defer lease.Close()
+	cfg.Backend = "native_ssh"
+	cfg.Inventory[0].Username = ""
+	_, _, err := store.AcceptWithCommit(runstore.Request{IdempotencyKey: "missing-user", Plan: p, Config: cfg}, func(string) (func(), error) { t.Fatal("installed credentials without a username"); return nil, nil })
+	var issue *plan.ParameterError
+	if !errors.As(err, &issue) || issue.Code != "SSH_USER_REQUIRED" || len(store.List()) != 0 {
+		t.Fatalf("missing login user: %v", err)
 	}
 }
 

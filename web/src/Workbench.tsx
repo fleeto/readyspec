@@ -29,12 +29,19 @@ import {
   type SavedPlan,
 } from './model'
 import { Templates } from './Templates'
-import { api } from './api'
+import { api, ApiError, type Diagnostic } from './api'
+import {
+  capacityHint,
+  focusInvalidField,
+  inputIssue,
+  requiredParameters,
+  type Property,
+} from './inputGuidance'
 
 interface Props {
   document: Plan
   draftKey: string | null
-  selectedIssue?: { role_id?: string; item_id?: string } | null
+  selectedIssue?: { role_id?: string; item_id?: string; field?: string; message?: string } | null
   plans: SavedPlan[]
   dirty: boolean
   digest: string
@@ -80,6 +87,100 @@ export function Workbench({
   const [catalog, setCatalog] = useState(false)
   const [deleting, setDeleting] = useState<'role' | 'item' | null>(null)
   const [undo, setUndo] = useState<DeletionUndo | null>(null)
+  const [validateAll, setValidateAll] = useState(false)
+  const [validationRequested, setValidationRequested] = useState(false)
+  const validationKey = JSON.stringify(plan)
+  const [parameterValidation, setParameterValidation] = useState<{
+    key: string
+    pending: boolean
+    issue?: Diagnostic
+    error?: string
+  }>({ key: '', pending: false })
+  const validationPending =
+    validationRequested &&
+    plan.state === 'DRAFT' &&
+    (parameterValidation.key !== validationKey || parameterValidation.pending)
+  useEffect(() => {
+    if (!validationRequested || plan.state !== 'DRAFT') return
+    const controller = new AbortController()
+    setParameterValidation({ key: validationKey, pending: true })
+    const timer = window.setTimeout(() => {
+      void api
+        .request(
+          '/plans/validate',
+          { source: validationKey, normalize_draft: true },
+          { signal: controller.signal },
+        )
+        .then(() => {
+          if (!controller.signal.aborted)
+            setParameterValidation({ key: validationKey, pending: false })
+        })
+        .catch((cause) => {
+          if (!controller.signal.aborted)
+            setParameterValidation({
+              key: validationKey,
+              pending: false,
+              issue: cause instanceof ApiError ? cause.diagnostics[0] : undefined,
+              error: '参数校验未通过，请检查字段提示或手动校验草稿。',
+            })
+        })
+    }, 400)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [validationKey, validationRequested, plan.state])
+  const serverIssue =
+    parameterValidation.key === validationKey ? parameterValidation.issue : undefined
+  function guardAction(action: () => void) {
+    setValidateAll(true)
+    if (serverIssue?.item_id) {
+      setRoleID(serverIssue.role_id ?? '')
+      setItemID(serverIssue.item_id)
+      window.setTimeout(focusInvalidField, 0)
+      return
+    }
+    if (
+      [plan.name, plan.plan_id, plan.version, plan.software_name, plan.software_version].some(
+        (value) => !value.trim(),
+      )
+    ) {
+      window.setTimeout(focusInvalidField, 0)
+      return
+    }
+    for (const candidateRole of plan.roles)
+      for (const candidate of candidateRole.items) {
+        const snapshot = plan.embedded_templates.find(
+          (entry) =>
+            entry.template_id === candidate.template_id &&
+            entry.version === candidate.template_version,
+        )
+        if (!snapshot) continue
+        const properties = (snapshot.params_schema.properties ?? {}) as Record<string, Property>
+        const values = Object.fromEntries(
+          Object.entries(properties).map(([key, property]) => [
+            key,
+            candidate.explicit_null_params.includes(key)
+              ? null
+              : Object.hasOwn(candidate.params, key)
+                ? candidate.params[key]
+                : property.default,
+          ]),
+        )
+        const required = requiredParameters(snapshot.params_schema, values)
+        if (
+          Object.entries(properties).some(([key, property]) =>
+            inputIssue(property, values[key], required.has(key)),
+          )
+        ) {
+          setRoleID(candidateRole.role_id)
+          setItemID(candidate.item_id)
+          window.setTimeout(focusInvalidField, 0)
+          return
+        }
+      }
+    action()
+  }
   useEffect(() => {
     if (!selectedIssue) return
     if (selectedIssue.role_id) setRoleID(selectedIssue.role_id)
@@ -282,23 +383,35 @@ export function Workbench({
           )}
         </div>
         <div className="plan-toolbar-actions">
-          <button className="button" onClick={() => onAction('export')} disabled={busy}>
+          <button
+            className="button"
+            onClick={() => guardAction(() => onAction('export'))}
+            disabled={busy}
+          >
             <Download size={15} />
             导出 YAML
           </button>
-          <button className="button" onClick={() => onAction('validate')} disabled={busy}>
+          <button
+            className="button"
+            onClick={() => guardAction(() => onAction('validate'))}
+            disabled={busy}
+          >
             {busy ? <Spinner /> : <CheckCheck size={16} />}
             {editable ? '校验草稿' : '校验方案'}
           </button>
-          <button className="button" onClick={() => onAction('compile')} disabled={busy}>
+          <button
+            className="button"
+            onClick={() => guardAction(() => onAction('compile'))}
+            disabled={busy}
+          >
             静态编译
           </button>
           {editable ? (
             <>
               <button
                 className="button primary"
-                onClick={onRelease}
-                disabled={busy || dirty || !plan.plan_id || !plan.version}
+                onClick={() => guardAction(onRelease)}
+                disabled={busy || validationPending || dirty || !plan.plan_id || !plan.version}
                 title={dirty ? '先保存草稿，再发布该修订' : undefined}
               >
                 发布版本
@@ -338,6 +451,27 @@ export function Workbench({
           <code title={digest}>{digest}</code>
         </div>
       )}
+      {validationPending && <p role="status">正在校验参数；草稿仍可保存。</p>}
+      {serverIssue && (
+        <Notice tone="warning">
+          {serverIssue.message}{' '}
+          {serverIssue.item_id && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                setRoleID(serverIssue.role_id ?? '')
+                setItemID(serverIssue.item_id ?? '')
+              }}
+            >
+              定位检查项 {serverIssue.item_id}
+            </button>
+          )}
+        </Notice>
+      )}
+      {parameterValidation.key === validationKey &&
+        parameterValidation.error &&
+        !serverIssue?.item_id && <Notice tone="warning">{parameterValidation.error}</Notice>}
       {!editable && (
         <Notice>此方案为只读状态。你可以校验或导出；如需调整，请创建新的草稿版本。</Notice>
       )}
@@ -368,7 +502,11 @@ export function Workbench({
           )}
         </div>
         <div className="metadata-grid">
-          <Field label="方案名称">
+          <Field
+            label="方案名称"
+            required
+            error={validateAll && !plan.name.trim() ? '请填写方案名称。' : ''}
+          >
             <input
               disabled={!editable}
               value={plan.name}
@@ -379,7 +517,12 @@ export function Workbench({
               }
             />
           </Field>
-          <Field label="方案标识" hint="字母、数字、点、下划线或连字符">
+          <Field
+            label="方案标识"
+            required
+            error={validateAll && !plan.plan_id.trim() ? '请填写方案标识。' : ''}
+            hint="字母、数字、点、下划线或连字符"
+          >
             <input
               className="mono"
               disabled={!editable}
@@ -391,7 +534,11 @@ export function Workbench({
               }
             />
           </Field>
-          <Field label="方案版本">
+          <Field
+            label="方案版本"
+            required
+            error={validateAll && !plan.version.trim() ? '请填写方案版本。' : ''}
+          >
             <input
               className="mono"
               disabled={!editable}
@@ -403,7 +550,11 @@ export function Workbench({
               }
             />
           </Field>
-          <Field label="软件名称">
+          <Field
+            label="软件名称"
+            required
+            error={validateAll && !plan.software_name.trim() ? '请填写软件名称。' : ''}
+          >
             <input
               disabled={!editable}
               value={plan.software_name}
@@ -414,7 +565,11 @@ export function Workbench({
               }
             />
           </Field>
-          <Field label="软件版本">
+          <Field
+            label="软件版本"
+            required
+            error={validateAll && !plan.software_version.trim() ? '请填写软件版本。' : ''}
+          >
             <input
               className="mono"
               disabled={!editable}
@@ -550,7 +705,7 @@ export function Workbench({
           </div>
           {role && (
             <div className="role-settings">
-              <Field label="角色名称">
+              <Field label="角色名称" required>
                 <input
                   disabled={!editable}
                   value={role.name}
@@ -724,7 +879,7 @@ export function Workbench({
                 <Badge status={template.execution_mode} />
                 <code>{template.evidence_mode}</code>
               </div>
-              <Field label="检查项名称">
+              <Field label="检查项名称" required>
                 <input
                   disabled={!editable}
                   value={item.name}
@@ -798,6 +953,15 @@ export function Workbench({
                 </>
               )}
               <Parameters
+                validateAll={validateAll}
+                onValidate={() => setValidationRequested(true)}
+                issue={
+                  serverIssue?.item_id === item.item_id
+                    ? serverIssue
+                    : selectedIssue?.item_id === item.item_id
+                      ? selectedIssue
+                      : undefined
+                }
                 key={item.item_id}
                 item={item}
                 template={template}
@@ -966,12 +1130,18 @@ function FilesIcon() {
 }
 
 function Parameters({
+  validateAll,
+  onValidate,
+  issue,
   item,
   template,
   editable,
   onUpdate,
   onAdd,
 }: {
+  validateAll: boolean
+  onValidate: () => void
+  issue?: { field?: string; message?: string }
   item: CheckItem
   template: CheckTemplate
   editable: boolean
@@ -983,10 +1153,19 @@ function Parameters({
     [type, setType] = useState('string')
   const [jsonDrafts, setJsonDrafts] = useState<Record<string, string>>({})
   const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({})
-  const properties = (template.params_schema.properties ?? {}) as Record<
-    string,
-    { type?: string; default?: unknown; enum?: (string | number)[]; items?: { enum?: string[] } }
-  >
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const properties = (template.params_schema.properties ?? {}) as Record<string, Property>
+  const values = Object.fromEntries(
+    Object.entries(properties).map(([key, definition]) => [
+      key,
+      item.explicit_null_params.includes(key)
+        ? null
+        : Object.hasOwn(item.params, key)
+          ? item.params[key]
+          : definition.default,
+    ]),
+  )
+  const required = requiredParameters(template.params_schema, values)
   const keys = [
     ...new Set([
       ...Object.keys(properties),
@@ -1012,11 +1191,40 @@ function Parameters({
       )}
       {keys.map((key) => {
         const definition = properties[key]
-        const value = item.params[key] ?? definition?.default
+        const value = Object.hasOwn(item.params, key) ? item.params[key] : definition?.default
         const isNull = item.explicit_null_params.includes(key)
         return (
           <div className="parameter" key={key}>
-            <Field label={key}>
+            <Field
+              label={
+                typeof definition?.title === 'string' && definition.title.trim()
+                  ? definition.title
+                  : key
+              }
+              required={required.has(key)}
+              hint={
+                definition?.['x-readyspec-type'] === 'capacity'
+                  ? capacityHint
+                  : typeof definition?.description === 'string'
+                    ? definition.description
+                    : undefined
+              }
+              error={
+                jsonErrors[key] ||
+                (issue?.field?.endsWith(
+                  '/params/' + key.replaceAll('~', '~0').replaceAll('/', '~1'),
+                )
+                  ? issue.message
+                  : '') ||
+                (touched[key] || validateAll
+                  ? inputIssue(definition, isNull ? null : value, required.has(key))
+                  : '')
+              }
+              onBlur={() => {
+                setTouched((previous) => ({ ...previous, [key]: true }))
+                onValidate()
+              }}
+            >
               {definition?.enum ? (
                 <select
                   disabled={!editable || isNull}
@@ -1127,7 +1335,6 @@ function Parameters({
                 />
               )}
             </Field>
-            {jsonErrors[key] && <p role="alert">{jsonErrors[key]}</p>}
             {template.source === 'BUILTIN' && (
               <button
                 className="text-button"
