@@ -45,6 +45,11 @@ func TestSubmitUnavailableAgentIsAuthenticationError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		if err := ws.Close(); err != nil {
+			t.Errorf("close workspace: %v", err)
+		}
+	})
 	store, err := runstore.Open(ws)
 	if err != nil {
 		t.Fatal(err)
